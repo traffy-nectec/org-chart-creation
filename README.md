@@ -59,11 +59,11 @@ flowchart TD
     E -->|ไม่พบความคล้าย| G["ส่งข้อมูลเข้า Staging"]
     
     %% Staging & Admin
-    G --> H[("Staging Table / คิวรอตรวจสอบ")]
+    G --> H[(Staging Table / คิวรอตรวจสอบ)]
     H -->|สถานะ: Pending| I["Admin Review Dashboard"]
     I -->|แอดมินตรวจสอบข้อมูล| J{"การตัดสินใจของ Admin"}
     
-    J -->|Approve (อนุมัติ)| K[("Production DB")]
+    J -->|Approve (อนุมัติ)| K[(Production DB)]
     J -->|Reject (ปฏิเสธ)| L["ระบบแจ้งเตือนกลับไปยัง External User"]
     
     %% Styling
