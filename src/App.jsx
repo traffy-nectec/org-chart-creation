@@ -1938,6 +1938,10 @@ const WelcomeModal = ({ isOpen, onClose }) => {
                     <CheckCircle size={14} className="text-emerald-500 shrink-0 mt-0.5" />
                     <span><b>Duplicate Org Name Check:</b> ตรวจจับชื่อหน่วยงานซ้ำกันในแผนผังแบบเรียลไทม์</span>
                   </li>
+                  <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
+                    <CheckCircle size={14} className="text-emerald-500 shrink-0 mt-0.5" />
+                    <span><b>Persistent Draft (localStorage):</b> บันทึกและกู้คืนร่างแบบเรียลไทม์ ป้องกันข้อมูลสูญหายเมื่อ Refresh</span>
+                  </li>
                 </ul>
               </div>
 
@@ -1988,15 +1992,28 @@ const WelcomeModal = ({ isOpen, onClose }) => {
 };
 
 export default function OrgManagerApp() {
-  const [organizations, setOrganizations] = useState([
-    { 
-      id: 'root-1', name: 'กรุงเทพมหานคร', level: 1, parentId: null, logo: null,
-      areas: { province: 'กรุงเทพมหานคร', amphoes: {}, tambons: ['ลาดยาว', 'จอมพล'] } 
-    },
-    { id: 'node-2', name: 'สำนักการโยธา', level: 2, parentId: 'root-1', logo: null, areas: { province: 'กรุงเทพมหานคร' } },
-    { id: 'node-3', name: 'สำนักการระบายน้ำ', level: 2, parentId: 'root-1', logo: null, areas: { province: 'กรุงเทพมหานคร' } },
-    { id: 'node-4', name: 'สำนักการจราจรและขนส่ง', level: 2, parentId: 'root-1', logo: null, areas: { province: 'กรุงเทพมหานคร' } }
-  ]);
+  const [organizations, setOrganizations] = useState(() => {
+    const saved = localStorage.getItem('org_builder_draft');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (err) {
+        console.error("Failed to parse saved draft:", err);
+      }
+    }
+    return [
+      { 
+        id: 'root-1', name: 'กรุงเทพมหานคร', level: 1, parentId: null, logo: null,
+        areas: { province: 'กรุงเทพมหานคร', amphoes: {}, tambons: ['ลาดยาว', 'จอมพล'] } 
+      },
+      { id: 'node-2', name: 'สำนักการโยธา', level: 2, parentId: 'root-1', logo: null, areas: { province: 'กรุงเทพมหานคร' } },
+      { id: 'node-3', name: 'สำนักการระบายน้ำ', level: 2, parentId: 'root-1', logo: null, areas: { province: 'กรุงเทพมหานคร' } },
+      { id: 'node-4', name: 'สำนักการจราจรและขนส่ง', level: 2, parentId: 'root-1', logo: null, areas: { province: 'กรุงเทพมหานคร' } }
+    ];
+  });
   
   const [locationDb, setLocationDb] = useState([]);
 
@@ -2049,6 +2066,18 @@ export default function OrgManagerApp() {
   const [moveMode, setMoveMode] = useState('branch'); // 'branch' or 'single'
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [collapsedTableNodes, setCollapsedTableNodes] = useState(new Set());
+  const [isDraftSaving, setIsDraftSaving] = useState(false);
+
+  const handleSaveDraft = () => {
+    setIsDraftSaving(true);
+    localStorage.setItem('org_builder_draft', JSON.stringify(organizations));
+    setTimeout(() => setIsDraftSaving(false), 1500);
+  };
+
+  // Auto-save draft on organization changes
+  useEffect(() => {
+    localStorage.setItem('org_builder_draft', JSON.stringify(organizations));
+  }, [organizations]);
   
   // Pan and Drag State
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -2937,10 +2966,19 @@ export default function OrgManagerApp() {
           <div className="w-px h-8 bg-slate-200 mx-1 self-center"></div>
           
           <button 
-            className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all"
+            onClick={handleSaveDraft}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold shadow-lg transition-all duration-300 cursor-pointer ${
+              isDraftSaving 
+                ? 'bg-green-600 hover:bg-green-700 text-white shadow-green-200' 
+                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200'
+            }`}
             aria-label="บันทึกแบบร่าง"
           >
-            <CheckCircle size={16} /> Save Draft
+            {isDraftSaving ? (
+              <><Check size={16} strokeWidth={3} /> Draft Saved!</>
+            ) : (
+              <><CheckCircle size={16} /> Save Draft</>
+            )}
           </button>
         </div>
       </header>
