@@ -1581,6 +1581,231 @@ const recalculateAllLevels = (orgs) => {
   });
 };
 
+const WelcomeModal = ({ isOpen, onClose }) => {
+  const [activeTab, setActiveTab] = useState('guide'); // 'guide' or 'checklist'
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col overflow-hidden max-h-[85vh] border border-slate-200">
+        
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-blue-50 to-indigo-50/50 flex justify-between items-center shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-blue-600 rounded-xl text-white shadow-md">
+              <Network size={22} strokeWidth={2.5} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-800">ยินดีต้อนรับสู่ Visual Org Builder 🚀</h2>
+              <p className="text-xs text-slate-650 mt-0.5 font-medium">เครื่องมือจัดทำและตรวจสอบโครงสร้างแผนผังหน่วยงานแบบครบวงจร</p>
+            </div>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 rounded-lg transition-colors cursor-pointer"
+            aria-label="ปิดคำแนะนำ"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Tab Selector */}
+        <div className="flex border-b border-slate-200 bg-slate-50 shrink-0 px-6">
+          <button 
+            onClick={() => setActiveTab('guide')}
+            className={`px-5 py-3 text-xs font-bold transition-all border-b-2 cursor-pointer ${
+              activeTab === 'guide' 
+                ? 'border-blue-650 text-blue-700 font-extrabold' 
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            📖 คู่มือการใช้งานและขั้นตอน
+          </button>
+          <button 
+            onClick={() => setActiveTab('checklist')}
+            className={`px-5 py-3 text-xs font-bold transition-all border-b-2 cursor-pointer ${
+              activeTab === 'checklist' 
+                ? 'border-blue-650 text-blue-700 font-extrabold' 
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            ⚙️ สถานะฟีเจอร์และแผนงาน
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {activeTab === 'guide' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              
+              {/* Left Column: Workflow */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-2">
+                  📌 ขั้นตอนการทำงานหลัก & การย้ายต้นสังกัด
+                </h3>
+                <div className="relative border-l-2 border-blue-100 ml-3 pl-5 space-y-5">
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-0 flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-[10px] font-bold text-white">
+                      1
+                    </span>
+                    <h4 className="text-xs font-bold text-slate-800">1. นำเข้าข้อมูล (Import)</h4>
+                    <p className="text-[11px] text-slate-650 font-semibold mt-0.5 leading-relaxed font-semibold">
+                      เริ่มต้นโดยดาวน์โหลดเทมเพลต Excel แล้วกรอกข้อมูล หรืออัปโหลดไฟล์ Excel/JSON เดิมเข้าระบบผ่านปุ่ม <b>"นำเข้าข้อมูล"</b> ด้านบน
+                    </p>
+                  </div>
+
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-0 flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-[10px] font-bold text-white">
+                      2
+                    </span>
+                    <h4 className="text-xs font-bold text-slate-800">2. ปรับแต่งและย้ายต้นสังกัด</h4>
+                    <div className="text-[11px] text-slate-650 mt-0.5 leading-relaxed font-semibold space-y-1.5">
+                      <p>คุณสามารถย้ายต้นสังกัดของหน่วยงานได้ 2 วิธี:</p>
+                      <ul className="list-disc pl-4 space-y-1 text-slate-600">
+                        <li><b>วิธีที่ 1 (ลากวาง)</b>: ลากการ์ดหน่วยงานไปวางซ้อนทับการ์ดหน่วยงานอื่นเพื่อย้ายต้นสังกัดทันที</li>
+                        <li><b>วิธีที่ 2 (แก้ไขในฟอร์ม)</b>: คลิกที่การ์ดหน่วยงาน แล้วเปลี่ยนต้นสังกัดในพาเนลแก้ไขข้อมูลฝั่งซ้ายมือ</li>
+                      </ul>
+                      <p className="text-blue-600 font-bold">💡 ระบบจะคอยตรวจสอบความสัมพันธ์ที่เป็นวงกลม (Cycle) และแจ้งเตือนข้อขัดแย้งให้อัตโนมัติแบบเรียลไทม์</p>
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <span className="absolute -left-[31px] top-0 flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-[10px] font-bold text-white">
+                      3
+                    </span>
+                    <h4 className="text-xs font-bold text-slate-800">3. ส่งออกข้อมูล (Export)</h4>
+                    <p className="text-[11px] text-slate-650 font-semibold mt-0.5 leading-relaxed font-semibold">
+                      เมื่อได้โครงสร้างที่สมบูรณ์และไม่มีข้อผิดพลาด ให้กดปุ่ม <b>"ส่งออกข้อมูล"</b> เพื่อดาวน์โหลดไฟล์ Excel หรือ JSON ไปใช้งานจริง
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Views & Tools */}
+              <div className="space-y-4 md:border-l md:border-slate-100 md:pl-6">
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-2">
+                  🛠️ การควบคุมบอร์ดและมุมมอง (Board & Views)
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex gap-2.5">
+                    <span className="text-base shrink-0 mt-0.5">🖱️</span>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800">การเลื่อนและซูม (Pan & Zoom)</h4>
+                      <p className="text-[11px] text-slate-650 font-semibold mt-0.5 leading-relaxed font-semibold">
+                        กดเมาส์ลากบนพื้นที่ว่างเพื่อเลื่อนผัง และใช้การหมุนลูกกลิ้งเมาส์ (Scroll Wheel) หรือปุ่มควบคุมขวาบนเพื่อซูมเข้า/ออก
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2.5">
+                    <span className="text-base shrink-0 mt-0.5">📐</span>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800">การสลับผัง แนวนอน/แนวตั้ง</h4>
+                      <p className="text-[11px] text-slate-650 font-semibold mt-0.5 leading-relaxed font-semibold">
+                        ระบบตั้งค่า <b>เริ่มต้นเป็นผังแนวนอน (Horizontal)</b> คุณสามารถสลับรูปแบบแผนผังเป็น <b>ผังแนวตั้ง (Vertical)</b> ได้ตามต้องการผ่านปุ่มสลับผังที่มุมขวาบน
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2.5">
+                    <span className="text-base shrink-0 mt-0.5">📊</span>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800">Table View (ตารางสรุปข้อมูล)</h4>
+                      <p className="text-[11px] text-slate-650 font-semibold mt-0.5 leading-relaxed font-semibold">
+                        คลิกปุ่ม <b>"ตารางข้อมูล"</b> ด้านบนเพื่อดูสรุปรายการในมุมมองแบบตาราง สามารถยุบ/ขยายลำดับชั้นเพื่อตรวจภาพรวมพื้นที่รับผิดชอบได้สะดวกขึ้น
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Completed */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-slate-855 flex items-center gap-2 border-b border-slate-100 pb-2">
+                  ✅ ฟีเจอร์ที่พร้อมใช้งานแล้ว (Completed)
+                </h3>
+                <ul className="space-y-3">
+                  <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
+                    <CheckCircle size={14} className="text-emerald-500 shrink-0 mt-0.5" />
+                    <span><b>Interactive Node Editor:</b> เพิ่ม แก้ไข ย้าย (Drag & Drop) และลบโหนด</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
+                    <CheckCircle size={14} className="text-emerald-500 shrink-0 mt-0.5" />
+                    <span><b>Dual View Layout:</b> มุมมอง Canvas (เลื่อน/ซูม) และมุมมองตารางสรุป (Table)</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
+                    <CheckCircle size={14} className="text-emerald-500 shrink-0 mt-0.5" />
+                    <span><b>Automated Import Audit:</b> ตรวจจับการเชื่อมโยงเป็นวงกลม (Cycle) และความขัดแย้งข้อมูล</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
+                    <CheckCircle size={14} className="text-emerald-500 shrink-0 mt-0.5" />
+                    <span><b>Import/Export Pipeline:</b> การโหลด/บันทึกไฟล์นามสกุล JSON และ Excel (.xlsx)</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* In Progress */}
+              <div className="space-y-3 md:border-l md:border-slate-100 md:pl-6">
+                <h3 className="text-sm font-bold text-slate-855 flex items-center gap-2 border-b border-slate-100 pb-2">
+                  🚧 ฟีเจอร์ที่อยู่ระหว่างพัฒนา (In Progress)
+                </h3>
+                <ul className="space-y-3">
+                  <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
+                    <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                    <span><b>String Clean & Align:</b> ระบบลบช่องว่างส่วนเกิน ลบอักขระพิเศษ และแก้สระพิมพ์ซ้ำอัตโนมัติ</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
+                    <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                    <span><b>Alias Dictionary Normalization:</b> ปรับเปลี่ยนคำย่อเป็นคำมาตรฐานทางการ (เช่น อบต.)</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
+                    <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                    <span><b>Area Code 6-Digit Mapping:</b> เชื่อมต่อพิกัดกับรหัสพื้นที่ของกระทรวงมหาดไทย</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
+                    <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                    <span><b>Admin Staging & Fuzzy Match:</b> ระบบรีวิวและอนุมัติความซ้ำซ้อนสำหรับผู้ควบคุมระบบ</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
+          <label className="flex items-center gap-2 text-xs text-slate-600 font-semibold cursor-pointer">
+            <input 
+              type="checkbox" 
+              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+              onChange={(e) => {
+                if (e.target.checked) {
+                  localStorage.setItem('hideWelcomeModal', 'true');
+                } else {
+                  localStorage.removeItem('hideWelcomeModal');
+                }
+              }}
+            />
+            <span>ไม่ต้องแสดงกล่องแนะนำนี้อีกในการเปิดครั้งถัดไป</span>
+          </label>
+          
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-100 hover:shadow-lg active:scale-95 cursor-pointer w-full sm:w-auto"
+          >
+            เริ่มต้นใช้งานระบบ
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
 export default function OrgManagerApp() {
   const [organizations, setOrganizations] = useState([
     { 
@@ -1596,6 +1821,7 @@ export default function OrgManagerApp() {
   const [zoomScale, setZoomScale] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(() => !localStorage.getItem('hideWelcomeModal'));
   const [treeLayout, setTreeLayout] = useState('horizontal'); // 'vertical' or 'horizontal'
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
@@ -2394,10 +2620,18 @@ export default function OrgManagerApp() {
 
           <button 
             onClick={() => setIsImportModalOpen(true)} 
-            className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg text-sm font-bold hover:bg-green-100 text-green-700 transition-all shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg text-sm font-bold hover:bg-green-100 text-green-700 transition-all shadow-sm cursor-pointer"
             aria-label="นำเข้าไฟล์ Excel หรือ CSV"
           >
             <FileSpreadsheet size={16} /> นำเข้าข้อมูล
+          </button>
+
+          <button 
+            onClick={() => setShowWelcomeModal(true)} 
+            className="flex items-center gap-1.5 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm font-bold hover:bg-blue-100 text-blue-700 transition-all shadow-sm cursor-pointer"
+            aria-label="เปิดคู่มือการใช้งานและสถานะระบบ"
+          >
+            💡 คู่มือใช้งาน
           </button>
           
           <div className="w-px h-8 bg-slate-200 mx-1 self-center"></div>
@@ -2860,6 +3094,13 @@ export default function OrgManagerApp() {
             </div>
           </div>
         </div>
+      )}
+
+      {showWelcomeModal && (
+        <WelcomeModal 
+          isOpen={showWelcomeModal} 
+          onClose={() => setShowWelcomeModal(false)} 
+        />
       )}
 
     </div>
