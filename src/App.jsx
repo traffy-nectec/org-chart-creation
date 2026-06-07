@@ -1890,6 +1890,10 @@ const WelcomeModal = ({ isOpen, onClose }) => {
                     <span className="text-blue-700 font-bold block mb-1">4. ปรับมาตรฐานคำระบุพื้นที่รับผิดชอบ (Location Code Linkage)</span>
                     ตัดคำระบุระดับพื้นที่ (จังหวัด, จ., อำเภอ, อ., เขต, ตำบล, ต., แขวง) ออกชั่วคราวเพื่อทำความสะอาดและ <b>เชื่อมต่อกับรหัสพื้นที่ของกระทรวงมหาดไทย (MoI Code 6 หลัก)</b> อย่างแม่นยำ
                   </div>
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm sm:col-span-2">
+                    <span className="text-blue-700 font-bold block mb-1">5. ตรวจสอบความซ้ำซ้อนของชื่อหน่วยงาน (Duplicate Name Detection)</span>
+                    ตรวจสอบชื่อหน่วยงานซ้ำกันในระบบแบบเรียลไทม์ โดยเทียบหลังจากทำความสะอาดข้อความแล้ว หากพบหน่วยงานที่มีชื่อซ้ำกัน ระบบจะแจ้งเตือนเป็นข้อควรระวัง (Warning) บนแผนผังและตารางทันที
+                  </div>
                 </div>
               </div>
 
@@ -1929,6 +1933,10 @@ const WelcomeModal = ({ isOpen, onClose }) => {
                   <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
                     <CheckCircle size={14} className="text-emerald-500 shrink-0 mt-0.5" />
                     <span><b>Area Code 6-Digit Mapping:</b> เชื่อมต่อพิกัดกับรหัสพื้นที่ของกระทรวงมหาดไทย (MoI Code) อัตโนมัติ</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
+                    <CheckCircle size={14} className="text-emerald-500 shrink-0 mt-0.5" />
+                    <span><b>Duplicate Org Name Check:</b> ตรวจจับชื่อหน่วยงานซ้ำกันในแผนผังแบบเรียลไทม์</span>
                   </li>
                 </ul>
               </div>
@@ -2272,6 +2280,24 @@ export default function OrgManagerApp() {
           causeType: 'error',
           causeMessage: `ความสัมพันธ์เป็นวงกลม: ${path.join(' -> ')}`
         });
+        return;
+      }
+
+      // 4. Duplicate name check
+      if (node.name) {
+        const cleanedName = sanitizeString(node.name).toLowerCase();
+        const hasDuplicate = organizations.some(n => 
+          n.id !== node.id && 
+          n.name && 
+          sanitizeString(n.name).toLowerCase() === cleanedName
+        );
+        if (hasDuplicate) {
+          unreachable.push({
+            ...node,
+            causeType: 'warning',
+            causeMessage: `ชื่อหน่วยงานซ้ำกันในระบบ: "${node.name}"`
+          });
+        }
       }
     });
 
