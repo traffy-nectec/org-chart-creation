@@ -1865,6 +1865,34 @@ const WelcomeModal = ({ isOpen, onClose }) => {
                 </div>
               </div>
 
+              {/* Full Width Bottom: Data Cleansing Rules */}
+              <div className="md:col-span-2 mt-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  🧼 กฎการทำความสะอาดข้อมูลอัตโนมัติ (Data Cleansing Rules)
+                </h3>
+                <p className="text-[11px] text-slate-650 font-semibold leading-relaxed">
+                  ระบบจะทำการคลีนและปรับมาตรฐานข้อความ (ชื่อหน่วยงานและขอบเขตพื้นที่) อัตโนมัติเมื่อนำเข้าไฟล์ หรือเมื่อป้อนข้อมูลเสร็จ (Event Blur) เพื่อล้างข้อมูลที่ไม่เป็นระเบียบ ดังนี้:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px] text-slate-700 font-semibold">
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                    <span className="text-blue-700 font-bold block mb-1">1. ล้างสระซ้ำและพิมพ์ผิด (Spell Alignment)</span>
+                    ยุบสระคู่ผิดพลาด <code className="bg-slate-100 px-1 py-0.5 rounded text-blue-700 font-mono text-[10px]">เเ</code> เป็นสระ <code className="bg-slate-100 px-1 py-0.5 rounded text-blue-700 font-mono text-[10px]">แ</code> และลดสระหรือวรรณยุกต์ซ้อน (เช่น <code className="bg-slate-100 px-1.5 py-0.5 rounded text-blue-750 font-mono text-[10px]">่่</code> &rarr; <code className="bg-slate-100 px-1.5 py-0.5 rounded text-blue-750 font-mono text-[10px]">่</code>) อัตโนมัติ
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                    <span className="text-blue-700 font-bold block mb-1">2. แปลงคำย่อทางการ (Alias Dictionary Normalization)</span>
+                    ตรวจสอบและขยายคำย่อ เช่น <code className="bg-slate-100 px-1 py-0.5 rounded text-blue-700 font-mono text-[10px]">อบต.</code> เป็น <code className="bg-slate-100 px-1 py-0.5 rounded text-blue-700 font-mono text-[10px]">องค์การบริหารส่วนตำบล</code> และ <code className="bg-slate-100 px-1 py-0.5 rounded text-blue-700 font-mono text-[10px]">รพ.สต.</code> เป็น <code className="bg-slate-100 px-1 py-0.5 rounded text-blue-700 font-mono text-[10px]">โรงพยาบาลส่งเสริมสุขภาพตำบล</code>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                    <span className="text-blue-700 font-bold block mb-1">3. ลบช่องว่างส่วนเกินและอักขระพิเศษ</span>
+                    ลบช่องว่างส่วนเกินหัวท้าย ยุบช่องว่างติดกันเหลือ 1 เคาะ และกรองตัวอักษรพิเศษที่ไม่ปลอดภัยออกเพื่อป้องกันความผิดพลาดของระบบฐานข้อมูล
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                    <span className="text-blue-700 font-bold block mb-1">4. ปรับมาตรฐานคำระบุพื้นที่รับผิดชอบ (Location Code Linkage)</span>
+                    ตัดคำระบุระดับพื้นที่ (จังหวัด, จ., อำเภอ, อ., เขต, ตำบล, ต., แขวง) ออกชั่วคราวเพื่อทำความสะอาดและ <b>เชื่อมต่อกับรหัสพื้นที่ของกระทรวงมหาดไทย (MoI Code 6 หลัก)</b> อย่างแม่นยำ
+                  </div>
+                </div>
+              </div>
+
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1890,6 +1918,18 @@ const WelcomeModal = ({ isOpen, onClose }) => {
                     <CheckCircle size={14} className="text-emerald-500 shrink-0 mt-0.5" />
                     <span><b>Import/Export Pipeline:</b> การโหลด/บันทึกไฟล์นามสกุล JSON และ Excel (.xlsx)</span>
                   </li>
+                  <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
+                    <CheckCircle size={14} className="text-emerald-500 shrink-0 mt-0.5" />
+                    <span><b>String Clean & Align:</b> ระบบลบช่องว่างส่วนเกิน ลบอักขระพิเศษ และแก้สระพิมพ์ซ้ำอัตโนมัติ</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
+                    <CheckCircle size={14} className="text-emerald-500 shrink-0 mt-0.5" />
+                    <span><b>Alias Dictionary Normalization:</b> ปรับเปลี่ยนคำย่อเป็นคำมาตรฐานทางการ (เช่น อบต. / อบจ. / รพ.สต.)</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
+                    <CheckCircle size={14} className="text-emerald-500 shrink-0 mt-0.5" />
+                    <span><b>Area Code 6-Digit Mapping:</b> เชื่อมต่อพิกัดกับรหัสพื้นที่ของกระทรวงมหาดไทย (MoI Code) อัตโนมัติ</span>
+                  </li>
                 </ul>
               </div>
 
@@ -1899,18 +1939,6 @@ const WelcomeModal = ({ isOpen, onClose }) => {
                   🚧 ฟีเจอร์ที่อยู่ระหว่างพัฒนา (In Progress)
                 </h3>
                 <ul className="space-y-3">
-                  <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
-                    <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
-                    <span><b>String Clean & Align:</b> ระบบลบช่องว่างส่วนเกิน ลบอักขระพิเศษ และแก้สระพิมพ์ซ้ำอัตโนมัติ</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
-                    <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
-                    <span><b>Alias Dictionary Normalization:</b> ปรับเปลี่ยนคำย่อเป็นคำมาตรฐานทางการ (เช่น อบต.)</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
-                    <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
-                    <span><b>Area Code 6-Digit Mapping:</b> เชื่อมต่อพิกัดกับรหัสพื้นที่ของกระทรวงมหาดไทย</span>
-                  </li>
                   <li className="flex items-start gap-2 text-[11px] text-slate-650 font-semibold">
                     <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
                     <span><b>Admin Staging & Fuzzy Match:</b> ระบบรีวิวและอนุมัติความซ้ำซ้อนสำหรับผู้ควบคุมระบบ</span>
