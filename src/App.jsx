@@ -104,6 +104,99 @@ const JsonTreeViewer = ({ data, level = 0, isLast = true }) => {
 
 
 
+// ==========================================
+// CONFIGURATION: Data Cleansing & Alias Dictionary
+// ==========================================
+// Dictionary for converting abbreviations to official terms.
+// Easily extendable - just add key-value pairs here.
+export const ALIAS_DICTIONARY = {
+  'อบต.': 'องค์การบริหารส่วนตำบล',
+  'อบต': 'องค์การบริหารส่วนตำบล',
+  'อบจ.': 'องค์การบริหารส่วนจังหวัด',
+  'อบจ': 'องค์การบริหารส่วนจังหวัด',
+  'ทน.': 'เทศบาลนคร',
+  'ทน': 'เทศบาลนคร',
+  'ทม.': 'เทศบาลเมือง',
+  'ทม': 'เทศบาลเมือง',
+  'ทต.': 'เทศบาลตำบล',
+  'ทต': 'เทศบาลตำบล',
+  'รพ.สต.': 'โรงพยาบาลส่งเสริมสุขภาพตำบล',
+  'รพ.สต': 'โรงพยาบาลส่งเสริมสุขภาพตำบล',
+  'รพสต': 'โรงพยาบาลส่งเสริมสุขภาพตำบล',
+  'รร.': 'โรงเรียน',
+  'รร': 'โรงเรียน',
+  'สนง.': 'สำนักงาน',
+  'สนง': 'สำนักงาน',
+  'กทม.': 'กรุงเทพมหานคร',
+  'กทม': 'กรุงเทพมหานคร',
+  'ผอ.': 'ผู้อำนวยการ',
+  'ผอ': 'ผู้อำนวยการ',
+  'บก.': 'กองบังคับการ',
+  'บก': 'กองบังคับการ',
+  'ภ.': 'ตำรวจภูธร',
+  'ภ': 'ตำรวจภูธร',
+  'จว.': 'จังหวัด',
+  'จว': 'จังหวัด',
+  'ตม.': 'ตรวจคนเข้าเมือง',
+  'ตม': 'ตรวจคนเข้าเมือง',
+};
+
+/**
+ * Sanitizes and normalizes a string.
+ * - Removes extra spaces
+ * - Resolves double vowels (เเ -> แ) and duplicate tone marks
+ * - Strips unwanted special characters
+ * - Normalizes abbreviations using ALIAS_DICTIONARY
+ */
+export const sanitizeString = (str, dictionary = ALIAS_DICTIONARY) => {
+  if (!str) return '';
+  let cleaned = String(str);
+
+  // 1. Fix double 'เ' -> 'แ'
+  cleaned = cleaned.replace(/เเ/g, 'แ');
+
+  // 2. Remove consecutive repeated Thai vowels / tone marks (typos)
+  cleaned = cleaned.replace(/่+/g, '่');
+  cleaned = cleaned.replace(/้+/g, '้');
+  cleaned = cleaned.replace(/๊+/g, '๊');
+  cleaned = cleaned.replace(/๋+/g, '๋');
+  cleaned = cleaned.replace(/ิ+/g, 'ิ');
+  cleaned = cleaned.replace(/ี+/g, 'ี');
+  cleaned = cleaned.replace(/ึ+/g, 'ึ');
+  cleaned = cleaned.replace(/ื+/g, 'ื');
+  cleaned = cleaned.replace(/ุ+/g, 'ุ');
+  cleaned = cleaned.replace(/ู+/g, 'ู');
+  cleaned = cleaned.replace(/ั+/g, 'ั');
+  cleaned = cleaned.replace(/์+/g, '์');
+
+  // 3. Remove unwanted special characters, keep safe punctuation (- _ / \ ( ) [ ] . ,)
+  cleaned = cleaned.replace(/[^\u0E00-\u0E7FA-Za-z0-9\s\-_/\\\(\)\[\]\.,]/g, '');
+
+  // 4. Normalize spacing
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+  // 5. Expand abbreviations from dictionary
+  // Sort keys by length descending to match longer abbreviations first (e.g., 'รพ.สต.' before 'รพ.')
+  const sortedKeys = Object.keys(dictionary).sort((a, b) => b.length - a.length);
+  for (const abbrev of sortedKeys) {
+    const fullWord = dictionary[abbrev];
+    if (abbrev.endsWith('.')) {
+      const escaped = abbrev.replace(/\./g, '\\.');
+      const regex = new RegExp(escaped, 'g');
+      cleaned = cleaned.replace(regex, fullWord);
+    } else {
+      // Direct replacement for sub-string abbreviations
+      const regex = new RegExp(abbrev, 'g');
+      cleaned = cleaned.replace(regex, fullWord);
+    }
+  }
+
+  // Final spaces normalization
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+  return cleaned;
+};
+
 const cleanInput = (val, type) => {
   if (!val) return '';
   let cleaned = String(val).trim();
@@ -208,10 +301,12 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate }) => {
         const orgMap = new Map();
 
         rawRows.forEach((row, index) => {
-          const orgName = getVal(row, ['org_name', 'orgName', 'หน่วยงาน']);
+          const rawOrgName = getVal(row, ['org_name', 'orgName', 'หน่วยงาน']);
+          const orgName = sanitizeString(rawOrgName);
           if (!orgName) return;
 
-          const parentName = getVal(row, ['parent_name', 'parentName', 'หน่วยงานต้นสังกัด', 'parent']);
+          const rawParentName = getVal(row, ['parent_name', 'parentName', 'หน่วยงานต้นสังกัด', 'parent']);
+          const parentName = sanitizeString(rawParentName) || null;
           const rawProvince = getVal(row, ['province', 'จังหวัด', 'changwat']);
           const rawAmphoe = getVal(row, ['amphoe', 'อำเภอ', 'เขต']);
           const rawTambon = getVal(row, ['tambon', 'ตำบล', 'แขวง']);
@@ -1511,8 +1606,17 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all text-sm font-medium shadow-sm"
               value={selectedNode.name || ''}
               onChange={(e) => handleUpdateNode(selectedNode.id, 'name', e.target.value)}
+              onBlur={(e) => {
+                const cleaned = sanitizeString(e.target.value);
+                if (cleaned !== e.target.value) {
+                  handleUpdateNode(selectedNode.id, 'name', cleaned);
+                }
+              }}
               placeholder="ระบุชื่อหน่วยงาน..."
             />
+            <p className="text-[10px] text-slate-505 font-semibold mt-1">
+              💡 ระบบจะคลีนสระพิมพ์ซ้ำ ลบอักขระพิเศษ และแปลงคำย่ออัตโนมัติเมื่อละจากช่องป้อน (Blur)
+            </p>
           </div>
         </div>
 
@@ -2574,6 +2678,17 @@ export default function OrgManagerApp() {
     );
   };
 
+  const handleCleanAllData = () => {
+    setOrganizations(prevOrgs => {
+      const cleaned = prevOrgs.map(org => ({
+        ...org,
+        name: sanitizeString(org.name)
+      }));
+      return recalculateAllLevels(cleaned);
+    });
+    alert('ล้างชื่อหน่วยงาน ปรับการสะกดคำ และแปลงคำย่อทั้งหมดเรียบร้อยแล้ว!');
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 font-sans p-4 flex flex-col h-screen overflow-hidden">
       
@@ -2632,6 +2747,14 @@ export default function OrgManagerApp() {
             aria-label="เปิดคู่มือการใช้งานและสถานะระบบ"
           >
             💡 คู่มือใช้งาน
+          </button>
+
+          <button 
+            onClick={handleCleanAllData} 
+            className="flex items-center gap-1.5 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm font-bold hover:bg-amber-100 text-amber-700 transition-all shadow-sm cursor-pointer"
+            aria-label="ล้างชื่อหน่วยงานและสระซ้ำทั้งหมดในผัง"
+          >
+            🧹 คลีนข้อมูลทั้งหมด
           </button>
           
           <div className="w-px h-8 bg-slate-200 mx-1 self-center"></div>
