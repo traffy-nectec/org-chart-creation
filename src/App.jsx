@@ -215,6 +215,39 @@ const cleanInput = (val, type) => {
   return cleaned;
 };
 
+export const getLocationCode = (loc, db) => {
+  if (!db || db.length === 0 || !loc || !loc.province) return '';
+  const cleanProv = cleanInput(loc.province, 'province');
+  const cleanAmp = cleanInput(loc.amphoe, 'amphoe');
+  const cleanTam = cleanInput(loc.tambon, 'tambon');
+
+  if (cleanTam) {
+    const rec = db.find(r => 
+      cleanInput(r.province, 'province') === cleanProv && 
+      cleanInput(r.amphoe, 'amphoe') === cleanAmp && 
+      cleanInput(r.district, 'tambon') === cleanTam
+    );
+    if (rec) {
+      if (rec.district_code) return String(rec.district_code);
+      if (rec.amphoe_code) return String(rec.amphoe_code);
+      if (rec.province_code) return String(rec.province_code);
+    }
+  }
+  if (cleanAmp) {
+    const rec = db.find(r => 
+      cleanInput(r.province, 'province') === cleanProv && 
+      cleanInput(r.amphoe, 'amphoe') === cleanAmp
+    );
+    if (rec) {
+      if (rec.amphoe_code) return String(rec.amphoe_code);
+      if (rec.province_code) return String(rec.province_code);
+    }
+  }
+  const rec = db.find(r => cleanInput(r.province, 'province') === cleanProv);
+  if (rec && rec.province_code) return String(rec.province_code);
+  return '';
+};
+
 const getVal = (row, keys) => {
   for (const k of keys) {
     const foundKey = Object.keys(row).find(rk => rk.trim().toLowerCase() === k.toLowerCase());
@@ -251,7 +284,7 @@ const getLevel = (nodeName, parentMap) => {
   return depth;
 };
 
-const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate }) => {
+const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locationDb }) => {
   const fileInputRef = useRef(null);
   const [parsedFile, setParsedFile] = useState(null);
   const [validatedNodes, setValidatedNodes] = useState([]);
@@ -351,12 +384,14 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate }) => {
               loc.tambon === tambon
             );
             if (!exists) {
-              orgInfo.locations.push({
+              const locObj = {
                 province,
                 amphoe,
                 tambon,
                 postalCode
-              });
+              };
+              locObj.code = getLocationCode(locObj, locationDb);
+              orgInfo.locations.push(locObj);
             }
           }
         });
@@ -1328,7 +1363,7 @@ const CustomAddressInput = ({ placeholder, className }) => {
   );
 };
 
-const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, nodeIssues, moveMode, setMoveMode }) => {
+const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, nodeIssues, moveMode, setMoveMode, locationDb }) => {
   const fileInputRef = useRef(null);
   const [addressInput, setAddressInput] = useState({
     subdistrict: '',
@@ -1415,6 +1450,7 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
       );
 
       if (!exists) {
+        newLoc.code = getLocationCode(newLoc, locationDb);
         const updated = [...selectedLocations, newLoc];
         handleUpdateNode(selectedNode.id, 'areas', {
           ...selectedNode.areas,
@@ -1646,8 +1682,13 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
               <label className="block text-[10px] font-bold text-slate-600 uppercase">พื้นที่ที่รับผิดชอบ ({selectedLocations.length})</label>
               <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 scrollbar-hide">
                 {selectedLocations.map((loc, idx) => (
-                  <div key={idx} className="flex justify-between items-center bg-blue-50/70 border border-blue-100 rounded-xl p-2.5 text-[11px] font-semibold text-blue-700 animate-in zoom-in-95">
-                    <span className="truncate pr-2">{formatSingleLocation(loc)}</span>
+                  <div key={idx} className="flex justify-between items-center bg-blue-50/70 border border-blue-100 rounded-xl p-2.5 text-[11px] font-semibold text-blue-700 animate-in zoom-in-95 gap-2">
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="truncate pr-2">{formatSingleLocation(loc)}</span>
+                      {loc.code && (
+                        <span className="text-[9px] text-blue-600/70 font-mono font-bold mt-0.5">รหัสพื้นที่: {loc.code}</span>
+                      )}
+                    </div>
                     <button 
                       onClick={() => handleRemoveLocation(idx)} 
                       className="p-1 hover:bg-blue-100 hover:text-red-700 rounded-lg transition-all cursor-pointer shrink-0"
@@ -1921,6 +1962,43 @@ export default function OrgManagerApp() {
     { id: 'node-4', name: 'สำนักการจราจรและขนส่ง', level: 2, parentId: 'root-1', logo: null, areas: { province: 'กรุงเทพมหานคร' } }
   ]);
   
+  const [locationDb, setLocationDb] = useState([]);
+
+  useEffect(() => {
+    fetch(`${import.meta.env.BASE_URL}raw_database.json`)
+      .then(res => res.json())
+      .then(data => {
+        setLocationDb(data);
+      })
+      .catch(err => console.error("Failed to load raw_database.json:", err));
+  }, []);
+
+  // Resolve location codes once the DB is loaded
+  useEffect(() => {
+    if (locationDb.length > 0) {
+      setOrganizations(orgs => orgs.map(org => {
+        const locations = getSelectedLocations(org.areas);
+        if (locations.length > 0) {
+          const updatedLocations = locations.map(loc => {
+            if (loc.code) return loc;
+            return {
+              ...loc,
+              code: getLocationCode(loc, locationDb)
+            };
+          });
+          return {
+            ...org,
+            areas: {
+              ...org.areas,
+              locations: updatedLocations
+            }
+          };
+        }
+        return org;
+      }));
+    }
+  }, [locationDb]);
+
   const [selectedNodeId, setSelectedNodeId] = useState('root-1');
   const [zoomScale, setZoomScale] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -2300,7 +2378,7 @@ export default function OrgManagerApp() {
   };
 
   const handleExportCSV = () => {
-    const headers = ['org_name', 'parent_name', 'level', 'province', 'amphoe', 'tambon', 'postal_code'];
+    const headers = ['org_name', 'parent_name', 'level', 'province', 'amphoe', 'tambon', 'postal_code', 'area_code'];
     const rows = [];
 
     organizations.forEach(org => {
@@ -2316,6 +2394,7 @@ export default function OrgManagerApp() {
           '',
           '',
           '',
+          '',
           ''
         ]);
       } else {
@@ -2327,7 +2406,8 @@ export default function OrgManagerApp() {
             loc.province || '',
             loc.amphoe || '',
             loc.tambon || '',
-            loc.postalCode || ''
+            loc.postalCode || '',
+            loc.code || ''
           ]);
         });
       }
@@ -2364,7 +2444,8 @@ export default function OrgManagerApp() {
           'province': '',
           'amphoe': '',
           'tambon': '',
-          'postal_code': ''
+          'postal_code': '',
+          'area_code': ''
         });
       } else {
         locations.forEach(loc => {
@@ -2375,7 +2456,8 @@ export default function OrgManagerApp() {
             'province': loc.province || '',
             'amphoe': loc.amphoe || '',
             'tambon': loc.tambon || '',
-            'postal_code': loc.postalCode || ''
+            'postal_code': loc.postalCode || '',
+            'area_code': loc.code || ''
           });
         });
       }
@@ -2970,6 +3052,7 @@ export default function OrgManagerApp() {
                   nodeIssues={nodeIssues}
                   moveMode={moveMode}
                   setMoveMode={setMoveMode}
+                  locationDb={locationDb}
                 />
              </div>
           )}
@@ -3105,6 +3188,7 @@ export default function OrgManagerApp() {
         onClose={() => setIsImportModalOpen(false)} 
         onImportData={handleFileImport}
         onDownloadTemplate={handleDownloadTemplate}
+        locationDb={locationDb}
       />
 
       {/* Delete Confirmation Modal */}
