@@ -2,12 +2,14 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Plus, Trash2, MapPin, CheckCircle, 
   Layers, Network, ChevronDown, ChevronRight, ChevronUp, ChevronLeft,
+  ChevronsDown, ChevronsUp,
   Image as ImageIcon, Upload, ZoomIn, ZoomOut, Maximize, Minimize,
   FileSpreadsheet, X, Download, Table, LayoutTemplate, LayoutList,
   AlertTriangle, Code, Copy, Check, Braces, Database, AlignLeft, Search, ExternalLink
 } from 'lucide-react';
 import { ThailandAddressTypeahead, ThailandAddressValue, useAddressTypeaheadContext } from "react-thailand-address-typeahead";
 import * as XLSX from 'xlsx';
+import ReactFlowOrgChart from './ReactFlowOrgChart';
 
 // สร้างข้อมูลจำลองพื้นที่ 77 จังหวัด และพื้นที่ย่อยสำหรับตัวอย่าง
 
@@ -111,34 +113,19 @@ const JsonTreeViewer = ({ data, level = 0, isLast = true }) => {
 // Easily extendable - just add key-value pairs here.
 export const ALIAS_DICTIONARY = {
   'อบต.': 'องค์การบริหารส่วนตำบล',
-  'อบต': 'องค์การบริหารส่วนตำบล',
   'อบจ.': 'องค์การบริหารส่วนจังหวัด',
-  'อบจ': 'องค์การบริหารส่วนจังหวัด',
   'ทน.': 'เทศบาลนคร',
-  'ทน': 'เทศบาลนคร',
   'ทม.': 'เทศบาลเมือง',
-  'ทม': 'เทศบาลเมือง',
   'ทต.': 'เทศบาลตำบล',
-  'ทต': 'เทศบาลตำบล',
   'รพ.สต.': 'โรงพยาบาลส่งเสริมสุขภาพตำบล',
-  'รพ.สต': 'โรงพยาบาลส่งเสริมสุขภาพตำบล',
-  'รพสต': 'โรงพยาบาลส่งเสริมสุขภาพตำบล',
   'รร.': 'โรงเรียน',
-  'รร': 'โรงเรียน',
   'สนง.': 'สำนักงาน',
-  'สนง': 'สำนักงาน',
   'กทม.': 'กรุงเทพมหานคร',
-  'กทม': 'กรุงเทพมหานคร',
   'ผอ.': 'ผู้อำนวยการ',
-  'ผอ': 'ผู้อำนวยการ',
   'บก.': 'กองบังคับการ',
-  'บก': 'กองบังคับการ',
   'ภ.': 'ตำรวจภูธร',
-  'ภ': 'ตำรวจภูธร',
   'จว.': 'จังหวัด',
-  'จว': 'จังหวัด',
   'ตม.': 'ตรวจคนเข้าเมือง',
-  'ตม': 'ตรวจคนเข้าเมือง',
 };
 
 /**
@@ -284,6 +271,38 @@ const getLevel = (nodeName, parentMap) => {
   return depth;
 };
 
+const DraftRestoreModal = ({ isOpen, draftCount, onResume, onStartFresh }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 text-center animate-in zoom-in-95">
+        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Database size={32} className="text-blue-600" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-800 mb-2">พบข้อมูลฉบับร่าง (Draft)</h2>
+        <p className="text-slate-600 mb-6">
+          ระบบพบข้อมูลโครงสร้างองค์กรที่คุณทำค้างไว้ จำนวน <span className="font-bold text-blue-600">{draftCount}</span> หน่วยงาน
+          <br/>คุณต้องการทำต่อจากที่ค้างไว้ หรือลบข้อมูลทิ้งเพื่อเริ่มต้นใหม่ทั้งหมด?
+        </p>
+        <div className="flex gap-3 justify-center">
+          <button 
+            onClick={onStartFresh}
+            className="px-6 py-2.5 rounded-xl text-red-600 font-bold border border-red-200 bg-red-50 hover:bg-red-100 transition-colors"
+          >
+            ลบทิ้ง เริ่มใหม่ทั้งหมด
+          </button>
+          <button 
+            onClick={onResume}
+            className="px-6 py-2.5 rounded-xl text-white font-bold bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200 transition-colors"
+          >
+            ทำต่อจากข้อมูลเดิม
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locationDb }) => {
   const fileInputRef = useRef(null);
   const [parsedFile, setParsedFile] = useState(null);
@@ -291,8 +310,12 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
   const [showDocumentation, setShowDocumentation] = useState(true);
   const [filterType, setFilterType] = useState('all'); // 'all' | 'issues' | 'valid'
   const [previewSearchQuery, setPreviewSearchQuery] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [progressStep, setProgressStep] = useState('');
 
   if (!isOpen) return null;
+
+  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -317,19 +340,90 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
     fileInputRef.current?.click();
   };
 
-  const processFile = (file) => {
+  const processFile = async (file) => {
+    setIsProcessing(true);
+    setProgressStep('กำลังอ่านไฟล์...');
+    await delay(50);
+
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        setProgressStep('กำลังแปลงโครงสร้างข้อมูล (Parsing)...');
+        await delay(50);
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rawRows = XLSX.utils.sheet_to_json(firstSheet);
+        let rawRows = XLSX.utils.sheet_to_json(firstSheet);
+
+        if (rawRows.length > 0 && ('กระทรวง' in rawRows[0] || 'ชื่อหน่วยงานระดับกรม' in rawRows[0])) {
+          const normalized = [];
+          const locationMap = new Map();
+
+          rawRows.forEach(row => {
+            const levels = [
+              row['กระทรวง'],
+              row['ชื่อหน่วยงานระดับกรม'],
+              row['ชื่อหน่วยงานระดับกอง'],
+              row['ชื่อหน่วยงานระดับกลุ่ม']
+            ];
+            
+            const province = row['จังหวัด'];
+            const amphoe = row['อำเภอ'];
+            const tambon = row['ตำบล'];
+            const location = { province, amphoe, tambon };
+
+            let parent = null;
+            let currentPath = [];
+            let deepestNode = null;
+
+            levels.forEach(node => {
+              if (node) {
+                const nodeStr = String(node).trim();
+                currentPath.unshift(nodeStr);
+                const nodeFullName = currentPath.join(' ');
+                
+                normalized.push({
+                  org_name: nodeFullName,
+                  parent_name: parent
+                });
+                parent = nodeFullName;
+                deepestNode = nodeFullName;
+              }
+            });
+
+            if (deepestNode && (province || amphoe || tambon)) {
+              if (!locationMap.has(deepestNode)) {
+                locationMap.set(deepestNode, []);
+              }
+              locationMap.get(deepestNode).push(location);
+            }
+          });
+
+          // Re-flatten normalized with locations
+          const finalRows = [];
+          normalized.forEach(entry => {
+            const locs = locationMap.get(entry.org_name) || [];
+            if (locs.length > 0) {
+              locs.forEach(loc => {
+                finalRows.push({ ...entry, ...loc });
+              });
+              // Clear to avoid duplicate locations
+              locationMap.set(entry.org_name, []);
+            } else {
+              finalRows.push(entry);
+            }
+          });
+          rawRows = finalRows;
+        }
 
         if (rawRows.length === 0) {
           alert("ไม่พบข้อมูลในไฟล์");
+          setIsProcessing(false);
           return;
         }
+
+        setProgressStep('กำลังทำความสะอาดและตรวจสอบข้อมูล (Cleansing & Validating)...');
+        await delay(50);
 
         const orgMap = new Map();
 
@@ -451,12 +545,17 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
           };
         });
 
+        setProgressStep('เตรียมการแสดงผล (Rendering)...');
+        await delay(50);
+
         setValidatedNodes(validated);
         setParsedFile({ name: file.name, size: file.size });
         setShowDocumentation(false);
+        setIsProcessing(false);
       } catch (err) {
         console.error(err);
         alert(`เกิดข้อผิดพลาดในการอ่านไฟล์: ${err.message}`);
+        setIsProcessing(false);
       }
     };
     reader.readAsArrayBuffer(file);
@@ -805,32 +904,51 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
           {/* Right Panel */}
           <div className="md:w-[35%] p-6 flex flex-col justify-between bg-white shrink-0">
             {!parsedFile ? (
-              <div className="flex-1 flex flex-col justify-center items-center">
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  className="hidden" 
-                  accept=".xlsx, .xls, .csv" 
-                  onChange={handleFileChange} 
-                />
-                <div 
-                  onClick={triggerFileInput}
-                  onDragOver={handleDragOver}
-                  onDrop={handleDrop}
-                  className="w-full flex-1 border-2 border-dashed border-green-300 bg-green-50/30 rounded-2xl p-8 flex flex-col items-center justify-center text-center hover:bg-green-50/60 transition-all cursor-pointer group"
-                >
-                  <Upload size={40} className="text-green-700 mb-4 group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300" strokeWidth={1.5} />
-                  <h3 className="text-md font-bold text-slate-800 mb-2">ลากไฟล์มาวางที่นี่</h3>
-                  <p className="text-xs text-slate-700 font-semibold mb-1">หรือคลิกเพื่อเลือกไฟล์จากคอมพิวเตอร์</p>
-                  <p className="text-[10px] text-slate-600 font-bold">รองรับไฟล์ Excel (.xlsx, .xls) และ CSV</p>
+              isProcessing ? (
+                <div className="flex-1 flex flex-col justify-center items-center bg-slate-50/50 rounded-2xl border border-slate-100 p-8 text-center animate-in fade-in duration-300">
+                  <div className="relative w-16 h-16 mb-6">
+                    <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
+                    <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Layers className="text-blue-600 animate-pulse w-6 h-6" />
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-800 mb-2">กำลังประมวลผลไฟล์...</h3>
+                  <p className="text-sm text-blue-700 font-bold bg-blue-50 px-4 py-2 rounded-xl inline-flex shadow-sm border border-blue-100 animate-pulse">
+                    {progressStep}
+                  </p>
+                  <p className="mt-4 text-xs text-slate-500 font-semibold max-w-[200px] leading-relaxed">
+                    กรุณารอสักครู่ ระบบกำลังจัดเตรียมข้อมูลโครงสร้างองค์กรของคุณ
+                  </p>
                 </div>
-                <button 
-                  onClick={triggerFileInput} 
-                  className="mt-4 px-6 py-3 w-full bg-slate-800 text-white rounded-xl text-sm font-bold shadow-md hover:bg-slate-900 hover:shadow-lg transition-all active:scale-95 cursor-pointer"
-                >
-                  เลือกไฟล์สำหรับอัปโหลด
-                </button>
-              </div>
+              ) : (
+                <div className="flex-1 flex flex-col justify-center items-center">
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept=".xlsx, .xls, .csv" 
+                    onChange={handleFileChange} 
+                  />
+                  <div 
+                    onClick={triggerFileInput}
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                    className="w-full flex-1 border-2 border-dashed border-green-300 bg-green-50/30 rounded-2xl p-8 flex flex-col items-center justify-center text-center hover:bg-green-50/60 transition-all cursor-pointer group"
+                  >
+                    <Upload size={40} className="text-green-700 mb-4 group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300" strokeWidth={1.5} />
+                    <h3 className="text-md font-bold text-slate-800 mb-2">ลากไฟล์มาวางที่นี่</h3>
+                    <p className="text-xs text-slate-700 font-semibold mb-1">หรือคลิกเพื่อเลือกไฟล์จากคอมพิวเตอร์</p>
+                    <p className="text-[10px] text-slate-600 font-bold">รองรับไฟล์ Excel (.xlsx, .xls) และ CSV</p>
+                  </div>
+                  <button 
+                    onClick={triggerFileInput} 
+                    className="mt-4 px-6 py-3 w-full bg-slate-800 text-white rounded-xl text-sm font-bold shadow-md hover:bg-slate-900 hover:shadow-lg transition-all active:scale-95 cursor-pointer"
+                  >
+                    เลือกไฟล์สำหรับอัปโหลด
+                  </button>
+                </div>
+              )
             ) : (
               <div className="flex-1 flex flex-col justify-between">
                 {/* Summary Info */}
@@ -1007,11 +1125,19 @@ const formatAreaLabel = (areas) => {
   return "ไม่ระบุพื้นที่";
 };
 
-const OrgNode = ({ node, selectedNodeId, setSelectedNodeId, handleAddNode, handleDeleteNode, treeLayout, parentName, nodeIssues }) => {
+const OrgNode = ({ node, selectedNodeId, setSelectedNodeId, handleAddNode, handleDeleteNode, treeLayout, parentName, nodeIssues, treeExpansionTrigger }) => {
   const isSelected = selectedNodeId === node.id;
   const hasChildren = node.children && node.children.length > 0;
-  const [isExpanded, setIsExpanded] = useState(true);
+  // Default to expanding only the first level to prevent browser freeze with 2500+ nodes
+  const [isExpanded, setIsExpanded] = useState((node?.level || 1) <= 1);
   const isVert = treeLayout === 'vertical';
+
+  useEffect(() => {
+    if (treeExpansionTrigger) {
+      if (treeExpansionTrigger.action === 'expand') setIsExpanded(true);
+      else if (treeExpansionTrigger.action === 'collapse') setIsExpanded((node?.level || 1) <= 1);
+    }
+  }, [treeExpansionTrigger, node?.level]);
 
   const issue = nodeIssues?.get(node.id);
   const hasError = issue?.type === 'error';
@@ -1071,7 +1197,7 @@ const OrgNode = ({ node, selectedNodeId, setSelectedNodeId, handleAddNode, handl
             </div>
           )}
           <div className="font-bold text-sm text-slate-800 break-words leading-tight flex-1 flex items-center gap-1.5 min-w-0">
-            <span className="truncate">{node.name || <span className="text-slate-500 italic">ไม่ได้ระบุชื่อ</span>}</span>
+            <span className="whitespace-normal break-words">{node.name || <span className="text-slate-500 italic">ไม่ได้ระบุชื่อ</span>}</span>
             {issue && (
               <span 
                 className={`${hasError ? 'text-red-700' : 'text-amber-700'} shrink-0`} 
@@ -1159,6 +1285,7 @@ const OrgNode = ({ node, selectedNodeId, setSelectedNodeId, handleAddNode, handl
                   treeLayout={treeLayout}
                   parentName={node.name}
                   nodeIssues={nodeIssues}
+                  treeExpansionTrigger={treeExpansionTrigger}
                 />
               </div>
             ))}
@@ -1363,16 +1490,19 @@ const CustomAddressInput = ({ placeholder, className }) => {
   );
 };
 
-const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, nodeIssues, moveMode, setMoveMode, locationDb }) => {
-  const fileInputRef = useRef(null);
-  const [addressInput, setAddressInput] = useState({
+const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, nodeIssues, moveMode, setMoveMode, locationDb, setFocusNodeId }) => {
+  const [addressInput, setAddressInput] = React.useState({
     subdistrict: '',
     district: '',
     province: '',
     postalCode: '',
   });
 
-  useEffect(() => {
+  const [isParentModalOpen, setIsParentModalOpen] = React.useState(false);
+  const [parentSearchQuery, setParentSearchQuery] = React.useState('');
+  const [pendingParentId, setPendingParentId] = React.useState(null);
+
+  React.useEffect(() => {
     setAddressInput({
       subdistrict: '',
       district: '',
@@ -1385,23 +1515,21 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
 
   const selectedLocations = getSelectedLocations(selectedNode.areas);
 
-  const parentOrg = useMemo(() => {
+  const parentOrg = React.useMemo(() => {
     if (!organizations || !selectedNode) return null;
     return organizations.find(o => o.id === selectedNode.parentId);
   }, [organizations, selectedNode?.parentId]);
   
   const parentName = parentOrg ? parentOrg.name : '';
 
-  const hasChildren = useMemo(() => {
-    if (!organizations || !selectedNode) return false;
-    return organizations.some(org => org.parentId === selectedNode.id);
+  const childCountForSetting = React.useMemo(() => {
+    if (!organizations || !selectedNode) return 0;
+    return organizations.filter(org => org.parentId === selectedNode.id).length;
   }, [organizations, selectedNode?.id]);
 
+  const hasChildren = childCountForSetting > 0;
 
-
-
-  // คำนวณหาหน่วยงานสูงสุดเพื่อปิดไม่ให้เลือกสังกัด
-  const potentialRoots = useMemo(() => {
+  const potentialRoots = React.useMemo(() => {
     if (!organizations) return [];
     return organizations.filter(org => !org.parentId || !organizations.some(n => n.id === org.parentId));
   }, [organizations]);
@@ -1409,8 +1537,7 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
   const primaryRootId = potentialRoots.length > 0 ? potentialRoots[0].id : null;
   const isPrimaryRoot = selectedNode.id === primaryRootId;
 
-  // ค้นหาโหนดลูกหลานทั้งหมดเพื่อป้องกันการเลือกสังกัดแบบวงกลม (Cyclic Reference)
-  const descendantIds = useMemo(() => {
+  const descendantIds = React.useMemo(() => {
     if (!organizations || !selectedNode) return new Set();
     const descendants = new Set();
     const queue = [selectedNode.id];
@@ -1426,12 +1553,16 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
     return descendants;
   }, [selectedNode?.id, organizations]);
 
-  const parentOptions = useMemo(() => {
+  const parentOptions = React.useMemo(() => {
     if (!organizations || !selectedNode) return [];
-    return organizations.filter(org => org.id !== selectedNode.id && !descendantIds.has(org.id));
-  }, [organizations, selectedNode?.id, descendantIds]);
+    let options = organizations.filter(org => org.id !== selectedNode.id && !descendantIds.has(org.id));
+    if (parentSearchQuery.trim()) {
+      const q = parentSearchQuery.toLowerCase();
+      options = options.filter(org => org.name && org.name.toLowerCase().includes(q));
+    }
+    return options;
+  }, [organizations, selectedNode?.id, descendantIds, parentSearchQuery]);
 
-  // ดึงข้อขัดแย้ง/ข้อควรระวังสำหรับโหนดที่เลือก
   const nodeIssue = nodeIssues?.get(selectedNode.id);
 
   const handleAddressSelect = (nextVal) => {
@@ -1477,14 +1608,6 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
     });
   };
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const imageUrl = URL.createObjectURL(file);
-      handleUpdateNode(selectedNode.id, 'logo', imageUrl);
-    }
-  };
-
   const formatSingleLocation = (loc) => {
     if (loc.province && !loc.amphoe && !loc.tambon) {
       return `ทั้งจังหวัด ${loc.province}`;
@@ -1510,9 +1633,16 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
     return parts.join(' ');
   };
 
+  const handleConfirmParentChange = (mode) => {
+    setMoveMode(mode);
+    handleUpdateNode(selectedNode.id, 'parentId', pendingParentId);
+    setPendingParentId(null);
+    setIsParentModalOpen(false);
+  };
+
   return (
     <div className="bg-white/95 backdrop-blur-md p-6 rounded-2xl border border-slate-200 shadow-2xl h-full flex flex-col animate-in fade-in slide-in-from-right-4 pointer-events-auto">
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+      <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100 shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700 font-bold">L{selectedNode.level}</div>
           <div><h3 className="font-bold text-slate-800">ตั้งค่าหน่วยงาน</h3></div>
@@ -1527,8 +1657,7 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
         </button>
       </div>
 
-      <div className="space-y-6 flex-1 overflow-y-auto pr-2 scrollbar-hide">
-        {/* แสดงข้อความ Warning/Error ใน Side Panel */}
+      <div className="space-y-6 flex-1 overflow-y-auto pr-2 scrollbar-hide relative">
         {nodeIssue && (
           <div className={`p-3 rounded-xl border flex items-start gap-2.5 text-xs font-semibold leading-normal animate-in fade-in slide-in-from-top-2 ${
             nodeIssue.type === 'error'
@@ -1543,119 +1672,57 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
           </div>
         )}
 
-        {/* หน่วยงานต้นสังกัด (ย้ายขึ้นมาไว้ด้านบนสุดเพื่อให้เห็นและตั้งค่าได้ง่าย) */}
-        <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
-          <label className="block text-[10px] font-bold text-slate-650 uppercase">หน่วยงานต้นสังกัด</label>
-          {isPrimaryRoot ? (
-            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 p-2.5 rounded-xl font-semibold flex items-center gap-1.5 shadow-sm bg-white">
-              <span>👑</span> หน่วยงานสูงสุดของระบบ (ไม่สามารถเลือกต้นสังกัดได้)
-            </div>
-          ) : (
-            <>
-              <select
-                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all text-sm font-medium shadow-sm"
-                value={selectedNode.parentId || ''}
-                onChange={(e) => {
-                  const val = e.target.value || null;
-                  handleUpdateNode(selectedNode.id, 'parentId', val);
+        {/* ชื่อหน่วยงาน (ย้ายขึ้นบนสุด) */}
+        <div className="space-y-2">
+          <label className="block text-[10px] font-bold text-slate-600 uppercase mb-2">ชื่อหน่วยงาน</label>
+          <textarea 
+            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all text-sm font-bold text-slate-800 shadow-sm resize-none"
+            rows="3"
+            value={selectedNode.name || ''}
+            onChange={(e) => handleUpdateNode(selectedNode.id, 'name', e.target.value)}
+            onBlur={(e) => {
+              const cleaned = sanitizeString(e.target.value);
+              if (cleaned !== e.target.value) {
+                handleUpdateNode(selectedNode.id, 'name', cleaned);
+              }
+            }}
+            placeholder="ระบุชื่อหน่วยงาน..."
+          />
+          <p className="text-[10px] text-slate-500 font-semibold mt-1">
+            💡 ระบบจะคลีนสระพิมพ์ซ้ำ ลบอักขระพิเศษ และแปลงคำย่ออัตโนมัติเมื่อละจากช่องป้อน
+          </p>
+        </div>
+
+        {/* หน่วยงานต้นสังกัด */}
+        <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3">
+          <div className="flex justify-between items-center">
+            <label className="block text-[10px] font-bold text-slate-650 uppercase">หน่วยงานต้นสังกัด</label>
+            {!isPrimaryRoot && (
+              <button 
+                onClick={() => {
+                  setParentSearchQuery('');
+                  setPendingParentId(null);
+                  setIsParentModalOpen(true);
                 }}
+                className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition-colors"
               >
-                <option value="">-- เป็นหน่วยงานสูงสุด (ไม่มีต้นสังกัด) --</option>
-                {parentOptions.map(org => (
-                  <option key={org.id} value={org.id}>
-                    {org.name || '(ไม่มีชื่อ)'}
-                  </option>
-                ))}
-              </select>
-
-              {hasChildren && (
-                <div className="mt-3 pt-2.5 border-t border-slate-200/50">
-                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">รูปแบบการย้ายหน่วยงาน</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setMoveMode('branch')}
-                      className={`px-2 py-1.5 rounded-lg border text-left text-[11px] font-bold transition-all cursor-pointer ${
-                        moveMode === 'branch'
-                          ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm'
-                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${moveMode === 'branch' ? 'bg-blue-600' : 'bg-slate-300'}`} />
-                        <span>ย้ายทั้งเส้น</span>
-                      </div>
-                      <div className="text-[9px] font-semibold text-slate-500 pl-3.5 mt-0.5">หน่วยงานย่อยจะย้ายตามไปด้วย</div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMoveMode('single')}
-                      className={`px-2 py-1.5 rounded-lg border text-left text-[11px] font-bold transition-all cursor-pointer ${
-                        moveMode === 'single'
-                          ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm'
-                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${moveMode === 'single' ? 'bg-blue-600' : 'bg-slate-300'}`} />
-                        <span>ย้ายเฉพาะหน่วยงาน</span>
-                      </div>
-                      <div className="text-[9px] font-semibold text-slate-500 pl-3.5 mt-0.5">ฝากลูกน้องไว้ที่สังกัดเดิมก่อนย้าย</div>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        <div className="flex gap-4 items-start">
-          <div className="flex flex-col items-center gap-2 shrink-0">
-             <label className="block text-[10px] font-bold text-slate-600 uppercase">โลโก้ (1:1)</label>
-             <div 
-               onClick={() => fileInputRef.current?.click()} 
-               className="w-20 h-20 bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors relative overflow-hidden group"
-               title="คลิกเพื่ออัปโหลดโลโก้"
-               aria-label="คลิกเพื่ออัปโหลดโลโก้"
-             >
-                {selectedNode.logo ? (
-                  <><img src={selectedNode.logo} alt={`โลโก้ของ ${selectedNode.name || 'หน่วยงาน'}`} className="w-full h-full object-cover" /><div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Upload className="text-white w-6 h-6" /></div></>
-                ) : (
-                  <><ImageIcon className="text-slate-500 mb-1 w-6 h-6" /><span className="text-[10px] text-slate-600 font-medium">อัปโหลด</span></>
-                )}
-             </div>
-             <input type="file" ref={fileInputRef} className="hidden" accept="image/png, image/jpeg" onChange={handleImageUpload} />
-             {selectedNode.logo && (
-                <button 
-                  onClick={() => handleUpdateNode(selectedNode.id, 'logo', null)} 
-                  className="text-[10px] text-red-700 hover:text-red-900 font-bold"
-                  aria-label="ลบรูปภาพโลโก้"
-                  title="ลบรูปภาพโลโก้"
-                >
-                  ลบรูปภาพ
-                </button>
-             )}
+                เปลี่ยน
+              </button>
+            )}
           </div>
-          <div className="flex-1">
-            <label className="block text-[10px] font-bold text-slate-600 uppercase mb-2">ชื่อหน่วยงาน</label>
-            <input 
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all text-sm font-medium shadow-sm"
-              value={selectedNode.name || ''}
-              onChange={(e) => handleUpdateNode(selectedNode.id, 'name', e.target.value)}
-              onBlur={(e) => {
-                const cleaned = sanitizeString(e.target.value);
-                if (cleaned !== e.target.value) {
-                  handleUpdateNode(selectedNode.id, 'name', cleaned);
-                }
-              }}
-              placeholder="ระบุชื่อหน่วยงาน..."
-            />
-            <p className="text-[10px] text-slate-505 font-semibold mt-1">
-              💡 ระบบจะคลีนสระพิมพ์ซ้ำ ลบอักขระพิเศษ และแปลงคำย่ออัตโนมัติเมื่อละจากช่องป้อน (Blur)
-            </p>
+          
+          <div className="text-sm font-bold text-slate-800 bg-white border border-slate-200 p-3 rounded-lg shadow-sm break-words whitespace-normal leading-relaxed">
+            {isPrimaryRoot ? (
+              <span className="text-amber-700 flex items-center gap-1.5">
+                <span>👑</span> หน่วยงานสูงสุดของระบบ
+              </span>
+            ) : (
+              <span>{parentName || '(ไม่มีต้นสังกัด)'}</span>
+            )}
           </div>
         </div>
 
+        {/* ขอบเขตพื้นที่รับผิดชอบ */}
         <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-4">
           <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2"><MapPin size={16} className="text-blue-700"/> ขอบเขตพื้นที่รับผิดชอบ</h4>
           
@@ -1676,7 +1743,6 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
             </ThailandAddressTypeahead>
           </div>
 
-          {/* List of Selected Areas */}
           {selectedLocations.length > 0 && (
             <div className="space-y-2 mt-4 animate-in fade-in slide-in-from-top-2 pt-3 border-t border-slate-200/60">
               <label className="block text-[10px] font-bold text-slate-600 uppercase">พื้นที่ที่รับผิดชอบ ({selectedLocations.length})</label>
@@ -1693,7 +1759,6 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
                       onClick={() => handleRemoveLocation(idx)} 
                       className="p-1 hover:bg-blue-100 hover:text-red-700 rounded-lg transition-all cursor-pointer shrink-0"
                       title="ลบพื้นที่รับผิดชอบนี้"
-                      aria-label="ลบพื้นที่รับผิดชอบนี้"
                     >
                       <X size={13} strokeWidth={2.5} />
                     </button>
@@ -1704,6 +1769,82 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
           )}
         </div>
 
+        {/* จำนวนลูกน้อง */}
+        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-650 uppercase mb-1">หน่วยงานย่อย</label>
+            <div className="text-sm font-bold text-slate-800">{childCountForSetting} หน่วยงาน</div>
+          </div>
+          {childCountForSetting > 0 && (
+            <button
+              onClick={() => {
+                setFocusNodeId(selectedNode.id);
+                onClose();
+              }}
+              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm flex items-center gap-1 transition-colors"
+            >
+              ดูหน่วยงานย่อย <ChevronRight size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Modal เลือกต้นสังกัด */}
+        {isParentModalOpen && (
+          <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-md rounded-xl p-4 flex flex-col border border-slate-200 shadow-xl animate-in fade-in zoom-in-95">
+            <div className="flex justify-between items-center mb-4">
+              <h4 className="font-bold text-slate-800">เลือกต้นสังกัดใหม่</h4>
+              <button onClick={() => setIsParentModalOpen(false)} className="text-slate-500 hover:bg-slate-100 p-1 rounded transition-colors"><X size={16}/></button>
+            </div>
+            
+            <input 
+              type="text" 
+              placeholder="ค้นหาชื่อหน่วยงาน..." 
+              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 mb-3"
+              value={parentSearchQuery}
+              onChange={e => setParentSearchQuery(e.target.value)}
+            />
+
+            <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-hide">
+              <button
+                onClick={() => setPendingParentId(null)}
+                className={`w-full text-left p-2.5 rounded-lg border text-sm font-bold transition-colors ${pendingParentId === null ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'}`}
+              >
+                -- เป็นหน่วยงานสูงสุด (ไม่มีต้นสังกัด) --
+              </button>
+              {parentOptions.map(org => (
+                <button
+                  key={org.id}
+                  onClick={() => setPendingParentId(org.id)}
+                  className={`w-full text-left p-2.5 rounded-lg border text-sm font-bold transition-colors ${pendingParentId === org.id ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'}`}
+                >
+                  {org.name || '(ไม่มีชื่อ)'}
+                </button>
+              ))}
+            </div>
+
+            {pendingParentId !== undefined && pendingParentId !== selectedNode.parentId && (
+              <div className="mt-4 border-t border-slate-200 pt-4 animate-in slide-in-from-bottom-2">
+                <p className="text-[10px] font-bold text-slate-600 mb-2">รูปแบบการย้าย:</p>
+                <div className="flex flex-col gap-2">
+                  <button 
+                    onClick={() => handleConfirmParentChange('branch')}
+                    className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm transition-colors"
+                  >
+                    ย้ายทั้งสาย (นำหน่วยงานย่อยไปด้วย)
+                  </button>
+                  {hasChildren && (
+                    <button 
+                      onClick={() => handleConfirmParentChange('single')}
+                      className="w-full py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
+                    >
+                      ย้ายเฉพาะหน่วยงานนี้ (ฝากลูกน้องไว้ที่เดิม)
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
     </div>
@@ -1992,28 +2133,39 @@ const WelcomeModal = ({ isOpen, onClose }) => {
 };
 
 export default function OrgManagerApp() {
-  const [organizations, setOrganizations] = useState(() => {
+  const DEFAULT_ORGS = [
+    { 
+      id: 'root-1', name: 'กรุงเทพมหานคร', level: 1, parentId: null, logo: null,
+      areas: { province: 'กรุงเทพมหานคร', amphoes: {}, tambons: ['ลาดยาว', 'จอมพล'] } 
+    },
+    { id: 'node-2', name: 'สำนักการโยธา', level: 2, parentId: 'root-1', logo: null, areas: { province: 'กรุงเทพมหานคร' } },
+    { id: 'node-3', name: 'สำนักการระบายน้ำ', level: 2, parentId: 'root-1', logo: null, areas: { province: 'กรุงเทพมหานคร' } },
+    { id: 'node-4', name: 'สำนักการจราจรและขนส่ง', level: 2, parentId: 'root-1', logo: null, areas: { province: 'กรุงเทพมหานคร' } }
+  ];
+
+  const [organizations, setOrganizations] = useState(DEFAULT_ORGS);
+  
+  const [draftData, setDraftData] = useState(null);
+  const [showDraftModal, setShowDraftModal] = useState(false);
+  const [isDraftRestored, setIsDraftRestored] = useState(false);
+
+  useEffect(() => {
     const saved = localStorage.getItem('org_builder_draft');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+        if (Array.isArray(parsed) && parsed.length > 4) {
+          setDraftData(parsed);
+          setShowDraftModal(true);
+          return;
         }
       } catch (err) {
         console.error("Failed to parse saved draft:", err);
       }
     }
-    return [
-      { 
-        id: 'root-1', name: 'กรุงเทพมหานคร', level: 1, parentId: null, logo: null,
-        areas: { province: 'กรุงเทพมหานคร', amphoes: {}, tambons: ['ลาดยาว', 'จอมพล'] } 
-      },
-      { id: 'node-2', name: 'สำนักการโยธา', level: 2, parentId: 'root-1', logo: null, areas: { province: 'กรุงเทพมหานคร' } },
-      { id: 'node-3', name: 'สำนักการระบายน้ำ', level: 2, parentId: 'root-1', logo: null, areas: { province: 'กรุงเทพมหานคร' } },
-      { id: 'node-4', name: 'สำนักการจราจรและขนส่ง', level: 2, parentId: 'root-1', logo: null, areas: { province: 'กรุงเทพมหานคร' } }
-    ];
-  });
+    // No large draft found, just start normally
+    setIsDraftRestored(true);
+  }, []);
   
   const [locationDb, setLocationDb] = useState([]);
 
@@ -2053,6 +2205,7 @@ export default function OrgManagerApp() {
   }, [locationDb]);
 
   const [selectedNodeId, setSelectedNodeId] = useState('root-1');
+  const [focusNodeId, setFocusNodeId] = useState(null);
   const [zoomScale, setZoomScale] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -2067,6 +2220,7 @@ export default function OrgManagerApp() {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [collapsedTableNodes, setCollapsedTableNodes] = useState(new Set());
   const [isDraftSaving, setIsDraftSaving] = useState(false);
+  const [treeExpansionTrigger, setTreeExpansionTrigger] = useState(null);
 
   const handleSaveDraft = () => {
     setIsDraftSaving(true);
@@ -2076,8 +2230,26 @@ export default function OrgManagerApp() {
 
   // Auto-save draft on organization changes
   useEffect(() => {
-    localStorage.setItem('org_builder_draft', JSON.stringify(organizations));
-  }, [organizations]);
+    if (isDraftRestored) {
+      localStorage.setItem('org_builder_draft', JSON.stringify(organizations));
+    }
+  }, [organizations, isDraftRestored]);
+
+  const breadcrumbPath = useMemo(() => {
+    if (!focusNodeId) return [];
+    const path = [];
+    let currentId = focusNodeId;
+    while (currentId) {
+      const node = organizations.find(n => n.id === currentId);
+      if (node) {
+        path.unshift(node);
+        currentId = node.parentId;
+      } else {
+        break;
+      }
+    }
+    return path;
+  }, [focusNodeId, organizations]);
   
   // Pan and Drag State
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -2244,6 +2416,33 @@ export default function OrgManagerApp() {
     return roots;
   }, [organizations]);
 
+  // Auto-focus on root if there is only one root
+  useEffect(() => {
+    if (orgTree.length === 1 && focusNodeId === null) {
+      setFocusNodeId(orgTree[0].id);
+    }
+  }, [orgTree, focusNodeId]);
+
+  // Verify focusNodeId still exists (handles draft load/bulk deletes)
+  useEffect(() => {
+    if (focusNodeId) {
+      const exists = organizations.some(o => o.id === focusNodeId);
+      if (!exists) {
+        setFocusNodeId(null);
+      }
+    }
+  }, [organizations, focusNodeId]);
+
+  // Verify selectedNodeId still exists
+  useEffect(() => {
+    if (selectedNodeId) {
+      const exists = organizations.some(o => o.id === selectedNodeId);
+      if (!exists) {
+        setSelectedNodeId(null);
+      }
+    }
+  }, [organizations, selectedNodeId]);
+
   const selectedNode = useMemo(() => organizations.find(o => o.id === selectedNodeId) || null, [organizations, selectedNodeId]);
 
   const searchResults = useMemo(() => {
@@ -2253,13 +2452,23 @@ export default function OrgManagerApp() {
   }, [searchQuery, organizations]);
 
   const conflictingNodes = useMemo(() => {
-    // A node is conflicting if it has multiple roots or orphan/cycle issues at runtime
-    // Let's identify the primary root first
-    const potentialRoots = organizations.filter(org => !org.parentId || !organizations.some(n => n.id === org.parentId));
-    const primaryRootId = potentialRoots.length > 0 ? potentialRoots[0].id : null;
-
     const unreachable = [];
     
+    // O(1) Lookups
+    const idMap = new Map();
+    const nameCounts = new Map();
+    
+    organizations.forEach(org => {
+      idMap.set(org.id, org);
+      if (org.name) {
+        const cleanedName = sanitizeString(org.name).toLowerCase();
+        nameCounts.set(cleanedName, (nameCounts.get(cleanedName) || 0) + 1);
+      }
+    });
+
+    const potentialRoots = organizations.filter(org => !org.parentId || !idMap.has(org.parentId));
+    const primaryRootId = potentialRoots.length > 0 ? potentialRoots[0].id : null;
+
     organizations.forEach(node => {
       // 1. Root constraint conflict: multiple roots
       if (!node.parentId && primaryRootId && node.id !== primaryRootId) {
@@ -2273,8 +2482,7 @@ export default function OrgManagerApp() {
       
       // 2. Parent missing conflict
       if (node.parentId) {
-        const parentExists = organizations.some(n => n.id === node.parentId);
-        if (!parentExists) {
+        if (!idMap.has(node.parentId)) {
           unreachable.push({
             ...node,
             causeType: 'warning',
@@ -2298,9 +2506,7 @@ export default function OrgManagerApp() {
         }
         visited.add(current.id);
         path.push(current.name || 'ไม่ระบุชื่อ');
-        const parent = organizations.find(n => n.id === current.parentId);
-        if (!parent) break;
-        current = parent;
+        current = idMap.get(current.parentId);
       }
       
       if (hasCycle) {
@@ -2315,12 +2521,7 @@ export default function OrgManagerApp() {
       // 4. Duplicate name check
       if (node.name) {
         const cleanedName = sanitizeString(node.name).toLowerCase();
-        const hasDuplicate = organizations.some(n => 
-          n.id !== node.id && 
-          n.name && 
-          sanitizeString(n.name).toLowerCase() === cleanedName
-        );
-        if (hasDuplicate) {
+        if ((nameCounts.get(cleanedName) || 0) > 1) {
           unreachable.push({
             ...node,
             causeType: 'warning',
@@ -2739,7 +2940,7 @@ export default function OrgManagerApp() {
                               {collapsedTableNodes.has(org.id) ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                             </button>
                           )}
-                          <span className="truncate max-w-[200px]" title={org.name}>
+                          <span className="whitespace-normal break-words max-w-[200px]" title={org.name}>
                             {org.name || <span className="text-slate-500 italic font-normal">ไม่ได้ระบุชื่อ</span>}
                           </span>
                           {issue && (
@@ -2989,69 +3190,7 @@ export default function OrgManagerApp() {
         {/* TOP: Visual Mind Map Canvas (Combined with Floating Config Panel) */}
         <div className={`flex-1 bg-[#f8fafc] border border-slate-200 shadow-inner overflow-hidden flex flex-col transition-all duration-300 ${isFullscreen ? 'fixed inset-0 z-50 rounded-none w-full h-full' : 'relative rounded-2xl'}`} style={viewMode === 'canvas' ? { backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' } : {}}>
           
-          {viewMode === 'canvas' && (
-            <div className="absolute top-4 left-4 z-30 flex gap-2 items-center">
-             <div className="bg-white/90 backdrop-blur border border-slate-200 rounded-xl px-4 py-2 shadow-sm text-xs font-bold text-slate-700 flex items-center gap-2">
-                <Layers size={14} className="text-blue-600" /> รวม: {organizations.length} โหนด
-             </div>
 
-             {/* Search Bar */}
-             <div className="relative">
-               <div className="bg-white/90 backdrop-blur border border-slate-200 rounded-xl flex items-center px-3 py-1.5 gap-2 w-64 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all shadow-sm">
-                 <Search size={14} className="text-slate-500 shrink-0" />
-                 <input 
-                   type="text"
-                   value={searchQuery}
-                   onChange={(e) => {
-                     setSearchQuery(e.target.value);
-                     setShowSearchSuggestions(true);
-                   }}
-                   onFocus={() => setShowSearchSuggestions(true)}
-                   onBlur={() => setTimeout(() => setShowSearchSuggestions(false), 200)}
-                   placeholder="ค้นหาชื่อหน่วยงาน..."
-                   className="w-full text-xs font-semibold text-slate-700 outline-none placeholder:text-slate-400 bg-transparent"
-                 />
-                 {searchQuery && (
-                   <button 
-                     onClick={() => setSearchQuery('')}
-                     aria-label="ล้างข้อความค้นหา"
-                     title="ล้างข้อความค้นหา"
-                     className="text-slate-400 hover:text-slate-600 shrink-0"
-                   >
-                     <X size={14} />
-                   </button>
-                 )}
-               </div>
-
-               {showSearchSuggestions && searchResults.length > 0 && (
-                 <ul className="absolute left-0 right-0 z-50 mt-1 max-h-48 overflow-y-auto bg-white/95 backdrop-blur border border-slate-200 rounded-xl shadow-lg divide-y divide-slate-100 text-xs font-semibold text-slate-700">
-                   {searchResults.map(node => (
-                     <li 
-                       key={node.id}
-                       onMouseDown={() => {
-                         setSelectedNodeId(node.id);
-                         setSearchQuery('');
-                         setShowSearchSuggestions(false);
-                         setTimeout(() => {
-                           const el = document.getElementById(node.id);
-                           if (el) {
-                             el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-                             el.classList.add('animate-pulse-highlight');
-                             setTimeout(() => el.classList.remove('animate-pulse-highlight'), 1500);
-                           }
-                         }, 100);
-                       }}
-                       className="px-3 py-2 hover:bg-blue-50 hover:text-blue-700 cursor-pointer transition-colors flex justify-between items-center"
-                     >
-                       <span className="truncate pr-2">{node.name}</span>
-                       <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded shrink-0">Level {node.level}</span>
-                     </li>
-                   ))}
-                 </ul>
-               )}
-             </div>
-          </div>
-          )}
 
           {/* แผงแสดงหน่วยงานที่ขัดแย้ง (แยกโครงสร้างและเน้นให้เด่น) */}
           {viewMode === 'canvas' && conflictingNodes.length > 0 && (
@@ -3112,26 +3251,7 @@ export default function OrgManagerApp() {
             </div>
           )}
 
-          {viewMode === 'canvas' && (
-            <div className={`absolute bottom-6 z-30 flex flex-col gap-2 transition-all duration-300 ${selectedNode && !isFullscreen ? 'right-[390px]' : 'right-6'}`}>
-               <div className="bg-white/90 backdrop-blur border border-slate-200 rounded-xl shadow-lg flex flex-col overflow-hidden">
-                  <button
-                    onClick={() => setTreeLayout(l => l === 'vertical' ? 'horizontal' : 'vertical')}
-                    className="p-3 text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-colors border-b border-slate-100"
-                    title={treeLayout === 'vertical' ? 'เปลี่ยนเป็นแนวนอน' : 'เปลี่ยนเป็นแนวตั้ง'}
-                    aria-label={treeLayout === 'vertical' ? 'เปลี่ยนเป็นแนวนอน' : 'เปลี่ยนเป็นแนวตั้ง'}
-                  >
-                    {treeLayout === 'vertical' ? <LayoutList size={18}/> : <LayoutTemplate size={18}/>}
-                  </button>
-                  <button onClick={handleZoomIn} className="p-3 text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-colors border-b border-slate-100"><ZoomIn size={18} /></button>
-                  <button onClick={handleZoomReset} className="p-2 text-[10px] font-bold text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors border-b border-slate-100">{Math.round(zoomScale * 100)}%</button>
-                  <button onClick={handleZoomOut} className="p-3 text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-colors"><ZoomOut size={18} /></button>
-               </div>
-               <button onClick={toggleFullscreen} className={`bg-white/90 backdrop-blur border border-slate-200 rounded-xl shadow-lg p-3 text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-colors ${isFullscreen ? 'text-blue-600 bg-blue-50' : ''}`}>
-                  {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
-               </button>
-            </div>
-          )}
+
 
           {/* Floating Config Panel */}
           {!isFullscreen && selectedNode && (
@@ -3150,127 +3270,126 @@ export default function OrgManagerApp() {
           )}
 
           {viewMode === 'canvas' ? (
-            <div 
-              className={`flex-1 overflow-hidden relative ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`} 
-              onClick={() => setSelectedNodeId(null)}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
-              onWheel={handleWheel}
-            >
-              <div 
-                className={`min-w-max min-h-max flex ${treeLayout === 'vertical' ? 'justify-center' : 'items-center'} py-20 px-[20vw] ${isDragging ? '' : 'transition-transform duration-200 ease-out'}`} 
-                style={{ 
-                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomScale})`, 
-                  transformOrigin: treeLayout === 'vertical' ? 'top center' : 'center left' 
-                }}
-              >
-                {orgTree.length === 0 ? (
+            <div className={`flex-1 overflow-hidden relative`} >
+              {orgTree.length === 0 ? (
+                <div className="w-full h-full flex items-center justify-center">
                   <button onClick={(e) => { e.stopPropagation(); handleAddNode(null, 0); }} className="px-6 py-3 bg-white border-2 border-dashed border-slate-300 rounded-xl text-slate-500 hover:border-blue-500 hover:text-blue-600 flex items-center gap-2 font-medium transition-colors shadow-sm">
                     <Plus size={18} /> เริ่มสร้างหน่วยงานสูงสุด
                   </button>
-                ) : (
-                  orgTree.map(root => (
-                    <OrgNode key={root.id} node={root} selectedNodeId={selectedNodeId} setSelectedNodeId={setSelectedNodeId} handleAddNode={handleAddNode} handleDeleteNode={handleDeleteNode} treeLayout={treeLayout} parentName={null} nodeIssues={nodeIssues} />
-                  ))
-                )}
-              </div>
+                </div>
+              ) : (
+                <>
+                  {/* Top Left Navigation & Search Group */}
+                  <div className="absolute top-4 left-4 z-40 flex flex-col gap-3 max-w-[calc(100vw-450px)]">
+                    
+                    {/* Breadcrumb Navigation */}
+                    <div className="bg-white/90 backdrop-blur border border-slate-200 shadow-sm rounded-xl px-3 py-2 flex flex-wrap items-center gap-2 text-sm font-medium">
+                      {orgTree.length > 1 && (
+                        <button 
+                          onClick={() => setFocusNodeId(null)}
+                          className={`hover:text-blue-600 transition-colors ${!focusNodeId ? 'text-blue-700 font-bold' : 'text-slate-500'}`}
+                        >
+                          หน้าหลัก
+                        </button>
+                      )}
+                      {breadcrumbPath.map((node, index) => (
+                        <React.Fragment key={node.id}>
+                          {(orgTree.length > 1 || index > 0) && (
+                            <ChevronRight size={14} className="text-slate-400" />
+                          )}
+                          <button
+                            onClick={() => setFocusNodeId(node.id)}
+                            className={`hover:text-blue-600 transition-colors truncate max-w-[150px] ${index === breadcrumbPath.length - 1 ? 'text-blue-700 font-bold' : 'text-slate-500'}`}
+                            title={node.name}
+                          >
+                            {node.name || 'ไม่ได้ระบุชื่อ'}
+                          </button>
+                        </React.Fragment>
+                      ))}
+                    </div>
+
+                    {/* Search Bar & Node Count */}
+                    <div className="flex gap-2 items-center">
+                      <div className="bg-white/90 backdrop-blur border border-slate-200 rounded-xl flex items-center px-3 py-1.5 gap-2 w-64 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all shadow-sm">
+                        <Search size={14} className="text-slate-500 shrink-0" />
+                        <input 
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            setShowSearchSuggestions(true);
+                          }}
+                          onFocus={() => setShowSearchSuggestions(true)}
+                          onBlur={() => setTimeout(() => setShowSearchSuggestions(false), 200)}
+                          placeholder="ค้นหาชื่อหน่วยงาน..."
+                          className="w-full text-xs font-semibold text-slate-700 outline-none placeholder:text-slate-400 bg-transparent"
+                        />
+                        {searchQuery && (
+                          <button 
+                            onClick={() => setSearchQuery('')}
+                            aria-label="ล้างข้อความค้นหา"
+                            title="ล้างข้อความค้นหา"
+                            className="text-slate-400 hover:text-slate-600 shrink-0"
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                        {showSearchSuggestions && searchResults.length > 0 && (
+                          <ul className="absolute left-0 top-[110%] right-0 z-50 mt-1 max-h-48 overflow-y-auto bg-white/95 backdrop-blur border border-slate-200 rounded-xl shadow-lg divide-y divide-slate-100 text-xs font-semibold text-slate-700">
+                            {searchResults.map(node => (
+                              <li 
+                                key={node.id}
+                                onMouseDown={() => {
+                                  setSelectedNodeId(node.id);
+                                  setSearchQuery('');
+                                  setShowSearchSuggestions(false);
+                                  setTimeout(() => {
+                                    const el = document.getElementById(node.id);
+                                    if (el) {
+                                      el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                                      el.classList.add('animate-pulse-highlight');
+                                      setTimeout(() => el.classList.remove('animate-pulse-highlight'), 1500);
+                                    }
+                                  }, 100);
+                                }}
+                                className="px-3 py-2 hover:bg-blue-50 hover:text-blue-700 cursor-pointer transition-colors flex justify-between items-center"
+                              >
+                                <span className="whitespace-normal break-words pr-2">{node.name}</span>
+                                <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded shrink-0">Level {node.level}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+
+                      <div className="bg-white/90 backdrop-blur border border-slate-200 rounded-xl px-4 py-2 shadow-sm text-xs font-bold text-slate-700 flex items-center gap-2">
+                        <Layers size={14} className="text-blue-600" /> รวม: {organizations.length} โหนด
+                      </div>
+                    </div>
+
+                  </div>
+
+                  <ReactFlowOrgChart 
+                    orgTree={orgTree}
+                    organizations={organizations}
+                    focusNodeId={focusNodeId}
+                    setFocusNodeId={setFocusNodeId}
+                  selectedNodeId={selectedNodeId}
+                  setSelectedNodeId={setSelectedNodeId}
+                  handleAddNode={handleAddNode}
+                  handleDeleteNode={handleDeleteNode}
+                  treeLayout={treeLayout}
+                  nodeIssues={nodeIssues}
+                  treeExpansionTrigger={treeExpansionTrigger}
+                />
+                </>
+              )}
             </div>
           ) : (
             renderTableView()
           )}
         </div>
 
-        {/* BOTTOM: JSON Editor with Foldable View */}
-        {!isFullscreen && (
-          <div className={`flex flex-col bg-[#1e1e1e] rounded-2xl shadow-lg border border-slate-800 transition-all duration-300 overflow-hidden relative z-10 ${isJsonExpanded ? 'h-80 shrink-0' : 'h-[52px] shrink-0'}`}>
-            
-            {/* Toggle Header Bar */}
-            <div className="bg-[#2d2d2d] px-4 py-3 flex justify-between items-center border-b border-black/40 select-none">
-              <div 
-                className="flex items-center gap-3 text-white text-sm font-bold cursor-pointer hover:text-blue-400 transition-colors"
-                onClick={() => setIsJsonExpanded(!isJsonExpanded)}
-              >
-                <div className="p-1.5 bg-blue-500/20 rounded-md text-blue-400"><Code size={16}/></div>
-                JSON Data Editor
-              </div>
-
-              {/* Toolbar */}
-              <div className="flex items-center gap-3">
-                {isJsonExpanded && (
-                  <div className="flex bg-[#1e1e1e] p-1 rounded-lg mr-2 border border-slate-700">
-                    <button 
-                      onClick={() => setJsonViewMode('tree')} 
-                      className={`px-3 py-1 text-xs font-bold rounded flex items-center gap-1 transition-colors ${jsonViewMode === 'tree' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                    >
-                      <AlignLeft size={14} /> Tree (Foldable)
-                    </button>
-                    <button 
-                      onClick={() => setJsonViewMode('raw')} 
-                      className={`px-3 py-1 text-xs font-bold rounded flex items-center gap-1 transition-colors ${jsonViewMode === 'raw' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                    >
-                      <Braces size={14} /> Raw (Edit)
-                    </button>
-                  </div>
-                )}
-                
-                {isJsonExpanded && (
-                  <>
-                    {jsonError ? (
-                      <span className="flex items-center gap-1 text-xs text-red-400 font-bold bg-red-400/10 px-2 py-1 rounded"><AlertTriangle size={14}/> Invalid</span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-xs text-green-400 font-bold bg-green-400/10 px-2 py-1 rounded"><Check size={14}/> Valid</span>
-                    )}
-                  </>
-                )}
-                <div className="text-slate-400 p-1 hover:text-white transition-colors cursor-pointer" onClick={() => setIsJsonExpanded(!isJsonExpanded)}>
-                  {isJsonExpanded ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
-                </div>
-              </div>
-            </div>
-            
-            {/* Editor Area */}
-            {isJsonExpanded && (
-              <div className="flex-1 relative flex flex-col group overflow-hidden">
-                {jsonViewMode === 'raw' ? (
-                  <textarea 
-                    ref={jsonTextAreaRef}
-                    className={`flex-1 w-full bg-[#1e1e1e] p-4 text-[13px] font-mono leading-relaxed outline-none resize-none scrollbar-hide ${jsonError ? 'text-red-300' : 'text-green-300'}`}
-                    value={jsonText}
-                    onChange={handleJsonChange}
-                    onBlur={handleBeautifyJson}
-                    spellCheck="false"
-                    placeholder="Paste JSON array of organizations here..."
-                  ></textarea>
-                ) : (
-                  <div className="flex-1 w-full bg-[#1e1e1e] p-4 overflow-auto scrollbar-hide">
-                    {jsonError ? (
-                      <div className="text-red-400 font-mono text-sm p-4 border border-red-500/30 rounded bg-red-500/10">
-                        {jsonError}
-                        <br/><span className="text-slate-400 mt-2 block">กรุณาสลับเป็น Raw (Edit) เพื่อแก้ไข Syntax</span>
-                      </div>
-                    ) : (
-                      <JsonTreeViewer data={organizations} />
-                    )}
-                  </div>
-                )}
-
-                {/* Quick Actions overlay */}
-                <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                   {jsonViewMode === 'raw' && (
-                     <button onClick={handleBeautifyJson} className="p-2.5 bg-slate-700/80 hover:bg-blue-600 text-slate-300 hover:text-white rounded-lg backdrop-blur shadow transition-colors" title="Format JSON">
-                       <AlignLeft size={16}/>
-                     </button>
-                   )}
-                   <button onClick={handleCopyJson} className="p-2.5 bg-slate-700/80 hover:bg-green-600 text-slate-300 hover:text-white rounded-lg backdrop-blur shadow transition-colors" title="Copy">
-                     {copied ? <Check size={16} /> : <Copy size={16}/>}
-                   </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
       </div>
 
@@ -3399,6 +3518,23 @@ export default function OrgManagerApp() {
         <WelcomeModal 
           isOpen={showWelcomeModal} 
           onClose={() => setShowWelcomeModal(false)} 
+        />
+      )}
+
+      {showDraftModal && (
+        <DraftRestoreModal 
+          isOpen={showDraftModal}
+          draftCount={draftData ? draftData.length : 0}
+          onResume={() => {
+            setOrganizations(draftData);
+            setShowDraftModal(false);
+            setIsDraftRestored(true);
+          }}
+          onStartFresh={() => {
+            localStorage.removeItem('org_builder_draft');
+            setShowDraftModal(false);
+            setIsDraftRestored(true);
+          }}
         />
       )}
 
