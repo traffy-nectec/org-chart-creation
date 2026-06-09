@@ -159,7 +159,15 @@ const OrgNodeFlow = ({ id, data }) => {
 };
 
 
-const nodeTypes = { orgNode: OrgNodeFlow };
+const GroupBgNode = ({ data }) => {
+  return (
+    <div className="w-full h-full rounded-[32px] border-[3px] border-dashed border-slate-300/80 bg-slate-100/50 flex justify-center items-end pb-6 pointer-events-none">
+      {data?.label && <span className="text-slate-400 font-bold text-sm bg-white/80 px-4 py-1.5 rounded-full backdrop-blur-sm shadow-sm">{data.label}</span>}
+    </div>
+  );
+};
+
+const nodeTypes = { orgNode: OrgNodeFlow, groupBg: GroupBgNode };
 
 // --- 2D Grid Layout Engine ---
 const getGridLayoutedElements = (nodes, edges) => {
@@ -198,6 +206,27 @@ const getGridLayoutedElements = (nodes, edges) => {
     const startX = -(gridWidth / 2) + (nodeWidth / 2);
     const childrenStartY = parentY + nodeHeight + gapY;
     
+    const numRows = Math.ceil(numChildren / maxCols);
+    const gridTotalHeight = numRows * nodeHeight + Math.max(0, numRows - 1) * gapY;
+
+    // Add background group node if there are children
+    if (numChildren > 0) {
+      const padding = 50;
+      layoutedNodes.push({
+        id: `groupBg-${root.id}`,
+        type: 'groupBg',
+        position: { x: -(gridWidth / 2) - padding, y: childrenStartY - padding },
+        style: { 
+          width: gridWidth + 2 * padding, 
+          height: gridTotalHeight + 2 * padding, 
+          zIndex: -1 
+        },
+        data: { label: `หน่วยงานย่อยภายใต้ ${root.data?.node?.name || ''}` },
+        selectable: false,
+        draggable: false,
+      });
+    }
+
     children.forEach((child, index) => {
       const row = Math.floor(index / maxCols);
       const col = index % maxCols;
@@ -212,8 +241,7 @@ const getGridLayoutedElements = (nodes, edges) => {
       });
     });
     
-    const numRows = Math.ceil(numChildren / maxCols);
-    currentYOffset += nodeHeight + gapY + (numRows * (nodeHeight + gapY));
+    currentYOffset += nodeHeight + gapY + gridTotalHeight + gapY;
   });
   
   return { nodes: layoutedNodes, edges };
