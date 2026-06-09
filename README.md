@@ -148,3 +148,31 @@ sequenceDiagram
 
 1. `npm install`
 2. `npm run dev`
+
+---
+
+## 🔧 การแก้ไขกฎการทำความสะอาดชื่อหน่วยงาน (Data Sanitization & Normalization)
+
+หากต้องการเพิ่มคำย่อ หรือ ปรับแต่งกฎในการกรองคำ/ลบคำออกจากชื่อหน่วยงาน สามารถไปเพิ่มได้ที่ไฟล์ [App.jsx](file:///Users/plagad/work/nstda/mu/batch-org-create/src/App.jsx):
+
+### 1. การเพิ่มคำย่อหรือคำทดแทน (Aliases)
+ไปที่ตัวแปร `ALIAS_DICTIONARY` (ประมาณบรรทัดที่ 100-130) แล้วเพิ่มคีย์ (คำย่อ) และค่า (คำเต็ม) เช่น:
+```javascript
+const ALIAS_DICTIONARY = {
+  'อบต.': 'องค์การบริหารส่วนตำบล',
+  'อบจ.': 'องค์การบริหารส่วนจังหวัด',
+  // เพิ่มคำย่อใหม่ตรงนี้
+};
+```
+
+### 2. การเพิ่มกฎ/ลบคำ (Custom Rules / Sanitization)
+ไปที่ฟังก์ชัน `sanitizeString` (ประมาณบรรทัดที่ 138+) แล้วเพิ่มเงื่อนไขการลบหรือการแทนที่คำด้วย Regular Expression เช่น:
+- **ตัวอย่างการลบคำออกจากชื่อหน่วยงาน:**
+  ```javascript
+  cleaned = cleaned.replace(/คำที่ต้องการลบ/g, '');
+  ```
+- **ตัวอย่างการเปลี่ยนรูปสระ/อักขระพิเศษ:**
+  ```javascript
+  cleaned = cleaned.replace(/เเ/g, 'แ');
+  ```
+
