@@ -14,7 +14,7 @@ import {
   getViewportForBounds
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Plus, Trash2, MapPin, Network, AlertTriangle, ChevronDown, ChevronRight, ChevronUp, ChevronLeft, Settings, Download } from 'lucide-react';
+import { Plus, Trash2, MapPin, Network, AlertTriangle, ChevronDown, ChevronRight, ChevronUp, ChevronLeft, Settings, Download, ArrowUp } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
 const getAreaCount = (areas) => {
@@ -206,19 +206,22 @@ const getGridLayoutedElements = (nodes, edges) => {
     const startX = -(gridWidth / 2) + (nodeWidth / 2);
     const childrenStartY = parentY + nodeHeight + gapY;
     
+    const childGapY = gapX;
     const numRows = Math.ceil(numChildren / maxCols);
-    const gridTotalHeight = numRows * nodeHeight + Math.max(0, numRows - 1) * gapY;
+    const gridTotalHeight = numRows * nodeHeight + Math.max(0, numRows - 1) * childGapY;
 
     // Add background group node if there are children
     if (numChildren > 0) {
-      const padding = 50;
+      const paddingX = 50;
+      const paddingTop = 50;
+      const paddingBottom = 120; // Increased padding to prevent overlapping with label
       layoutedNodes.push({
         id: `groupBg-${root.id}`,
         type: 'groupBg',
-        position: { x: -(gridWidth / 2) - padding, y: childrenStartY - padding },
+        position: { x: -(gridWidth / 2) - paddingX, y: childrenStartY - paddingTop },
         style: { 
-          width: gridWidth + 2 * padding, 
-          height: gridTotalHeight + 2 * padding, 
+          width: gridWidth + 2 * paddingX, 
+          height: gridTotalHeight + paddingTop + paddingBottom, 
           zIndex: -1 
         },
         data: { label: `หน่วยงานย่อยภายใต้ ${root.data?.node?.name || ''}` },
@@ -231,7 +234,7 @@ const getGridLayoutedElements = (nodes, edges) => {
       const row = Math.floor(index / maxCols);
       const col = index % maxCols;
       const x = startX + col * (nodeWidth + gapX);
-      const y = childrenStartY + row * (nodeHeight + gapY);
+      const y = childrenStartY + row * (nodeHeight + childGapY);
       
       layoutedNodes.push({
         ...child,
@@ -407,6 +410,24 @@ const FlowInner = ({ orgTree, organizations, focusNodeId, setFocusNodeId, select
     });
   };
 
+  const handleGoToTop = () => {
+    const reactFlowBounds = document.querySelector('.react-flow')?.getBoundingClientRect();
+    const width = reactFlowBounds ? reactFlowBounds.width : window.innerWidth;
+    
+    if (nodes.length > 0) {
+      let minX = Infinity, maxX = -Infinity;
+      nodes.forEach(n => {
+        if (n.type !== 'groupBg') {
+          minX = Math.min(minX, n.position.x);
+          maxX = Math.max(maxX, n.position.x + 240);
+        }
+      });
+      const graphWidth = maxX - minX;
+      const zoom = Math.min(1, width / (graphWidth + 80));
+      setViewport({ x: width / 2, y: 40, zoom }, { duration: 800 });
+    }
+  };
+
   return (
     <ReactFlow
       nodes={nodes}
@@ -432,6 +453,15 @@ const FlowInner = ({ orgTree, organizations, focusNodeId, setFocusNodeId, select
         >
           <Download size={16} />
           บันทึกรูปภาพ (PNG)
+        </button>
+      </Panel>
+      <Panel position="bottom-right" className="mb-4 mr-4">
+        <button
+          className="flex items-center justify-center w-12 h-12 bg-white rounded-full shadow-lg border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors cursor-pointer"
+          onClick={handleGoToTop}
+          title="เลื่อนกลับไปบนสุด"
+        >
+          <ArrowUp size={24} />
         </button>
       </Panel>
     </ReactFlow>
