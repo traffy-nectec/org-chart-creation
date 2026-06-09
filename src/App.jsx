@@ -3215,8 +3215,8 @@ export default function OrgManagerApp() {
               </button>
               <button 
                 onClick={() => {
-                  const nodesWithChildren = organizations.filter(o => o.children && o.children.length > 0).map(o => o.id);
-                  setCollapsedTableNodes(new Set(nodesWithChildren));
+                  const parentIds = new Set(organizations.map(o => o.parentId).filter(Boolean));
+                  setCollapsedTableNodes(parentIds);
                 }}
                 className="px-3 py-1.5 hover:bg-white hover:shadow-sm text-slate-700 rounded-lg text-xs font-bold transition-all"
                 title="ซ่อนหน่วยงานย่อยทั้งหมด"

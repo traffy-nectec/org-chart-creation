@@ -94,18 +94,6 @@ const OrgNodeFlow = ({ id, data }) => {
             </span>
           )}
         </div>
-        
-        <div className={`flex gap-1 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-          {!isParent && (
-            <button 
-              onClick={(e) => { e.stopPropagation(); handleDeleteNode(node.id); }}
-              className="w-6 h-6 bg-red-50 text-red-700 rounded flex items-center justify-center hover:bg-red-500 hover:text-white"
-              title="ลบหน่วยงานนี้"
-            >
-              <Trash2 size={14} />
-            </button>
-          )}
-        </div>
       </div>
       
       <div className="flex-1 flex items-start gap-2 mb-2 min-w-0">
