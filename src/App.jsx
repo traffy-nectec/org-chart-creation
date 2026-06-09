@@ -3223,12 +3223,10 @@ export default function OrgManagerApp() {
           <table className="w-full text-left border-collapse text-xs font-semibold text-slate-700">
             <thead className="bg-slate-50 text-slate-700 uppercase font-bold border-b border-slate-200 sticky top-0 z-10">
               <tr>
-                <th className="px-4 py-3.5 w-16 text-center">โลโก้</th>
                 <th className="px-6 py-3.5">ชื่อหน่วยงาน</th>
-                <th className="px-6 py-3.5">หน่วยงานต้นสังกัด</th>
                 <th className="px-4 py-3.5 w-24 text-center">ระดับ</th>
+                <th className="px-6 py-3.5 w-32 text-center">หน่วยงานย่อย</th>
                 <th className="px-6 py-3.5">พื้นที่รับผิดชอบ</th>
-                <th className="px-6 py-3.5 w-64">สถานะ / ข้อขัดแย้ง</th>
                 <th className="px-4 py-3.5 min-w-[180px] text-center">การจัดการ</th>
               </tr>
             </thead>
@@ -3260,25 +3258,21 @@ export default function OrgManagerApp() {
                     rowStyle = "bg-amber-50/40 hover:bg-amber-50/60 transition-colors cursor-pointer";
                   }
 
+                  const childCount = org.children ? org.children.length : 0;
+                  
+                  let levelColorClass = "bg-slate-100 text-slate-700 border-slate-200";
+                  if (org.level === 1) levelColorClass = "bg-purple-100 text-purple-800 border-purple-200";
+                  else if (org.level === 2) levelColorClass = "bg-blue-100 text-blue-800 border-blue-200";
+                  else if (org.level === 3) levelColorClass = "bg-teal-100 text-teal-800 border-teal-200";
+                  else if (org.level === 4) levelColorClass = "bg-amber-100 text-amber-800 border-amber-200";
+                  else if (org.level >= 5) levelColorClass = "bg-rose-100 text-rose-800 border-rose-200";
+
                   return (
                     <tr 
                       key={org.id} 
                       className={rowStyle}
                       onClick={() => setSelectedNodeId(org.id)}
                     >
-                      {/* Logo */}
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex justify-center">
-                          {org.logo ? (
-                            <img src={org.logo} alt="Logo" className="w-8 h-8 rounded object-cover border border-slate-200 shadow-sm" />
-                          ) : (
-                            <div className="w-8 h-8 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600">
-                              <Network size={14} />
-                            </div>
-                          )}
-                        </div>
-                      </td>
-
                       {/* Name */}
                       <td className="py-3 font-bold text-slate-800" style={{ paddingLeft: `${Math.max(24, 24 + (org.level - 1) * 20)}px`, paddingRight: '24px' }}>
                         <div className="flex items-center gap-2">
@@ -3298,29 +3292,37 @@ export default function OrgManagerApp() {
                             {org.name || <span className="text-slate-500 italic font-normal">ไม่ได้ระบุชื่อ</span>}
                           </span>
                           {issue && (
-                            <span className={`${hasError ? 'text-red-700' : 'text-amber-700'} shrink-0`} title={issue.message}>
-                              <AlertTriangle size={14} className="animate-pulse" />
-                            </span>
+                            <div 
+                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border shrink-0 ${
+                                hasError 
+                                  ? 'bg-red-50 text-red-700 border-red-200' 
+                                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                              }`} 
+                              title={issue.message}
+                            >
+                              <AlertTriangle size={10} className="animate-pulse" />
+                              <span className="truncate max-w-[150px]">{issue.message}</span>
+                            </div>
                           )}
                         </div>
                       </td>
 
-                      {/* Parent */}
-                      <td className="px-6 py-3">
-                        {hasParent ? (
-                          <span className={`bg-blue-50 px-2 py-1 rounded text-[11px] font-bold border border-blue-100 ${parentOrg?.name ? 'text-blue-800' : 'text-slate-500 italic font-normal'}`}>
-                            {parentName}
-                          </span>
-                        ) : (
-                          <span className="text-slate-500 italic font-normal">หน่วยงานสูงสุด</span>
-                        )}
-                      </td>
-
                       {/* Level */}
                       <td className="px-4 py-3 text-center">
-                        <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-mono text-[11px] font-bold border border-slate-200">
+                        <span className={`${levelColorClass} px-2 py-0.5 rounded font-mono text-[11px] font-bold border`}>
                           L{org.level}
                         </span>
+                      </td>
+
+                      {/* Children Count */}
+                      <td className="px-6 py-3 text-center">
+                        {childCount > 0 ? (
+                          <span className="text-slate-700 bg-slate-100 border border-slate-200 px-2 py-1 rounded text-[11px] font-bold">
+                            {childCount} แห่ง
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
                       </td>
 
                       {/* Areas */}
@@ -3333,25 +3335,6 @@ export default function OrgManagerApp() {
                           <span className="text-slate-600 bg-slate-50 border border-slate-100 px-2 py-1 rounded text-[11px] font-medium">
                             ไม่มีพื้นที่รับผิดชอบ
                           </span>
-                        )}
-                      </td>
-
-                      {/* Status / Conflict */}
-                      <td className="px-6 py-3">
-                        {issue ? (
-                          <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
-                            hasError 
-                              ? 'bg-red-100 text-red-700 border-red-200' 
-                              : 'bg-amber-100 text-amber-900 border-amber-200'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${hasError ? 'bg-red-600' : 'bg-amber-600'} animate-ping shrink-0`} />
-                            <span className="truncate max-w-[220px]" title={issue.message}>{issue.message}</span>
-                          </div>
-                        ) : (
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-green-100 text-green-700 border border-green-200">
-                            <span className="w-1.5 h-1.5 rounded-full bg-green-600 shrink-0" />
-                            <span>ปกติ</span>
-                          </div>
                         )}
                       </td>
 
