@@ -19,6 +19,7 @@ import { toPng } from 'html-to-image';
 
 const getAreaCount = (areas) => {
   if (!areas) return 0;
+  if (areas.locations) return areas.locations.length;
   let count = 0;
   if (areas.tambons) count += areas.tambons.length;
   if (areas.amphoes) count += Object.keys(areas.amphoes).length;
@@ -155,14 +156,13 @@ const OrgNodeFlow = ({ id, data }) => {
             onClick={(e) => { e.stopPropagation(); setFocusNodeId(node.id); }}
             className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-bold shadow-sm transition-colors"
           >
-            ดูหน่วยงานย่อย
+            {childCount > 0 ? 'ดูหน่วยงานย่อย' : 'เพิ่มหน่วยงานย่อย'}
           </button>
         ) : (
           <button 
-            disabled
-            className="flex-1 py-1.5 bg-slate-50 text-slate-300 rounded-lg text-[10px] font-bold transition-colors cursor-not-allowed"
+            className="flex-1 py-1.5 bg-slate-100 text-slate-400 cursor-not-allowed rounded-lg text-[10px] font-bold shadow-sm"
           >
-            ดูหน่วยงานย่อย
+            {childCount > 0 ? 'ดูหน่วยงานย่อย' : 'เพิ่มหน่วยงานย่อย'}
           </button>
         )}
       </div>
@@ -313,7 +313,7 @@ const FlowInner = ({ orgTree, organizations, focusNodeId, setFocusNodeId, select
           treeLayout: 'vertical', // Force vertical for grid layout handles
           childCount,
           isParent: depth === 0,
-          isDrillable: depth === 1 && childCount > 0,
+          isDrillable: depth === 1,
           setFocusNodeId,
           handleAddNode,
           handleDeleteNode,
