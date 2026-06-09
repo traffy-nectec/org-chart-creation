@@ -49,6 +49,14 @@ const OrgNodeFlow = ({ id, data }) => {
   const { node, isSelected, hasError, hasWarning, issue, treeLayout, isDrillable, setFocusNodeId, handleAddNode, handleDeleteNode, isParent, childCount, setSelectedNodeId } = data;
   const isVert = treeLayout === 'vertical';
 
+  const lvl = node.level || 1;
+  let levelColorClass = "bg-slate-100 text-slate-700 border-slate-200";
+  if (lvl === 1) levelColorClass = "bg-purple-100 text-purple-800 border-purple-200";
+  else if (lvl === 2) levelColorClass = "bg-blue-100 text-blue-800 border-blue-200";
+  else if (lvl === 3) levelColorClass = "bg-teal-100 text-teal-800 border-teal-200";
+  else if (lvl === 4) levelColorClass = "bg-amber-100 text-amber-800 border-amber-200";
+  else if (lvl >= 5) levelColorClass = "bg-rose-100 text-rose-800 border-rose-200";
+
   return (
     <div 
       className={`relative p-3 rounded-2xl transition-all duration-200 bg-white ${isParent ? 'w-[480px]' : 'w-[240px]'} h-[210px] flex flex-col ${
@@ -73,9 +81,9 @@ const OrgNodeFlow = ({ id, data }) => {
     >
       <div className="text-[10px] font-bold uppercase tracking-wider mb-2 flex justify-between items-start group">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className={`px-1.5 py-0.5 rounded font-bold ${
-            hasError ? 'bg-red-100 text-red-700' : 'text-slate-650 bg-slate-100'
-          }`}>ระดับ {node.level || 1}</span>
+          <span className={`px-1.5 py-0.5 rounded font-bold border ${
+            hasError ? 'bg-red-100 text-red-700 border-red-200' : levelColorClass
+          }`}>ระดับ {lvl}</span>
           {isParent && (
             <span className="px-1.5 py-0.5 rounded font-bold bg-slate-900 text-white flex items-center">ต้นสังกัด</span>
           )}

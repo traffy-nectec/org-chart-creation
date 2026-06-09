@@ -3310,7 +3310,7 @@ export default function OrgManagerApp() {
                       {/* Level */}
                       <td className="px-4 py-3 text-center">
                         <span className={`${levelColorClass} px-2 py-0.5 rounded font-mono text-[11px] font-bold border`}>
-                          L{org.level}
+                          ระดับ {org.level}
                         </span>
                       </td>
 
