@@ -3627,7 +3627,7 @@ export default function OrgManagerApp() {
                     <div className="bg-white/90 backdrop-blur border border-slate-200 shadow-sm rounded-xl px-3 py-2 flex flex-wrap items-center gap-2 text-sm font-medium">
                       {orgTree.length > 1 && (
                         <button 
-                          onClick={() => setFocusNodeId(null)}
+                          onClick={() => { setFocusNodeId(null); setSelectedNodeId(null); }}
                           className={`hover:text-blue-600 transition-colors ${!focusNodeId ? 'text-blue-700 font-bold' : 'text-slate-500'}`}
                         >
                           หน้าหลัก
@@ -3639,7 +3639,7 @@ export default function OrgManagerApp() {
                             <ChevronRight size={14} className="text-slate-400" />
                           )}
                           <button
-                            onClick={() => setFocusNodeId(node.id)}
+                            onClick={() => { setFocusNodeId(node.id); setSelectedNodeId(null); }}
                             className={`hover:text-blue-600 transition-colors truncate max-w-[150px] ${index === breadcrumbPath.length - 1 ? 'text-blue-700 font-bold' : 'text-slate-500'}`}
                             title={node.name}
                           >
