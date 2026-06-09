@@ -112,9 +112,15 @@ const JsonTreeViewer = ({ data, level = 0, isLast = true }) => {
 // ==========================================
 // Dictionary for converting abbreviations to official terms.
 // Easily extendable - just add key-value pairs here.
-export const ALIAS_DICTIONARY = {
-  'อบต.': 'องค์การบริหารส่วนตำบล',
-  'อบจ.': 'องค์การบริหารส่วนจังหวัด',
+export const FULL_TO_ABBREV_DICT = {
+  'องค์การบริหารส่วนตำบล': 'อบต.',
+  'องค์การบริหารส่วนจังหวัด': 'อบจ.',
+  'สถานีตำรวจภูธร': 'สภ.',
+  'สถานีตำรวจนครบาล': 'สน.',
+};
+
+export const ABBREV_TO_FULL_DICT = {
+  'อ.': 'อำเภอ',
   'ทน.': 'เทศบาลนคร',
   'ทม.': 'เทศบาลเมือง',
   'ทต.': 'เทศบาลตำบล',
@@ -134,9 +140,10 @@ export const ALIAS_DICTIONARY = {
  * - Removes extra spaces
  * - Resolves double vowels (เเ -> แ) and duplicate tone marks
  * - Strips unwanted special characters
- * - Normalizes abbreviations using ALIAS_DICTIONARY (Full to Abbrev)
+ * - Converts specific full names to abbreviations (FULL_TO_ABBREV_DICT)
+ * - Expands specific abbreviations to full names (ABBREV_TO_FULL_DICT)
  */
-export const sanitizeString = (str, dictionary = ALIAS_DICTIONARY, options = { showToast: false }) => {
+export const sanitizeString = (str, options = { showToast: false }) => {
   if (!str) return '';
   let cleaned = String(str);
 
@@ -169,18 +176,42 @@ export const sanitizeString = (str, dictionary = ALIAS_DICTIONARY, options = { s
   // 4. Normalize spacing
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
-  // 5. Abbreviate full names to abbreviations using dictionary
-  // Sort by fullWord length descending to match longer names first
-  const entries = Object.entries(dictionary);
-  const sortedEntries = entries.sort((a, b) => b[1].length - a[1].length);
-  
-  for (const [abbrev, fullWord] of sortedEntries) {
+  // 5. Abbreviate full names
+  const fullToAbbrevEntries = Object.entries(FULL_TO_ABBREV_DICT).sort((a, b) => b[0].length - a[0].length);
+  for (const [fullWord, abbrev] of fullToAbbrevEntries) {
     if (cleaned.includes(fullWord)) {
       cleaned = cleaned.replaceAll(fullWord, abbrev);
       if (options.showToast) {
         toast.success(`เปลี่ยนคำว่า "${fullWord}" เป็น "${abbrev}"`, {
           duration: 3000,
         });
+      }
+    }
+  }
+
+  // 6. Expand abbreviations
+  const abbrevToFullEntries = Object.entries(ABBREV_TO_FULL_DICT).sort((a, b) => b[0].length - a[0].length);
+  for (const [abbrev, fullWord] of abbrevToFullEntries) {
+    if (abbrev.endsWith('.')) {
+      const escaped = abbrev.replace(/\./g, '\\.');
+      const regex = new RegExp(escaped, 'g');
+      if (regex.test(cleaned)) {
+        cleaned = cleaned.replace(regex, fullWord);
+        if (options.showToast) {
+          toast.success(`เปลี่ยนคำย่อ "${abbrev}" เป็น "${fullWord}"`, {
+            duration: 3000,
+          });
+        }
+      }
+    } else {
+      const regex = new RegExp(abbrev, 'g');
+      if (regex.test(cleaned)) {
+        cleaned = cleaned.replace(regex, fullWord);
+        if (options.showToast) {
+          toast.success(`เปลี่ยนคำย่อ "${abbrev}" เป็น "${fullWord}"`, {
+            duration: 3000,
+          });
+        }
       }
     }
   }
@@ -1879,7 +1910,7 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose
             value={selectedNode.name || ''}
             onChange={(e) => handleUpdateNode(selectedNode.id, 'name', e.target.value)}
             onBlur={(e) => {
-              const cleaned = sanitizeString(e.target.value, ALIAS_DICTIONARY, { showToast: true });
+              const cleaned = sanitizeString(e.target.value, { showToast: true });
               if (cleaned !== e.target.value) {
                 handleUpdateNode(selectedNode.id, 'name', cleaned);
               }
