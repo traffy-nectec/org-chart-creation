@@ -5,7 +5,7 @@ import {
   ChevronsDown, ChevronsUp,
   Image as ImageIcon, Upload, ZoomIn, ZoomOut, Maximize, Minimize,
   FileSpreadsheet, X, Download, Table, LayoutTemplate, LayoutList,
-  AlertTriangle, Code, Copy, Check, Braces, Database, AlignLeft, Search, ExternalLink
+  AlertTriangle, Code, Copy, Check, Braces, Database, AlignLeft, Search, ExternalLink, Undo2
 } from 'lucide-react';
 import { ThailandAddressTypeahead, ThailandAddressValue, useAddressTypeaheadContext } from "react-thailand-address-typeahead";
 import * as XLSX from 'xlsx';
@@ -1490,7 +1490,7 @@ const CustomAddressInput = ({ placeholder, className }) => {
   );
 };
 
-const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, nodeIssues, moveMode, setMoveMode, locationDb, setFocusNodeId }) => {
+const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, nodeIssues, moveMode, setMoveMode, locationDb, setFocusNodeId, setSearchedNodeId }) => {
   const [addressInput, setAddressInput] = React.useState({
     subdistrict: '',
     district: '',
@@ -1501,6 +1501,24 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
   const [isParentModalOpen, setIsParentModalOpen] = React.useState(false);
   const [parentSearchQuery, setParentSearchQuery] = React.useState('');
   const [pendingParentId, setPendingParentId] = React.useState(null);
+  const [selectedMoveMode, setSelectedMoveMode] = React.useState(null);
+  const [confirmingParentData, setConfirmingParentData] = React.useState(null);
+
+  const allAncestors = React.useMemo(() => {
+    if (!organizations || !selectedNode) return [];
+    const ancestors = [];
+    let currId = selectedNode.parentId;
+    while (currId) {
+      const parent = organizations.find(o => o.id === currId);
+      if (parent) {
+        ancestors.unshift(parent);
+        currId = parent.parentId;
+      } else {
+        break;
+      }
+    }
+    return ancestors;
+  }, [organizations, selectedNode]);
 
   React.useEffect(() => {
     setAddressInput({
@@ -1633,10 +1651,13 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
     return parts.join(' ');
   };
 
-  const handleConfirmParentChange = (mode) => {
-    setMoveMode(mode);
+  const handleConfirmParentChange = () => {
+    if (pendingParentId === undefined) return;
+    setMoveMode(selectedMoveMode || 'branch');
     handleUpdateNode(selectedNode.id, 'parentId', pendingParentId);
     setPendingParentId(null);
+    setSelectedMoveMode(null);
+    setConfirmingParentData(null);
     setIsParentModalOpen(false);
   };
 
@@ -1693,31 +1714,103 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
           </p>
         </div>
 
-        {/* หน่วยงานต้นสังกัด */}
+        {/* สายการบังคับบัญชา (ทุกระดับ) */}
         <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3">
           <div className="flex justify-between items-center">
-            <label className="block text-[10px] font-bold text-slate-650 uppercase">หน่วยงานต้นสังกัด</label>
-            {!isPrimaryRoot && (
-              <button 
-                onClick={() => {
-                  setParentSearchQuery('');
-                  setPendingParentId(null);
-                  setIsParentModalOpen(true);
-                }}
-                className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition-colors"
-              >
-                เปลี่ยน
-              </button>
-            )}
+            <label className="block text-[10px] font-bold text-slate-650 uppercase">สายการบังคับบัญชา (ทุกระดับ)</label>
           </div>
           
-          <div className="text-sm font-bold text-slate-800 bg-white border border-slate-200 p-3 rounded-lg shadow-sm break-words whitespace-normal leading-relaxed">
-            {isPrimaryRoot ? (
-              <span className="text-amber-700 flex items-center gap-1.5">
-                <span>👑</span> หน่วยงานสูงสุดของระบบ
-              </span>
+          <div className="bg-white border border-slate-200 p-3 rounded-lg shadow-sm">
+            {isPrimaryRoot && allAncestors.length === 0 ? (
+              <div className="flex justify-between items-center group">
+                <span className="text-sm font-bold text-amber-700 flex items-center gap-1.5">
+                  <span>👑</span> หน่วยงานสูงสุดของระบบ
+                </span>
+                <button 
+                  onClick={() => {
+                    setParentSearchQuery('');
+                    setPendingParentId(null);
+                    setSelectedMoveMode(hasChildren ? null : 'branch');
+                    setIsParentModalOpen(true);
+                  }}
+                  className="shrink-0 text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded transition-colors opacity-0 group-hover:opacity-100 sm:opacity-100"
+                  title="กำหนดต้นสังกัด"
+                >
+                  ตั้งต้นสังกัด
+                </button>
+              </div>
+            ) : allAncestors.length > 0 ? (
+              <div className="space-y-1.5">
+                {allAncestors.map((anc, idx) => {
+                  const isImmediateParent = idx === allAncestors.length - 1;
+                  return (
+                    <div key={anc.id} className="flex items-start gap-2 text-xs group">
+                      <div className="flex flex-col items-center mt-0.5 min-w-[16px]">
+                        <div className="w-4 h-4 shrink-0 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center text-[8px] font-bold text-slate-500" title={`ระดับ ${anc.level}`}>
+                          {anc.level || '-'}
+                        </div>
+                        <div className="w-px bg-slate-200 h-3 my-0.5"></div>
+                      </div>
+                      <div className="flex-1 flex justify-between items-start gap-2">
+                        <button 
+                          onClick={() => {
+                            setFocusNodeId(anc.parentId || null);
+                            setSelectedNodeId(anc.id);
+                            // Need to pass setSearchedNodeId to focus correctly
+                            if (setSearchedNodeId) setSearchedNodeId(anc.id);
+                          }}
+                          className={`${isImmediateParent ? 'font-bold text-slate-900' : 'font-medium text-slate-700'} hover:text-blue-600 cursor-pointer break-words whitespace-normal leading-tight pt-0.5 text-left underline decoration-slate-200 hover:decoration-blue-500 underline-offset-2 transition-colors`}
+                        >
+                          {anc.name}
+                        </button>
+                        {isImmediateParent && (
+                          <button 
+                            onClick={() => {
+                              setParentSearchQuery('');
+                              setPendingParentId(null);
+                              setSelectedMoveMode(hasChildren ? null : 'branch');
+                              setIsParentModalOpen(true);
+                            }}
+                            className="shrink-0 text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded transition-colors opacity-0 group-hover:opacity-100 sm:opacity-100"
+                            title="เปลี่ยนต้นสังกัด"
+                          >
+                            เปลี่ยน
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* Current Node */}
+                <div className="flex items-start gap-2 text-xs group">
+                  <div className="flex flex-col items-center mt-0.5 min-w-[16px]">
+                    <div className="w-4 h-4 shrink-0 rounded-full bg-blue-100 border border-blue-400 flex items-center justify-center text-[8px] font-bold text-blue-700" title={`ระดับ ${selectedNode.level}`}>
+                      {selectedNode.level || '-'}
+                    </div>
+                  </div>
+                  <div className="flex-1 flex justify-between items-start gap-2">
+                    <div className="font-bold text-blue-700 break-words whitespace-normal leading-tight pt-0.5">
+                      {selectedNode.name || '(ไม่มีชื่อ)'} <span className="text-[10px] font-normal text-blue-500 ml-1">(หน่วยงานนี้)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : (
-              <span>{parentName || '(ไม่มีต้นสังกัด)'}</span>
+              <div className="flex justify-between items-center group">
+                <span className="text-sm font-bold text-slate-800">(ไม่มีต้นสังกัด)</span>
+                <button 
+                  onClick={() => {
+                    setParentSearchQuery('');
+                    setPendingParentId(null);
+                    setSelectedMoveMode(hasChildren ? null : 'branch');
+                    setIsParentModalOpen(true);
+                  }}
+                  className="shrink-0 text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded transition-colors opacity-0 group-hover:opacity-100 sm:opacity-100"
+                  title="ตั้งต้นสังกัด"
+                >
+                  ตั้งต้นสังกัด
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -1793,54 +1886,128 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
           <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-md rounded-xl p-4 flex flex-col border border-slate-200 shadow-xl animate-in fade-in zoom-in-95">
             <div className="flex justify-between items-center mb-4">
               <h4 className="font-bold text-slate-800">เลือกต้นสังกัดใหม่</h4>
-              <button onClick={() => setIsParentModalOpen(false)} className="text-slate-500 hover:bg-slate-100 p-1 rounded transition-colors"><X size={16}/></button>
+              <button 
+                onClick={() => {
+                  setIsParentModalOpen(false);
+                  setPendingParentId(null);
+                  setSelectedMoveMode(null);
+                  setConfirmingParentData(null);
+                }} 
+                className="text-slate-500 hover:bg-slate-100 p-1 rounded transition-colors"
+              >
+                <X size={16}/>
+              </button>
             </div>
             
-            <input 
-              type="text" 
-              placeholder="ค้นหาชื่อหน่วยงาน..." 
-              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 mb-3"
-              value={parentSearchQuery}
-              onChange={e => setParentSearchQuery(e.target.value)}
-            />
-
-            <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-hide">
-              <button
-                onClick={() => setPendingParentId(null)}
-                className={`w-full text-left p-2.5 rounded-lg border text-sm font-bold transition-colors ${pendingParentId === null ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'}`}
-              >
-                -- เป็นหน่วยงานสูงสุด (ไม่มีต้นสังกัด) --
-              </button>
-              {parentOptions.map(org => (
-                <button
-                  key={org.id}
-                  onClick={() => setPendingParentId(org.id)}
-                  className={`w-full text-left p-2.5 rounded-lg border text-sm font-bold transition-colors ${pendingParentId === org.id ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'}`}
+            {hasChildren && selectedMoveMode === null ? (
+              <div className="flex flex-col gap-3 h-full justify-center pb-8 animate-in slide-in-from-bottom-2">
+                <p className="text-sm font-bold text-slate-700 text-center mb-2">เลือกรูปแบบการย้ายหน่วยงาน</p>
+                <button 
+                  onClick={() => setSelectedMoveMode('branch')}
+                  className="w-full p-4 bg-white border-2 border-slate-200 text-slate-700 rounded-xl text-left hover:border-blue-500 hover:bg-blue-50/50 transition-all group"
                 >
-                  {org.name || '(ไม่มีชื่อ)'}
+                  <div className="font-bold text-sm text-slate-900 group-hover:text-blue-700 mb-1">📦 ย้ายทั้งสาย</div>
+                  <div className="text-xs text-slate-500 font-medium">นำหน่วยงานย่อยทั้งหมดติดไปด้วย</div>
                 </button>
-              ))}
-            </div>
-
-            {pendingParentId !== undefined && pendingParentId !== selectedNode.parentId && (
-              <div className="mt-4 border-t border-slate-200 pt-4 animate-in slide-in-from-bottom-2">
-                <p className="text-[10px] font-bold text-slate-600 mb-2">รูปแบบการย้าย:</p>
-                <div className="flex flex-col gap-2">
-                  <button 
-                    onClick={() => handleConfirmParentChange('branch')}
-                    className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm transition-colors"
+                <button 
+                  onClick={() => setSelectedMoveMode('single')}
+                  className="w-full p-4 bg-white border-2 border-slate-200 text-slate-700 rounded-xl text-left hover:border-blue-500 hover:bg-blue-50/50 transition-all group"
+                >
+                  <div className="font-bold text-sm text-slate-900 group-hover:text-blue-700 mb-1">📄 ย้ายเฉพาะหน่วยงานนี้</div>
+                  <div className="text-xs text-slate-500 font-medium">ฝากหน่วยงานย่อยไว้ที่ต้นสังกัดเดิม</div>
+                </button>
+              </div>
+            ) : confirmingParentData ? (
+              <div className="flex flex-col h-full animate-in slide-in-from-right-4">
+                <div className="flex-1 space-y-4 pt-2">
+                  <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
+                    <p className="text-xs font-bold text-amber-800 mb-3 text-center">ยืนยันการย้ายต้นสังกัด?</p>
+                    
+                    <div className="space-y-3">
+                      <div className="bg-white p-3 rounded-lg border border-amber-100">
+                        <div className="text-[10px] text-slate-500 font-bold uppercase mb-1">หน่วยงานปัจจุบัน</div>
+                        <div className="text-sm font-bold text-slate-800">{selectedNode.name}</div>
+                      </div>
+                      
+                      <div className="flex justify-center text-amber-500">
+                        <ChevronsDown size={16} />
+                      </div>
+                      
+                      <div className="bg-white p-3 rounded-lg border border-amber-100">
+                        <div className="text-[10px] text-slate-500 font-bold uppercase mb-1">ย้ายไปอยู่ภายใต้</div>
+                        <div className="text-sm font-bold text-blue-700">{confirmingParentData.name}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-4 border-t border-slate-100 shrink-0">
+                  <button
+                    onClick={() => {
+                      setConfirmingParentData(null);
+                      setPendingParentId(null);
+                    }}
+                    className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-200 transition-colors"
                   >
-                    ย้ายทั้งสาย (นำหน่วยงานย่อยไปด้วย)
+                    ย้อนกลับ
                   </button>
-                  {hasChildren && (
-                    <button 
-                      onClick={() => handleConfirmParentChange('single')}
-                      className="w-full py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
+                  <button
+                    onClick={handleConfirmParentChange}
+                    className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 shadow-sm transition-colors"
+                  >
+                    ยืนยันการย้าย
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col h-full animate-in slide-in-from-right-4">
+                <input 
+                  type="text" 
+                  placeholder="ค้นหาชื่อหน่วยงานต้นสังกัดใหม่..." 
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 mb-3 shrink-0"
+                  value={parentSearchQuery}
+                  onChange={e => setParentSearchQuery(e.target.value)}
+                  autoFocus
+                />
+
+                <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-hide pb-2">
+                  <button
+                    onClick={() => {
+                      setPendingParentId(null);
+                      setConfirmingParentData({ name: '-- เป็นหน่วยงานสูงสุด (ไม่มีต้นสังกัด) --' });
+                    }}
+                    className="w-full text-left p-2.5 rounded-lg border text-sm font-bold transition-colors bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
+                  >
+                    -- เป็นหน่วยงานสูงสุด (ไม่มีต้นสังกัด) --
+                  </button>
+                  {parentOptions.map(org => (
+                    <button
+                      key={org.id}
+                      onClick={() => {
+                        setPendingParentId(org.id);
+                        setConfirmingParentData(org);
+                      }}
+                      className="w-full text-left p-2.5 rounded-lg border text-sm font-bold transition-colors bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
                     >
-                      ย้ายเฉพาะหน่วยงานนี้ (ฝากลูกน้องไว้ที่เดิม)
+                      {org.name || '(ไม่มีชื่อ)'}
                     </button>
+                  ))}
+                  {parentOptions.length === 0 && (
+                    <div className="text-center py-4 text-xs font-medium text-slate-500">
+                      ไม่พบหน่วยงานอื่นที่สามารถเป็นต้นสังกัดได้
+                    </div>
                   )}
                 </div>
+                
+                {hasChildren && (
+                  <div className="pt-3 border-t border-slate-100 shrink-0">
+                    <button
+                      onClick={() => setSelectedMoveMode(null)}
+                      className="text-xs font-medium text-slate-500 hover:text-slate-700 flex items-center justify-center w-full gap-1 p-2"
+                    >
+                      <ChevronLeft size={14} /> กลับไปเลือกรูปแบบการย้าย
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2144,6 +2311,31 @@ export default function OrgManagerApp() {
   ];
 
   const [organizations, setOrganizations] = useState(DEFAULT_ORGS);
+  const [history, setHistory] = useState([]);
+
+  const setOrganizationsWithHistory = (updater) => {
+    setOrganizations(prevOrgs => {
+      const nextOrgs = typeof updater === 'function' ? updater(prevOrgs) : updater;
+      // Only push to history if there is an actual change
+      if (prevOrgs !== nextOrgs && JSON.stringify(prevOrgs) !== JSON.stringify(nextOrgs)) {
+        setHistory(prev => {
+          const newHistory = [...prev, prevOrgs];
+          if (newHistory.length > 50) return newHistory.slice(-50);
+          return newHistory;
+        });
+      }
+      return nextOrgs;
+    });
+  };
+
+  const handleUndo = () => {
+    setHistory(prev => {
+      if (prev.length === 0) return prev;
+      const lastState = prev[prev.length - 1];
+      setOrganizations(lastState);
+      return prev.slice(0, -1);
+    });
+  };
   
   const [draftData, setDraftData] = useState(null);
   const [showDraftModal, setShowDraftModal] = useState(false);
@@ -2205,6 +2397,7 @@ export default function OrgManagerApp() {
   }, [locationDb]);
 
   const [selectedNodeId, setSelectedNodeId] = useState('root-1');
+  const [searchedNodeId, setSearchedNodeId] = useState(null);
   const [focusNodeId, setFocusNodeId] = useState(null);
   const [zoomScale, setZoomScale] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -2575,12 +2768,12 @@ export default function OrgManagerApp() {
       id: `node-${Date.now()}`, name: '', level: currentLevel + 1, parentId: parentId, logo: null,
       areas: { locations: [] }
     };
-    setOrganizations(orgs => recalculateAllLevels([...orgs, newNode]));
+    setOrganizationsWithHistory(orgs => recalculateAllLevels([...orgs, newNode]));
     setSelectedNodeId(newNode.id);
   };
 
   const handleUpdateNode = (id, field, value) => {
-    setOrganizations(orgs => {
+    setOrganizationsWithHistory(orgs => {
       let nextOrgs = [...orgs];
       if (field === 'parentId') {
         const targetNode = orgs.find(org => org.id === id);
@@ -2606,7 +2799,7 @@ export default function OrgManagerApp() {
       currentSize = idsToDelete.size;
       organizations.forEach(org => { if (idsToDelete.has(org.parentId)) idsToDelete.add(org.id); });
     }
-    setOrganizations(orgs => recalculateAllLevels(orgs.filter(org => !idsToDelete.has(org.id))));
+    setOrganizationsWithHistory(orgs => recalculateAllLevels(orgs.filter(org => !idsToDelete.has(org.id))));
     if (selectedNodeId === id) setSelectedNodeId(null);
   };
 
@@ -2616,7 +2809,7 @@ export default function OrgManagerApp() {
     const parentIdOfDeleted = targetNode.parentId;
     const directChildren = organizations.filter(org => org.parentId === id);
 
-    setOrganizations(orgs => {
+    setOrganizationsWithHistory(orgs => {
       let nextOrgs = orgs.filter(org => org.id !== id);
       
       if (!parentIdOfDeleted) {
@@ -2773,7 +2966,7 @@ export default function OrgManagerApp() {
 
   const handleFileImport = (newOrgs) => {
     if (newOrgs && newOrgs.length > 0) {
-      setOrganizations(recalculateAllLevels(newOrgs));
+      setOrganizationsWithHistory(recalculateAllLevels(newOrgs));
       setSelectedNodeId(newOrgs[0].id);
       setIsImportModalOpen(false);
       alert(`นำเข้าข้อมูลหน่วยงานสำเร็จ: ${newOrgs.length} หน่วยงาน`);
@@ -3045,7 +3238,7 @@ export default function OrgManagerApp() {
   };
 
   const handleCleanAllData = () => {
-    setOrganizations(prevOrgs => {
+    setOrganizationsWithHistory(prevOrgs => {
       const cleaned = prevOrgs.map(org => ({
         ...org,
         name: sanitizeString(org.name)
@@ -3265,6 +3458,8 @@ export default function OrgManagerApp() {
                   moveMode={moveMode}
                   setMoveMode={setMoveMode}
                   locationDb={locationDb}
+                  setFocusNodeId={setFocusNodeId}
+                  setSearchedNodeId={setSearchedNodeId}
                 />
              </div>
           )}
@@ -3376,6 +3571,8 @@ export default function OrgManagerApp() {
                     setFocusNodeId={setFocusNodeId}
                   selectedNodeId={selectedNodeId}
                   setSelectedNodeId={setSelectedNodeId}
+                  searchedNodeId={searchedNodeId}
+                  setSearchedNodeId={setSearchedNodeId}
                   handleAddNode={handleAddNode}
                   handleDeleteNode={handleDeleteNode}
                   treeLayout={treeLayout}
