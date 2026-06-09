@@ -142,6 +142,12 @@ export const sanitizeString = (str, dictionary = ALIAS_DICTIONARY) => {
   // 1. Fix double 'เ' -> 'แ'
   cleaned = cleaned.replace(/เเ/g, 'แ');
 
+  // Fix 'ํา' (Nikhahit + Sara Aa) -> 'ำ' (Sara Am)
+  cleaned = cleaned.replace(/\u0E4D\u0E32/g, '\u0E33');
+
+  // Remove 'บัญชีทางการ'
+  cleaned = cleaned.replace(/บัญชีทางการ/g, '');
+
   // 2. Remove consecutive repeated Thai vowels / tone marks (typos)
   cleaned = cleaned.replace(/่+/g, '่');
   cleaned = cleaned.replace(/้+/g, '้');
