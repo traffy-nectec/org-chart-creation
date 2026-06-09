@@ -3226,7 +3226,7 @@ export default function OrgManagerApp() {
                 <th className="px-6 py-3.5">ชื่อหน่วยงาน</th>
                 <th className="px-4 py-3.5 w-24 text-center">ระดับ</th>
                 <th className="px-6 py-3.5 w-32 text-center">หน่วยงานย่อย</th>
-                <th className="px-6 py-3.5">พื้นที่รับผิดชอบ</th>
+                <th className="px-6 py-3.5 w-32 text-center">พื้นที่รับผิดชอบ</th>
                 <th className="px-4 py-3.5 min-w-[180px] text-center">การจัดการ</th>
               </tr>
             </thead>
@@ -3326,15 +3326,13 @@ export default function OrgManagerApp() {
                       </td>
 
                       {/* Areas */}
-                      <td className="px-6 py-3">
+                      <td className="px-6 py-3 text-center">
                         {areaCount > 0 ? (
                           <span className="text-blue-700 bg-blue-50/70 border border-blue-100 px-2 py-1 rounded text-[11px] font-bold" title={formatAreaLabel(org.areas)}>
-                            รับผิดชอบ {areaCount} พื้นที่
+                            {areaCount}
                           </span>
                         ) : (
-                          <span className="text-slate-600 bg-slate-50 border border-slate-100 px-2 py-1 rounded text-[11px] font-medium">
-                            ไม่มีพื้นที่รับผิดชอบ
-                          </span>
+                          <span className="text-slate-400">-</span>
                         )}
                       </td>
 
