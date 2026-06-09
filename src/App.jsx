@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { ThailandAddressTypeahead, ThailandAddressValue, useAddressTypeaheadContext } from "react-thailand-address-typeahead";
 import * as XLSX from 'xlsx';
+import toast, { Toaster } from 'react-hot-toast';
 import ReactFlowOrgChart from './ReactFlowOrgChart';
 
 // สร้างข้อมูลจำลองพื้นที่ 77 จังหวัด และพื้นที่ย่อยสำหรับตัวอย่าง
@@ -133,9 +134,9 @@ export const ALIAS_DICTIONARY = {
  * - Removes extra spaces
  * - Resolves double vowels (เเ -> แ) and duplicate tone marks
  * - Strips unwanted special characters
- * - Normalizes abbreviations using ALIAS_DICTIONARY
+ * - Normalizes abbreviations using ALIAS_DICTIONARY (Full to Abbrev)
  */
-export const sanitizeString = (str, dictionary = ALIAS_DICTIONARY) => {
+export const sanitizeString = (str, dictionary = ALIAS_DICTIONARY, options = { showToast: false }) => {
   if (!str) return '';
   let cleaned = String(str);
 
@@ -168,19 +169,19 @@ export const sanitizeString = (str, dictionary = ALIAS_DICTIONARY) => {
   // 4. Normalize spacing
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
-  // 5. Expand abbreviations from dictionary
-  // Sort keys by length descending to match longer abbreviations first (e.g., 'รพ.สต.' before 'รพ.')
-  const sortedKeys = Object.keys(dictionary).sort((a, b) => b.length - a.length);
-  for (const abbrev of sortedKeys) {
-    const fullWord = dictionary[abbrev];
-    if (abbrev.endsWith('.')) {
-      const escaped = abbrev.replace(/\./g, '\\.');
-      const regex = new RegExp(escaped, 'g');
-      cleaned = cleaned.replace(regex, fullWord);
-    } else {
-      // Direct replacement for sub-string abbreviations
-      const regex = new RegExp(abbrev, 'g');
-      cleaned = cleaned.replace(regex, fullWord);
+  // 5. Abbreviate full names to abbreviations using dictionary
+  // Sort by fullWord length descending to match longer names first
+  const entries = Object.entries(dictionary);
+  const sortedEntries = entries.sort((a, b) => b[1].length - a[1].length);
+  
+  for (const [abbrev, fullWord] of sortedEntries) {
+    if (cleaned.includes(fullWord)) {
+      cleaned = cleaned.replaceAll(fullWord, abbrev);
+      if (options.showToast) {
+        toast.success(`เปลี่ยนคำว่า "${fullWord}" เป็น "${abbrev}"`, {
+          duration: 3000,
+        });
+      }
     }
   }
 
@@ -1878,7 +1879,7 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose
             value={selectedNode.name || ''}
             onChange={(e) => handleUpdateNode(selectedNode.id, 'name', e.target.value)}
             onBlur={(e) => {
-              const cleaned = sanitizeString(e.target.value);
+              const cleaned = sanitizeString(e.target.value, ALIAS_DICTIONARY, { showToast: true });
               if (cleaned !== e.target.value) {
                 handleUpdateNode(selectedNode.id, 'name', cleaned);
               }
@@ -3438,6 +3439,7 @@ export default function OrgManagerApp() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 font-sans p-4 flex flex-col h-screen overflow-hidden">
+      <Toaster position="bottom-right" />
       
       {/* Header */}
       <header className="flex items-center justify-between shrink-0 mb-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
