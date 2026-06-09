@@ -3203,24 +3203,47 @@ export default function OrgManagerApp() {
             <p className="text-xs text-slate-500 mt-1">คลิกเลือกแถวเพื่อตั้งค่าข้อมูลพื้นที่ สังกัด และโลโก้ในแผงตั้งค่าด้านขวา</p>
           </div>
           
-          {/* Quick Table Search */}
-          <div className="relative w-64">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input 
-              type="text"
-              placeholder="ค้นหาหน่วยงานในตาราง..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 bg-white focus:outline-none focus:border-blue-500 shadow-sm"
-            />
-            {searchQuery && (
+          {/* Controls */}
+          <div className="flex items-center gap-2">
+            <div className="flex bg-slate-100 rounded-xl p-1 shrink-0">
               <button 
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                onClick={() => setCollapsedTableNodes(new Set())}
+                className="px-3 py-1.5 hover:bg-white hover:shadow-sm text-slate-700 rounded-lg text-xs font-bold transition-all"
+                title="แสดงทุกหน่วยงาน"
               >
-                <X size={14} />
+                ขยายทั้งหมด
               </button>
-            )}
+              <button 
+                onClick={() => {
+                  const nodesWithChildren = organizations.filter(o => o.children && o.children.length > 0).map(o => o.id);
+                  setCollapsedTableNodes(new Set(nodesWithChildren));
+                }}
+                className="px-3 py-1.5 hover:bg-white hover:shadow-sm text-slate-700 rounded-lg text-xs font-bold transition-all"
+                title="ซ่อนหน่วยงานย่อยทั้งหมด"
+              >
+                ย่อทั้งหมด
+              </button>
+            </div>
+
+            {/* Quick Table Search */}
+            <div className="relative w-64">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input 
+                type="text"
+                placeholder="ค้นหาหน่วยงานในตาราง..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 bg-white focus:outline-none focus:border-blue-500 shadow-sm"
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
