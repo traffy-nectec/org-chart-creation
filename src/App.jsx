@@ -320,6 +320,8 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
   const [excludedNodes, setExcludedNodes] = useState(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
   const [progressStep, setProgressStep] = useState('');
+  const [isFinalImporting, setIsFinalImporting] = useState(false);
+  const [finalImportProgress, setFinalImportProgress] = useState(0);
 
   const availableLevels = useMemo(() => {
     return Array.from(new Set(validatedNodes.map(n => n.level))).sort((a,b) => a - b);
@@ -573,13 +575,22 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
     reader.readAsArrayBuffer(file);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    setIsFinalImporting(true);
+    setFinalImportProgress(10);
+    await delay(100);
+
     const nodesToImport = validatedNodes.filter(node => !excludedNodes.has(node.name));
+    setFinalImportProgress(30);
+    await delay(100);
 
     const idMap = new Map();
     nodesToImport.forEach(node => {
       idMap.set(node.name, `org-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
     });
+
+    setFinalImportProgress(50);
+    await delay(100);
 
     const roots = nodesToImport.filter(node => !node.parentName || !idMap.has(node.parentName));
 
@@ -608,7 +619,16 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
       };
     });
 
+    setFinalImportProgress(80);
+    await delay(100);
+
     onImportData(finalOrgs);
+
+    setFinalImportProgress(100);
+    await delay(400);
+
+    setIsFinalImporting(false);
+    setFinalImportProgress(0);
     resetState();
   };
 
@@ -654,7 +674,7 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col overflow-hidden max-h-[90vh]">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col overflow-hidden max-h-[90vh] relative">
         
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
@@ -1081,6 +1101,26 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
             )}
           </div>
         </div>
+
+        {/* Final Import Progress Overlay */}
+        {isFinalImporting && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/20 backdrop-blur-sm animate-in fade-in">
+            <div className="text-center max-w-sm w-full p-8 bg-white rounded-2xl shadow-2xl border border-slate-100 scale-in-center">
+              <div className="mb-4 text-[#553923] flex justify-center">
+                <Database size={48} strokeWidth={1.5} className="animate-bounce" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-6">กำลังนำเข้าข้อมูล...</h3>
+              <div className="w-full bg-slate-100 rounded-full h-3 mb-3 overflow-hidden shadow-inner">
+                <div 
+                  className="bg-[#553923] h-3 rounded-full transition-all duration-300 ease-out" 
+                  style={{ width: `${finalImportProgress}%` }}
+                ></div>
+              </div>
+              <p className="text-xs font-bold text-slate-600">{finalImportProgress}% เสร็จสมบูรณ์</p>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
