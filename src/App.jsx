@@ -3103,7 +3103,6 @@ export default function OrgManagerApp() {
       setOrganizationsWithHistory(recalculateAllLevels(newOrgs));
       setSelectedNodeId(newOrgs[0].id);
       setIsImportModalOpen(false);
-      alert(`นำเข้าข้อมูลหน่วยงานสำเร็จ: ${newOrgs.length} หน่วยงาน`);
     } else {
       alert("ไม่พบข้อมูลหน่วยงานที่ถูกต้องในไฟล์");
     }
