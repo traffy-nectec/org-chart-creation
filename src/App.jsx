@@ -316,8 +316,14 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
   const [showDocumentation, setShowDocumentation] = useState(true);
   const [filterType, setFilterType] = useState('all'); // 'all' | 'issues' | 'valid'
   const [previewSearchQuery, setPreviewSearchQuery] = useState('');
+  const [filterLevel, setFilterLevel] = useState('all');
+  const [excludedNodes, setExcludedNodes] = useState(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
   const [progressStep, setProgressStep] = useState('');
+
+  const availableLevels = useMemo(() => {
+    return Array.from(new Set(validatedNodes.map(n => n.level))).sort((a,b) => a - b);
+  }, [validatedNodes]);
 
   if (!isOpen) return null;
 
@@ -568,14 +574,16 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
   };
 
   const handleConfirm = () => {
+    const nodesToImport = validatedNodes.filter(node => !excludedNodes.has(node.name));
+
     const idMap = new Map();
-    validatedNodes.forEach(node => {
+    nodesToImport.forEach(node => {
       idMap.set(node.name, `org-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
     });
 
-    const roots = validatedNodes.filter(node => !node.parentName);
+    const roots = nodesToImport.filter(node => !node.parentName || !idMap.has(node.parentName));
 
-    const finalOrgs = validatedNodes.map(node => {
+    const finalOrgs = nodesToImport.map(node => {
       let parentId = node.parentName && idMap.has(node.parentName) ? idMap.get(node.parentName) : null;
       let warnings = [...(node.warnings || [])];
       let errors = [...(node.errors || [])];
@@ -609,6 +617,8 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
     setValidatedNodes([]);
     setShowDocumentation(true);
     setFilterType('all');
+    setFilterLevel('all');
+    setExcludedNodes(new Set());
     setPreviewSearchQuery('');
   };
 
@@ -625,10 +635,14 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
     }
     // Tab filter
     if (filterType === 'issues') {
-      return node.errors.length > 0 || node.warnings.length > 0;
+      if (node.errors.length === 0 && node.warnings.length === 0) return false;
     }
     if (filterType === 'valid') {
-      return node.errors.length === 0 && node.warnings.length === 0;
+      if (node.errors.length > 0 || node.warnings.length > 0) return false;
+    }
+    // Level filter
+    if (filterLevel !== 'all' && String(node.level) !== String(filterLevel)) {
+      return false;
     }
     return true;
   });
@@ -784,36 +798,68 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
                 </div>
 
                 {/* Filter Controls */}
-                <div className="flex flex-col sm:flex-row gap-3 mb-4 shrink-0">
-                  <div className="relative flex-1">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input 
-                      type="text"
-                      placeholder="ค้นหารายชื่อหน่วยงานพรีวิว..."
-                      value={previewSearchQuery}
-                      onChange={(e) => setPreviewSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-500 bg-white"
-                    />
+                <div className="flex flex-col gap-3 mb-4 shrink-0">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input 
+                        type="text"
+                        placeholder="ค้นหารายชื่อหน่วยงานพรีวิว..."
+                        value={previewSearchQuery}
+                        onChange={(e) => setPreviewSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-500 bg-white"
+                      />
+                    </div>
+                    <div className="flex bg-slate-200 p-0.5 rounded-xl border border-slate-300 self-start text-xs font-bold">
+                      <button 
+                        onClick={() => setFilterType('all')} 
+                        className={`px-3 py-1.5 rounded-lg transition-colors ${filterType === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                      >
+                        ทั้งหมด ({validatedNodes.length})
+                      </button>
+                      <button 
+                        onClick={() => setFilterType('issues')} 
+                        className={`px-3 py-1.5 rounded-lg transition-colors ${filterType === 'issues' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'} flex items-center gap-1`}
+                      >
+                        พบปัญหา ({issueCount})
+                      </button>
+                      <button 
+                        onClick={() => setFilterType('valid')} 
+                        className={`px-3 py-1.5 rounded-lg transition-colors ${filterType === 'valid' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                      >
+                        ผ่านการตรวจ ({validCount})
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex bg-slate-200 p-0.5 rounded-xl border border-slate-300 self-start text-xs font-bold">
-                    <button 
-                      onClick={() => setFilterType('all')} 
-                      className={`px-3 py-1.5 rounded-lg transition-colors ${filterType === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-                    >
-                      ทั้งหมด ({validatedNodes.length})
-                    </button>
-                    <button 
-                      onClick={() => setFilterType('issues')} 
-                      className={`px-3 py-1.5 rounded-lg transition-colors ${filterType === 'issues' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'} flex items-center gap-1`}
-                    >
-                      พบปัญหา ({issueCount})
-                    </button>
-                    <button 
-                      onClick={() => setFilterType('valid')} 
-                      className={`px-3 py-1.5 rounded-lg transition-colors ${filterType === 'valid' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-                    >
-                      ผ่านการตรวจ ({validCount})
-                    </button>
+                  
+                  <div className="flex justify-between items-center bg-slate-100 p-2 rounded-xl border border-slate-200">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-700 ml-1">กรองระดับชั้น (Level):</span>
+                      <select 
+                        value={filterLevel}
+                        onChange={(e) => setFilterLevel(e.target.value)}
+                        className="text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg px-2 py-1 outline-none focus:border-blue-500"
+                      >
+                        <option value="all">แสดงทุกระดับ</option>
+                        {availableLevels.map(lvl => (
+                          <option key={lvl} value={lvl}>Level {lvl}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setExcludedNodes(new Set())}
+                        className="text-xs font-bold text-blue-700 hover:underline px-2"
+                      >
+                        นำเข้าทั้งหมด
+                      </button>
+                      <button
+                        onClick={() => setExcludedNodes(new Set(validatedNodes.map(n => n.name)))}
+                        className="text-xs font-bold text-slate-600 hover:underline px-2"
+                      >
+                        ไม่นำเข้าเลย
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -827,28 +873,47 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
                     filteredNodes.map((node, index) => {
                       const hasErrors = node.errors.length > 0;
                       const hasWarnings = node.warnings.length > 0;
+                      const isExcluded = excludedNodes.has(node.name);
+                      
                       let cardStyle = "border-slate-200 bg-white hover:border-blue-300";
                       if (hasErrors) cardStyle = "border-red-500 bg-red-50/70";
                       else if (hasWarnings) cardStyle = "border-amber-500 bg-amber-50/70";
+                      
+                      if (isExcluded) cardStyle = "border-slate-200 bg-slate-100 opacity-60 grayscale";
 
                       return (
-                        <div key={index} className={`p-4 rounded-xl border-2 transition-all shadow-sm ${cardStyle}`}>
+                        <div key={index} className={`p-4 rounded-xl border-2 transition-all shadow-sm flex flex-col ${cardStyle}`}>
                           <div className="flex justify-between items-start gap-2 mb-2">
-                            <div>
-                              <h4 className="font-bold text-slate-800 text-sm">{node.name}</h4>
-                              <div className="text-[11px] font-semibold text-slate-600 mt-0.5">
-                                ระดับ: <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">Level {node.level}</span>
-                                {node.parentName ? (
-                                  <> • ต้นสังกัด: <span className="text-blue-800">{node.parentName}</span></>
-                                ) : (
-                                  <> • <span className="text-slate-500 italic">หน่วยงานสูงสุด</span></>
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                              <label className="flex items-center gap-2 cursor-pointer mt-0.5">
+                                <input
+                                  type="checkbox"
+                                  checked={!isExcluded}
+                                  onChange={(e) => {
+                                    const newSet = new Set(excludedNodes);
+                                    if (e.target.checked) newSet.delete(node.name);
+                                    else newSet.add(node.name);
+                                    setExcludedNodes(newSet);
+                                  }}
+                                  className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500"
+                                />
+                              </label>
+                              <div className="min-w-0 flex-1">
+                                <h4 className={`font-bold text-sm ${isExcluded ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{node.name}</h4>
+                                <div className="text-[11px] font-semibold text-slate-600 mt-0.5">
+                                  ระดับ: <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">Level {node.level}</span>
+                                  {node.parentName ? (
+                                    <> • ต้นสังกัด: <span className="text-blue-800">{node.parentName}</span></>
+                                  ) : (
+                                    <> • <span className="text-slate-500 italic">หน่วยงานสูงสุด</span></>
+                                  )}
+                                </div>
+                                {node.originalParentName !== node.parentName && node.originalParentName && (
+                                  <p className="text-[10px] text-red-600 font-bold mt-1">
+                                    ⚠️ สังกัดเดิมในไฟล์: "{node.originalParentName}" (ถูกปรับปรุงอัตโนมัติ)
+                                  </p>
                                 )}
                               </div>
-                              {node.originalParentName !== node.parentName && node.originalParentName && (
-                                <p className="text-[10px] text-red-600 font-bold mt-1">
-                                  ⚠️ สังกัดเดิมในไฟล์: "{node.originalParentName}" (ถูกปรับปรุงอัตโนมัติ)
-                                </p>
-                              )}
                             </div>
                             <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-1 rounded-lg shrink-0">
                               รับผิดชอบ {node.locations.length} พื้นที่
