@@ -464,6 +464,17 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
           let tambon = cleanInput(rawTambon, 'tambon');
           const postalCode = rawPostalCode;
 
+          // If the area is nationwide or all, clear the location data so it becomes unassigned
+          const isNationwide = [province, amphoe, tambon, rawProvince, rawAmphoe, rawTambon].some(val => 
+            val && (val.includes('ทั่วประเทศ') || val.includes('ทั้งหมด'))
+          );
+
+          if (isNationwide) {
+            province = '';
+            amphoe = '';
+            tambon = '';
+          }
+
           if (!orgMap.has(orgName)) {
             orgMap.set(orgName, {
               name: orgName,
