@@ -544,6 +544,26 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
           }
         });
 
+        // Enforce Single Root Constraint in preview
+        const rootsInPreview = [];
+        orgList.forEach(org => {
+          if (!parentMap.get(org.name)) {
+            rootsInPreview.push(org.name);
+          }
+        });
+
+        if (rootsInPreview.length > 1) {
+          const mainRoot = rootsInPreview[0];
+          for (let i = 1; i < rootsInPreview.length; i++) {
+            const extraRoot = rootsInPreview[i];
+            parentMap.set(extraRoot, mainRoot);
+            const extraOrg = orgList.find(o => o.name === extraRoot);
+            if (extraOrg) {
+              extraOrg.warnings.push(`⚠️ ถูกปรับให้อยู่ภายใต้ ${mainRoot} เนื่องจากระบบกำหนดให้มีหน่วยงานสูงสุดได้เพียง 1 แห่ง`);
+            }
+          }
+        }
+
         // Level calculation
         const validated = orgList.map(org => {
           const calculatedLevel = getLevel(org.name, parentMap);
@@ -599,10 +619,13 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
       let warnings = [...(node.warnings || [])];
       let errors = [...(node.errors || [])];
 
-      // Enforce single root constraint
+      // Enforce single root constraint (in case exclusions changed the roots)
       if (roots.length > 1 && !node.parentName && node.name !== roots[0].name) {
         parentId = idMap.get(roots[0].name);
-        warnings.push(`⚠️ ถูกปรับให้อยู่ภายใต้ ${roots[0].name} เนื่องจากระบบกำหนดให้มีหน่วยงานสูงสุดได้เพียง 1 แห่ง`);
+        const warningMsg = `⚠️ ถูกปรับให้อยู่ภายใต้ ${roots[0].name} เนื่องจากระบบกำหนดให้มีหน่วยงานสูงสุดได้เพียง 1 แห่ง`;
+        if (!warnings.includes(warningMsg)) {
+          warnings.push(warningMsg);
+        }
       }
 
       return {
