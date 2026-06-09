@@ -3288,7 +3288,7 @@ export default function OrgManagerApp() {
                               {collapsedTableNodes.has(org.id) ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                             </button>
                           )}
-                          <span className="whitespace-normal break-words max-w-[200px]" title={org.name}>
+                          <span className="whitespace-normal break-words max-w-[500px]" title={org.name}>
                             {org.name || <span className="text-slate-500 italic font-normal">ไม่ได้ระบุชื่อ</span>}
                           </span>
                           {issue && (
@@ -3318,7 +3318,7 @@ export default function OrgManagerApp() {
                       <td className="px-6 py-3 text-center">
                         {childCount > 0 ? (
                           <span className="text-slate-700 bg-slate-100 border border-slate-200 px-2 py-1 rounded text-[11px] font-bold">
-                            {childCount} แห่ง
+                            {childCount}
                           </span>
                         ) : (
                           <span className="text-slate-400">-</span>
