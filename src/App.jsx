@@ -181,6 +181,12 @@ export const sanitizeString = (str, dictionary = ALIAS_DICTIONARY) => {
   // Final spaces normalization
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
+  // Handle common null-like strings from Excel
+  const upperCleaned = cleaned.toUpperCase();
+  if (upperCleaned === 'NULL' || upperCleaned === 'N/A' || upperCleaned === '-' || upperCleaned === 'ไม่มี' || upperCleaned === 'NONE') {
+    return '';
+  }
+
   return cleaned;
 };
 
