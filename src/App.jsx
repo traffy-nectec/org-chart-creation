@@ -1624,7 +1624,7 @@ const CustomAddressInput = ({ placeholder, className }) => {
   );
 };
 
-const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, nodeIssues, moveMode, setMoveMode, locationDb, setFocusNodeId, setSearchedNodeId }) => {
+const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose, organizations, nodeIssues, moveMode, setMoveMode, locationDb, setFocusNodeId, setSearchedNodeId }) => {
   const [addressInput, setAddressInput] = React.useState({
     subdistrict: '',
     district: '',
@@ -2165,6 +2165,15 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
             )}
           </div>
         )}
+
+        <div className="pt-4 border-t border-red-100 mt-6 shrink-0">
+          <button 
+            onClick={() => handleDeleteNode(selectedNode.id)}
+            className="w-full py-2.5 bg-red-50 hover:bg-red-500 text-red-600 hover:text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors border border-red-100 hover:border-red-500 shadow-sm"
+          >
+            <Trash2 size={16} /> ลบหน่วยงานนี้
+          </button>
+        </div>
 
       </div>
     </div>
@@ -3612,6 +3621,7 @@ export default function OrgManagerApp() {
                   locationDb={locationDb}
                   setFocusNodeId={setFocusNodeId}
                   setSearchedNodeId={setSearchedNodeId}
+                  handleDeleteNode={handleDeleteNode}
                 />
              </div>
           )}
