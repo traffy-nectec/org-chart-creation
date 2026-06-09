@@ -191,8 +191,9 @@ export const sanitizeString = (str, dictionary = ALIAS_DICTIONARY) => {
 };
 
 const cleanInput = (val, type) => {
-  if (!val) return '';
+  if (val === undefined || val === null || val === 'undefined' || val === 'null') return '';
   let cleaned = String(val).trim();
+  if (cleaned.toLowerCase() === 'undefined' || cleaned.toLowerCase() === 'null') return '';
   if (type === 'province') {
     if (cleaned.startsWith('จ.')) cleaned = cleaned.substring(2).trim();
     if (cleaned.startsWith('จังหวัด')) cleaned = cleaned.substring(7).trim();
@@ -244,7 +245,12 @@ export const getLocationCode = (loc, db) => {
 const getVal = (row, keys) => {
   for (const k of keys) {
     const foundKey = Object.keys(row).find(rk => rk.trim().toLowerCase() === k.toLowerCase());
-    if (foundKey) return String(row[foundKey]).trim();
+    if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null) {
+      const valStr = String(row[foundKey]).trim();
+      if (valStr.toLowerCase() !== 'undefined' && valStr.toLowerCase() !== 'null') {
+        return valStr;
+      }
+    }
   }
   return '';
 };
@@ -3678,6 +3684,9 @@ export default function OrgManagerApp() {
                                   setSelectedNodeId(node.id);
                                   setSearchQuery('');
                                   setShowSearchSuggestions(false);
+                                  // Update focus node to the parent so it appears in the tree context
+                                  setFocusNodeId(node.parentId || node.id);
+                                  setSearchedNodeId(node.id);
                                   setTimeout(() => {
                                     const el = document.getElementById(node.id);
                                     if (el) {
