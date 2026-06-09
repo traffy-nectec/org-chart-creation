@@ -8,10 +8,14 @@ import {
   Position,
   useNodesState,
   useEdgesState,
-  useReactFlow
+  useReactFlow,
+  Panel,
+  getNodesBounds,
+  getViewportForBounds
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Plus, Trash2, MapPin, Network, AlertTriangle, ChevronDown, ChevronRight, ChevronUp, ChevronLeft, Settings } from 'lucide-react';
+import { Plus, Trash2, MapPin, Network, AlertTriangle, ChevronDown, ChevronRight, ChevronUp, ChevronLeft, Settings, Download } from 'lucide-react';
+import { toPng } from 'html-to-image';
 
 const getAreaCount = (areas) => {
   if (!areas) return 0;
@@ -369,6 +373,44 @@ const FlowInner = ({ orgTree, organizations, focusNodeId, setFocusNodeId, select
 
   }, [orgTree, focusNodeId, treeLayout, selectedNodeId, nodeIssues]);
 
+  const onDownload = () => {
+    if (nodes.length === 0) return;
+    const nodesBounds = getNodesBounds(nodes);
+    
+    // Add padding to bounds
+    const imageWidth = nodesBounds.width + 100;
+    const imageHeight = nodesBounds.height + 100;
+
+    const transform = getViewportForBounds(
+      nodesBounds,
+      imageWidth,
+      imageHeight,
+      0.5,
+      2
+    );
+
+    const element = document.querySelector('.react-flow__viewport');
+    if (!element) return;
+
+    toPng(element, {
+      backgroundColor: '#f8fafc',
+      width: imageWidth,
+      height: imageHeight,
+      style: {
+        width: `${imageWidth}px`,
+        height: `${imageHeight}px`,
+        transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.zoom})`,
+      },
+    }).then((dataUrl) => {
+      const a = document.createElement('a');
+      a.setAttribute('download', 'org-chart.png');
+      a.setAttribute('href', dataUrl);
+      a.click();
+    }).catch(err => {
+      console.error('Failed to export image', err);
+    });
+  };
+
   return (
     <ReactFlow
       nodes={nodes}
@@ -386,6 +428,16 @@ const FlowInner = ({ orgTree, organizations, focusNodeId, setFocusNodeId, select
     >
       <Background color="#e2e8f0" gap={20} size={1} />
       <Controls />
+      <Panel position="top-right">
+        <button
+          className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-md border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+          onClick={onDownload}
+          title="ส่งออกผังองค์กรเป็นรูปภาพ"
+        >
+          <Download size={16} />
+          บันทึกรูปภาพ (PNG)
+        </button>
+      </Panel>
     </ReactFlow>
   );
 };
