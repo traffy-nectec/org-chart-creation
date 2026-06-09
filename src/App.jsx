@@ -1814,16 +1814,35 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, onClose, organizations, n
 
       <div className="space-y-6 flex-1 overflow-y-auto pr-2 scrollbar-hide relative">
         {nodeIssue && (
-          <div className={`p-3 rounded-xl border flex items-start gap-2.5 text-xs font-semibold leading-normal animate-in fade-in slide-in-from-top-2 ${
+          <div className={`p-3 rounded-xl border flex items-start gap-2.5 text-xs font-semibold leading-normal animate-in fade-in slide-in-from-top-2 relative ${
             nodeIssue.type === 'error'
               ? 'bg-red-50 border-red-200 text-red-700'
               : 'bg-amber-50 border-amber-200 text-amber-700'
           }`}>
             <AlertTriangle className={`w-4 h-4 shrink-0 ${nodeIssue.type === 'error' ? 'text-red-600' : 'text-amber-600'}`} />
-            <div>
+            <div className="flex-1">
               <div className="font-bold mb-0.5">{nodeIssue.type === 'error' ? 'ข้อผิดพลาด (Error)' : 'ข้อควรระวัง (Warning)'}</div>
-              <div className="font-medium text-slate-700">{nodeIssue.message}</div>
+              <div className="font-medium text-slate-700 pr-6">{nodeIssue.message}</div>
             </div>
+            <button 
+              onClick={() => {
+                if (nodeIssue.type === 'error') {
+                  const newErrors = (selectedNode.errors || []).filter(e => e !== nodeIssue.message);
+                  handleUpdateNode(selectedNode.id, 'errors', newErrors);
+                } else {
+                  const newWarnings = (selectedNode.warnings || []).filter(w => w !== nodeIssue.message);
+                  handleUpdateNode(selectedNode.id, 'warnings', newWarnings);
+                }
+              }}
+              className={`absolute top-2 right-2 p-1 rounded-lg transition-colors ${
+                nodeIssue.type === 'error'
+                  ? 'text-red-400 hover:text-red-600 hover:bg-red-100/50'
+                  : 'text-amber-400 hover:text-amber-600 hover:bg-amber-100/50'
+              }`}
+              title="รับทราบและลบแจ้งเตือนนี้"
+            >
+              <X size={14} />
+            </button>
           </div>
         )}
 
