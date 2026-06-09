@@ -5,7 +5,7 @@ import {
   ChevronsDown, ChevronsUp,
   Image as ImageIcon, Upload, ZoomIn, ZoomOut, Maximize, Minimize,
   FileSpreadsheet, X, Download, Table, LayoutTemplate, LayoutList,
-  AlertTriangle, Code, Copy, Check, Braces, Database, AlignLeft, Search, ExternalLink, Undo2
+  AlertTriangle, Code, Copy, Check, Braces, Database, AlignLeft, Search, ExternalLink, Undo2, HelpCircle
 } from 'lucide-react';
 import { ThailandAddressTypeahead, ThailandAddressValue, useAddressTypeaheadContext } from "react-thailand-address-typeahead";
 import * as XLSX from 'xlsx';
@@ -2572,7 +2572,7 @@ export default function OrgManagerApp() {
   const [viewMode, setViewMode] = useState('canvas'); // 'canvas' or 'table'
   const [deleteConfirmNode, setDeleteConfirmNode] = useState(null);
   const [moveMode, setMoveMode] = useState('branch'); // 'branch' or 'single'
-  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isDataMenuOpen, setIsDataMenuOpen] = useState(false);
   const [collapsedTableNodes, setCollapsedTableNodes] = useState(new Set());
   const [isDraftSaving, setIsDraftSaving] = useState(false);
   const [treeExpansionTrigger, setTreeExpansionTrigger] = useState(null);
@@ -3453,71 +3453,68 @@ export default function OrgManagerApp() {
             </button>
           </div>
 
-          <button 
-            onClick={() => setIsImportModalOpen(true)} 
-            className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg text-sm font-bold hover:bg-green-100 text-green-700 transition-all shadow-sm cursor-pointer"
-            aria-label="นำเข้าไฟล์ Excel หรือ CSV"
-          >
-            <FileSpreadsheet size={16} /> นำเข้าข้อมูล
-          </button>
-
-          <button 
-            onClick={() => setShowWelcomeModal(true)} 
-            className="flex items-center gap-1.5 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm font-bold hover:bg-blue-100 text-blue-700 transition-all shadow-sm cursor-pointer"
-            aria-label="เปิดคู่มือการใช้งานและสถานะระบบ"
-          >
-            💡 คู่มือใช้งาน
-          </button>
-
-          <button 
-            onClick={handleCleanAllData} 
-            className="flex items-center gap-1.5 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm font-bold hover:bg-amber-100 text-amber-700 transition-all shadow-sm cursor-pointer"
-            aria-label="ล้างชื่อหน่วยงานและสระซ้ำทั้งหมดในผัง"
-          >
-            🧹 คลีนข้อมูลทั้งหมด
-          </button>
-          
           <div className="w-px h-8 bg-slate-200 mx-1 self-center"></div>
-          
-          {/* Export Dropdown */}
+
+          {/* Data Management Dropdown */}
           <div className="relative">
             <button 
-              onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-sm font-bold hover:bg-emerald-100 text-emerald-700 transition-all shadow-sm"
+              onClick={() => setIsDataMenuOpen(!isDataMenuOpen)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold hover:bg-slate-100 text-slate-700 transition-all shadow-sm cursor-pointer"
               aria-haspopup="true"
-              aria-expanded={isExportMenuOpen}
-              aria-label="เมนูส่งออกข้อมูล"
+              aria-expanded={isDataMenuOpen}
+              aria-label="เมนูจัดการข้อมูล"
             >
-              <Download size={16} /> ส่งออกข้อมูล <ChevronDown size={14} />
+              <Database size={16} /> จัดการข้อมูล <ChevronDown size={14} />
             </button>
             
             {/* Backdrop to close dropdown */}
-            {isExportMenuOpen && (
+            {isDataMenuOpen && (
               <div 
                 className="fixed inset-0 z-[90]" 
-                onClick={() => setIsExportMenuOpen(false)} 
+                onClick={() => setIsDataMenuOpen(false)} 
                 aria-hidden="true"
               />
             )}
 
-            {isExportMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-[100] animate-in fade-in slide-in-from-top-2">
+            {isDataMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-[100] animate-in fade-in slide-in-from-top-2">
                 <button 
-                  onClick={() => { handleExportExcel(); setIsExportMenuOpen(false); }}
-                  className="w-full flex items-center gap-2 px-4 py-3 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors border-b border-slate-100 text-left"
+                  onClick={() => { setIsImportModalOpen(true); setIsDataMenuOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors border-b border-slate-100 text-left"
                 >
-                  <FileSpreadsheet size={14} className="text-emerald-600" /> ส่งออกเป็น Excel
+                  <FileSpreadsheet size={14} className="text-green-600" /> นำเข้าข้อมูล (Import)
                 </button>
                 <button 
-                  onClick={() => { handleExportCSV(); setIsExportMenuOpen(false); }}
-                  className="w-full flex items-center gap-2 px-4 py-3 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors text-left"
+                  onClick={() => { handleExportExcel(); setIsDataMenuOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors text-left"
                 >
-                  <FileSpreadsheet size={14} className="text-amber-600" /> ส่งออกเป็น CSV
+                  <Download size={14} className="text-emerald-600" /> ส่งออกเป็น Excel
+                </button>
+                <button 
+                  onClick={() => { handleExportCSV(); setIsDataMenuOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors border-b border-slate-100 text-left"
+                >
+                  <Download size={14} className="text-amber-600" /> ส่งออกเป็น CSV
+                </button>
+                <button 
+                  onClick={() => { handleCleanAllData(); setIsDataMenuOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 hover:text-red-700 text-slate-700 text-xs font-bold transition-colors text-left"
+                >
+                  <AlertTriangle size={14} className="text-red-500" /> คลีนข้อมูลทั้งหมด
                 </button>
               </div>
             )}
           </div>
 
+          <button 
+            onClick={() => setShowWelcomeModal(true)} 
+            className="flex items-center justify-center w-9 h-9 bg-slate-50 border border-slate-200 rounded-full hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 text-slate-500 transition-all shadow-sm cursor-pointer ml-1"
+            title="คู่มือใช้งาน"
+            aria-label="คู่มือใช้งาน"
+          >
+            <HelpCircle size={18} />
+          </button>
+          
           <div className="w-px h-8 bg-slate-200 mx-1 self-center"></div>
           
           <button 
