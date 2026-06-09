@@ -1,22 +1,38 @@
 @import "tailwindcss";
 
+@theme {
+  --color-blue-50: #faf7f5;
+  --color-blue-100: #f2e9e1;
+  --color-blue-200: #e0cec0;
+  --color-blue-300: #c9af9c;
+  --color-blue-400: #af8d74;
+  --color-blue-500: #936b4e;
+  --color-blue-600: #553923;
+  --color-blue-650: #4e341f;
+  --color-blue-700: #462e1c;
+  --color-blue-750: #3f2919;
+  --color-blue-800: #382516;
+  --color-blue-900: #2c1d10;
+  --color-blue-950: #1b110a;
+}
+
 @keyframes pulse-highlight {
   0% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+    box-shadow: 0 0 0 0 rgba(85, 57, 35, 0.7);
     transform: scale(1.05);
   }
   70% {
-    box-shadow: 0 0 0 15px rgba(59, 130, 246, 0);
+    box-shadow: 0 0 0 15px rgba(85, 57, 35, 0);
     transform: scale(1.05);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+    box-shadow: 0 0 0 0 rgba(85, 57, 35, 0);
     transform: scale(1.05);
   }
 }
 
 .animate-pulse-highlight {
   animation: pulse-highlight 1.5s ease-in-out;
-  border-color: #3b82f6 !important;
-  background-color: #eff6ff !important;
+  border-color: var(--color-blue-600) !important;
+  background-color: var(--color-blue-50) !important;
 }

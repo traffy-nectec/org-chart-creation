@@ -220,7 +220,7 @@ const getGridLayoutedElements = (nodes, edges) => {
 };
 
 // --- Main Flow Component ---
-const FlowInner = ({ orgTree, organizations, focusNodeId, setFocusNodeId, selectedNodeId, setSelectedNodeId, handleAddNode, handleDeleteNode, treeLayout, nodeIssues }) => {
+const FlowInner = ({ orgTree, organizations, focusNodeId, setFocusNodeId, selectedNodeId, setSelectedNodeId, searchedNodeId, setSearchedNodeId, handleAddNode, handleDeleteNode, treeLayout, nodeIssues }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { fitView, setViewport } = useReactFlow();
@@ -309,7 +309,12 @@ const FlowInner = ({ orgTree, organizations, focusNodeId, setFocusNodeId, select
     const isBulkChange = Math.abs(totalNodesCount - prevNodeCountRef.current) > 1;
     const isInitialLoad = prevNodeCountRef.current === 0;
 
-    if (isSingleAdd && selectedNodeId && !isDrillDownChange) {
+    if (searchedNodeId) {
+      setTimeout(() => {
+        fitView({ nodes: [{ id: searchedNodeId }], duration: 800, maxZoom: 1 });
+        setSearchedNodeId(null);
+      }, 150);
+    } else if (isSingleAdd && selectedNodeId && !isDrillDownChange) {
       setTimeout(() => {
         fitView({ nodes: [{ id: selectedNodeId }], duration: 800, maxZoom: 1 });
       }, 100);
