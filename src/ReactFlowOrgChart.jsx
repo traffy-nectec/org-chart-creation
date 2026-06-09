@@ -182,7 +182,7 @@ const getGridLayoutedElements = (nodes, edges) => {
   const parentWidth = 480;
   const nodeHeight = 210;
   const gapX = 40;
-  const gapY = 40;
+  const gapY = 80;
   const maxCols = 5;
   
   const layoutedNodes = [];
