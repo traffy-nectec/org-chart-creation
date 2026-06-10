@@ -242,10 +242,12 @@ const cleanInput = (val, type) => {
     if (cleaned.startsWith('อ.')) cleaned = cleaned.substring(2).trim();
     if (cleaned.startsWith('อำเภอ')) cleaned = cleaned.substring(5).trim();
     if (cleaned.startsWith('เขต')) cleaned = cleaned.substring(3).trim();
+    if (cleaned === 'สุไหงโกลก') cleaned = 'สุไหงโก-ลก';
   } else if (type === 'tambon') {
     if (cleaned.startsWith('ต.')) cleaned = cleaned.substring(2).trim();
     if (cleaned.startsWith('ตำบล')) cleaned = cleaned.substring(4).trim();
     if (cleaned.startsWith('แขวง')) cleaned = cleaned.substring(4).trim();
+    if (cleaned === 'สุไหงโกลก') cleaned = 'สุไหงโก-ลก';
   }
   return cleaned;
 };
