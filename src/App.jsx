@@ -3300,8 +3300,8 @@ export default function OrgManagerApp() {
           <table className="w-full text-left border-collapse text-xs font-semibold text-slate-700">
             <thead className="bg-slate-50 text-slate-700 uppercase font-bold border-b border-slate-200 sticky top-0 z-10">
               <tr>
-                <th className="px-6 py-3.5">ชื่อหน่วยงาน</th>
                 <th className="px-4 py-3.5 w-24 text-center">ระดับ</th>
+                <th className="px-6 py-3.5">ชื่อหน่วยงาน</th>
                 <th className="px-6 py-3.5 w-32 text-center">หน่วยงานย่อย</th>
                 <th className="px-6 py-3.5 w-32 text-center">พื้นที่รับผิดชอบ</th>
                 <th className="px-4 py-3.5 min-w-[180px] text-center">การจัดการ</th>
@@ -3350,6 +3350,13 @@ export default function OrgManagerApp() {
                       className={rowStyle}
                       onClick={() => setSelectedNodeId(org.id)}
                     >
+                      {/* Level */}
+                      <td className="px-4 py-3 text-center">
+                        <span className={`${levelColorClass} px-2 py-0.5 rounded font-mono text-[11px] font-bold border`}>
+                          ระดับ {org.level}
+                        </span>
+                      </td>
+
                       {/* Name */}
                       <td className="py-3 font-bold text-slate-800" style={{ paddingLeft: `${Math.max(24, 24 + (org.level - 1) * 20)}px`, paddingRight: '24px' }}>
                         <div className="flex items-center gap-2">
@@ -3382,13 +3389,6 @@ export default function OrgManagerApp() {
                             </div>
                           )}
                         </div>
-                      </td>
-
-                      {/* Level */}
-                      <td className="px-4 py-3 text-center">
-                        <span className={`${levelColorClass} px-2 py-0.5 rounded font-mono text-[11px] font-bold border`}>
-                          ระดับ {org.level}
-                        </span>
                       </td>
 
                       {/* Children Count */}
