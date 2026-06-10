@@ -234,6 +234,10 @@ const cleanInput = (val, type) => {
   if (type === 'province') {
     if (cleaned.startsWith('จ.')) cleaned = cleaned.substring(2).trim();
     if (cleaned.startsWith('จังหวัด')) cleaned = cleaned.substring(7).trim();
+    if (cleaned === 'กทม' || cleaned === 'กทม.') cleaned = 'กรุงเทพมหานคร';
+    if (cleaned === 'กรุงเทพ') cleaned = 'กรุงเทพมหานคร';
+    if (cleaned === 'อยุธยา') cleaned = 'พระนครศรีอยุธยา';
+    if (cleaned === 'โคราช') cleaned = 'นครราชสีมา';
   } else if (type === 'amphoe') {
     if (cleaned.startsWith('อ.')) cleaned = cleaned.substring(2).trim();
     if (cleaned.startsWith('อำเภอ')) cleaned = cleaned.substring(5).trim();
