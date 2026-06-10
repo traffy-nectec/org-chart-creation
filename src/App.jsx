@@ -574,13 +574,13 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
 
                 if (!isValidLoc) {
                    const locStr = [rawProvItem, rawAmphoe, rawTambon].filter(Boolean).join(' ');
-                   const warningMsg = `⚠️ ข้อมูลพื้นที่รับผิดชอบไม่ถูกต้องกับในระบบ ("${locStr}")`;
+                   const warningMsg = `⚠️ ไม่พบข้อมูลพื้นที่รับผิดชอบในระบบ จะถูกข้ามไป ("${locStr}")`;
                    if (!orgInfo.warnings.includes(warningMsg)) {
                      orgInfo.warnings.push(warningMsg);
                    }
+                } else {
+                   orgInfo.locations.push(locObj);
                 }
-
-                orgInfo.locations.push(locObj);
               }
             }
           });
