@@ -533,6 +533,11 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
             let tambon = cleanInput(rawTambon, 'tambon');
             const postalCode = rawPostalCode;
 
+            // Handle "อ.เมือง" by appending the province name
+            if (amphoe === 'เมือง' && province) {
+              amphoe = `เมือง${province}`;
+            }
+
             // If the area is nationwide or all, clear the location data so it becomes unassigned
             const isNationwide = [province, amphoe, tambon, rawProvItem, rawAmphoe, rawTambon].some(val => 
               val && (val.includes('ทั่วประเทศ') || val.includes('ทั้งหมด'))
