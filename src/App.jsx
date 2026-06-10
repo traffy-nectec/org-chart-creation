@@ -553,6 +553,28 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
                 postalCode
               };
               locObj.code = getLocationCode(locObj, locationDb);
+              
+              let isValidLoc = false;
+              const cleanProv = cleanInput(province, 'province');
+              const cleanAmp = cleanInput(amphoe, 'amphoe');
+              const cleanTam = cleanInput(tambon, 'tambon');
+
+              if (cleanTam) {
+                 isValidLoc = locationDb.some(r => cleanInput(r.province, 'province') === cleanProv && cleanInput(r.amphoe, 'amphoe') === cleanAmp && cleanInput(r.district, 'tambon') === cleanTam);
+              } else if (cleanAmp) {
+                 isValidLoc = locationDb.some(r => cleanInput(r.province, 'province') === cleanProv && cleanInput(r.amphoe, 'amphoe') === cleanAmp);
+              } else if (cleanProv) {
+                 isValidLoc = locationDb.some(r => cleanInput(r.province, 'province') === cleanProv);
+              }
+
+              if (!isValidLoc) {
+                 const locStr = [rawProvince, rawAmphoe, rawTambon].filter(Boolean).join(' ');
+                 const warningMsg = `⚠️ ข้อมูลพื้นที่รับผิดชอบไม่ถูกต้องกับในระบบ ("${locStr}")`;
+                 if (!orgInfo.warnings.includes(warningMsg)) {
+                   orgInfo.warnings.push(warningMsg);
+                 }
+              }
+
               orgInfo.locations.push(locObj);
             }
           }
