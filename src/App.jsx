@@ -2644,6 +2644,7 @@ export default function OrgManagerApp() {
   const [treeLayout, setTreeLayout] = useState('horizontal'); // 'vertical' or 'horizontal'
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+  const [showWarningsDropdown, setShowWarningsDropdown] = useState(false);
   const [isConflictPanelExpanded, setIsConflictPanelExpanded] = useState(true);
   const [viewMode, setViewMode] = useState('canvas'); // 'canvas' or 'table'
   const [deleteConfirmNode, setDeleteConfirmNode] = useState(null);
@@ -3000,6 +3001,10 @@ export default function OrgManagerApp() {
 
     return issues;
   }, [conflictingNodes, organizations]);
+
+  const orgsWithIssues = useMemo(() => {
+    return organizations.filter(org => nodeIssues.has(org.id));
+  }, [organizations, nodeIssues]);
 
   const handleAddNode = (parentId, currentLevel) => {
     const newNode = {
@@ -3743,8 +3748,53 @@ export default function OrgManagerApp() {
                       ))}
                     </div>
 
-                    {/* Search Bar & Node Count */}
+                    {/* Warnings & Search Bar */}
                     <div className="flex gap-2 items-center">
+                      {orgsWithIssues.length > 0 && (
+                        <div className="relative">
+                          <button
+                            onClick={() => setShowWarningsDropdown(!showWarningsDropdown)}
+                            onBlur={() => setTimeout(() => setShowWarningsDropdown(false), 200)}
+                            className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+                          >
+                            <AlertTriangle size={14} />
+                            {orgsWithIssues.length} แจ้งเตือน
+                          </button>
+                          {showWarningsDropdown && (
+                            <ul className="absolute right-0 top-[110%] z-50 mt-1 w-72 max-h-64 overflow-y-auto bg-white/95 backdrop-blur border border-amber-200 rounded-xl shadow-lg divide-y divide-amber-100/50 text-xs font-semibold text-slate-700">
+                              {orgsWithIssues.map(node => {
+                                const issue = nodeIssues.get(node.id);
+                                return (
+                                  <li 
+                                    key={node.id}
+                                    onMouseDown={() => {
+                                      setSelectedNodeId(node.id);
+                                      setShowWarningsDropdown(false);
+                                      setFocusNodeId(node.parentId || node.id);
+                                      setSearchedNodeId(node.id);
+                                      setTimeout(() => {
+                                        const el = document.getElementById(node.id);
+                                        if (el) {
+                                          el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                                          el.classList.add('animate-pulse-highlight');
+                                          setTimeout(() => el.classList.remove('animate-pulse-highlight'), 1500);
+                                        }
+                                      }, 100);
+                                    }}
+                                    className="px-3 py-2 hover:bg-amber-50 cursor-pointer transition-colors flex flex-col gap-1"
+                                  >
+                                    <span className="whitespace-normal break-words">{node.name || 'ไม่ได้ระบุชื่อ'}</span>
+                                    <span className={`text-[10px] ${issue?.type === 'error' ? 'text-red-600' : 'text-amber-600'}`}>
+                                      {issue?.message}
+                                    </span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+
                       <div className="bg-white/90 backdrop-blur border border-slate-200 rounded-xl flex items-center px-3 py-1.5 gap-2 w-64 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all shadow-sm">
                         <Search size={14} className="text-slate-500 shrink-0" />
                         <input 
