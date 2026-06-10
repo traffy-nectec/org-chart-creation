@@ -496,22 +496,6 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
           const rawTambon = getVal(row, ['tambon', 'ตำบล', 'แขวง']);
           const rawPostalCode = getVal(row, ['postal_code', 'postalcode', 'รหัสไปรษณีย์', 'postalCode']);
 
-          let province = cleanInput(rawProvince, 'province');
-          let amphoe = cleanInput(rawAmphoe, 'amphoe');
-          let tambon = cleanInput(rawTambon, 'tambon');
-          const postalCode = rawPostalCode;
-
-          // If the area is nationwide or all, clear the location data so it becomes unassigned
-          const isNationwide = [province, amphoe, tambon, rawProvince, rawAmphoe, rawTambon].some(val => 
-            val && (val.includes('ทั่วประเทศ') || val.includes('ทั้งหมด'))
-          );
-
-          if (isNationwide) {
-            province = '';
-            amphoe = '';
-            tambon = '';
-          }
-
           if (!orgMap.has(orgName)) {
             orgMap.set(orgName, {
               name: orgName,
@@ -539,45 +523,67 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
             }
           }
 
-          if (province) {
-            const exists = orgInfo.locations.some(loc => 
-              loc.province === province &&
-              loc.amphoe === amphoe &&
-              loc.tambon === tambon
+          const rawProvinceString = typeof rawProvince === 'string' ? rawProvince : String(rawProvince || '');
+          const rawProvinceList = rawProvinceString.split(/[\s,]+/).filter(Boolean);
+          if (rawProvinceList.length === 0) rawProvinceList.push('');
+
+          rawProvinceList.forEach(rawProvItem => {
+            let province = cleanInput(rawProvItem, 'province');
+            let amphoe = cleanInput(rawAmphoe, 'amphoe');
+            let tambon = cleanInput(rawTambon, 'tambon');
+            const postalCode = rawPostalCode;
+
+            // If the area is nationwide or all, clear the location data so it becomes unassigned
+            const isNationwide = [province, amphoe, tambon, rawProvItem, rawAmphoe, rawTambon].some(val => 
+              val && (val.includes('ทั่วประเทศ') || val.includes('ทั้งหมด'))
             );
-            if (!exists) {
-              const locObj = {
-                province,
-                amphoe,
-                tambon,
-                postalCode
-              };
-              locObj.code = getLocationCode(locObj, locationDb);
-              
-              let isValidLoc = false;
-              const cleanProv = cleanInput(province, 'province');
-              const cleanAmp = cleanInput(amphoe, 'amphoe');
-              const cleanTam = cleanInput(tambon, 'tambon');
 
-              if (cleanTam) {
-                 isValidLoc = locationDb.some(r => cleanInput(r.province, 'province') === cleanProv && cleanInput(r.amphoe, 'amphoe') === cleanAmp && cleanInput(r.district, 'tambon') === cleanTam);
-              } else if (cleanAmp) {
-                 isValidLoc = locationDb.some(r => cleanInput(r.province, 'province') === cleanProv && cleanInput(r.amphoe, 'amphoe') === cleanAmp);
-              } else if (cleanProv) {
-                 isValidLoc = locationDb.some(r => cleanInput(r.province, 'province') === cleanProv);
-              }
-
-              if (!isValidLoc) {
-                 const locStr = [rawProvince, rawAmphoe, rawTambon].filter(Boolean).join(' ');
-                 const warningMsg = `⚠️ ข้อมูลพื้นที่รับผิดชอบไม่ถูกต้องกับในระบบ ("${locStr}")`;
-                 if (!orgInfo.warnings.includes(warningMsg)) {
-                   orgInfo.warnings.push(warningMsg);
-                 }
-              }
-
-              orgInfo.locations.push(locObj);
+            if (isNationwide) {
+              province = '';
+              amphoe = '';
+              tambon = '';
             }
-          }
+
+            if (province) {
+              const exists = orgInfo.locations.some(loc => 
+                loc.province === province &&
+                loc.amphoe === amphoe &&
+                loc.tambon === tambon
+              );
+              if (!exists) {
+                const locObj = {
+                  province,
+                  amphoe,
+                  tambon,
+                  postalCode
+                };
+                locObj.code = getLocationCode(locObj, locationDb);
+                
+                let isValidLoc = false;
+                const cleanProv = cleanInput(province, 'province');
+                const cleanAmp = cleanInput(amphoe, 'amphoe');
+                const cleanTam = cleanInput(tambon, 'tambon');
+
+                if (cleanTam) {
+                   isValidLoc = locationDb.some(r => cleanInput(r.province, 'province') === cleanProv && cleanInput(r.amphoe, 'amphoe') === cleanAmp && cleanInput(r.district, 'tambon') === cleanTam);
+                } else if (cleanAmp) {
+                   isValidLoc = locationDb.some(r => cleanInput(r.province, 'province') === cleanProv && cleanInput(r.amphoe, 'amphoe') === cleanAmp);
+                } else if (cleanProv) {
+                   isValidLoc = locationDb.some(r => cleanInput(r.province, 'province') === cleanProv);
+                }
+
+                if (!isValidLoc) {
+                   const locStr = [rawProvItem, rawAmphoe, rawTambon].filter(Boolean).join(' ');
+                   const warningMsg = `⚠️ ข้อมูลพื้นที่รับผิดชอบไม่ถูกต้องกับในระบบ ("${locStr}")`;
+                   if (!orgInfo.warnings.includes(warningMsg)) {
+                     orgInfo.warnings.push(warningMsg);
+                   }
+                }
+
+                orgInfo.locations.push(locObj);
+              }
+            }
+          });
         });
 
         // 1. ค้นหา parentName ที่ถูกอ้างอิงแต่ไม่มีข้อมูลในไฟล์ เพื่อสร้างหน่วยงานใหม่ขึ้นมาให้เลือกใหม่ตามต้องการ
@@ -3761,7 +3767,7 @@ export default function OrgManagerApp() {
                             {orgsWithIssues.length} แจ้งเตือน
                           </button>
                           {showWarningsDropdown && (
-                            <ul className="absolute right-0 top-[110%] z-50 mt-1 w-72 max-h-64 overflow-y-auto bg-white/95 backdrop-blur border border-amber-200 rounded-xl shadow-lg divide-y divide-amber-100/50 text-xs font-semibold text-slate-700">
+                            <ul className="absolute left-0 top-[110%] z-50 mt-1 w-72 sm:w-80 max-w-[90vw] max-h-64 overflow-y-auto bg-white/95 backdrop-blur border border-amber-200 rounded-xl shadow-lg divide-y divide-amber-100/50 text-xs font-semibold text-slate-700">
                               {orgsWithIssues.map(node => {
                                 const issue = nodeIssues.get(node.id);
                                 return (
