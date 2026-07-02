@@ -278,6 +278,23 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
   const [isFinalImporting, setIsFinalImporting] = useState(false);
   const [finalImportProgress, setFinalImportProgress] = useState(0);
   const [finalImportStepText, setFinalImportStepText] = useState('');
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    let interval;
+    if (isFinalImporting) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setElapsedSeconds(0);
+      interval = setInterval(() => {
+        setElapsedSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setElapsedSeconds(0);
+    }
+    return () => clearInterval(interval);
+  }, [isFinalImporting]);
+
   const [sheetLink, setSheetLink] = useState('');
 
   const availableLevels = useMemo(() => {
@@ -737,7 +754,7 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
     }
 
     setFinalImportProgress(80);
-    setFinalImportStepText('กำลังประกอบโครงสร้างความสัมพันธ์และวาดแผนผัง...');
+    setFinalImportStepText(`จัดเตรียมข้อมูลเสร็จสมบูรณ์ (${nodesToImport.length.toLocaleString()} หน่วยงาน)\nกำลังเข้าสู่กระบวนการวาดหน้าจอ (อาจใช้เวลา 10-30 วินาที)...`);
     await delay(100);
 
     onImportData(finalOrgs);
@@ -1266,14 +1283,19 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
                 <Database size={48} strokeWidth={1.5} className="animate-bounce" />
               </div>
               <h3 className="text-xl font-bold text-slate-800 mb-2">กำลังนำเข้าข้อมูล...</h3>
-              <p className="text-sm text-slate-500 mb-6 font-medium min-h-[20px]">{finalImportStepText}</p>
+              <p className="text-sm text-slate-500 mb-6 font-medium min-h-[40px] whitespace-pre-line">{finalImportStepText}</p>
               <div className="w-full bg-slate-100 rounded-full h-3 mb-3 overflow-hidden shadow-inner">
                 <div 
                   className="bg-[#553923] h-3 rounded-full transition-all duration-300 ease-out" 
                   style={{ width: `${finalImportProgress}%` }}
                 ></div>
               </div>
-              <p className="text-xs font-bold text-slate-600">{finalImportProgress}% เสร็จสมบูรณ์</p>
+              <div className="flex justify-between items-center text-xs font-bold text-slate-600">
+                <span>{finalImportProgress}% เสร็จสมบูรณ์</span>
+                <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                  ใช้เวลา {elapsedSeconds} วินาที
+                </span>
+              </div>
             </div>
           </div>
         )}
