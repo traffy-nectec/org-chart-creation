@@ -268,11 +268,6 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
   const fileInputRef = useRef(null);
   const [parsedFile, setParsedFile] = useState(null);
   const [validatedNodes, setValidatedNodes] = useState([]);
-  const [showDocumentation, setShowDocumentation] = useState(true);
-  const [filterType, setFilterType] = useState('all'); // 'all' | 'issues' | 'valid'
-  const [previewSearchQuery, setPreviewSearchQuery] = useState('');
-  const [filterLevel, setFilterLevel] = useState('all');
-  const [excludedNodes, setExcludedNodes] = useState(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
   const [progressStep, setProgressStep] = useState('');
   const [isFinalImporting, setIsFinalImporting] = useState(false);
@@ -295,10 +290,6 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
   }, [isFinalImporting]);
 
   const [sheetLink, setSheetLink] = useState('');
-
-  const availableLevels = useMemo(() => {
-    return Array.from(new Set(validatedNodes.map(n => n.level))).sort((a,b) => a - b);
-  }, [validatedNodes]);
 
   const issueGroups = React.useMemo(() => {
     const groups = {
@@ -688,27 +679,62 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
           }
         }
 
-        // Level calculation
-        const validated = orgList.map(org => {
-          const calculatedLevel = getLevel(org.name, parentMap);
-          return {
-            name: org.name,
-            parentName: parentMap.get(org.name) || null,
-            originalParentName: org.parentName,
-            level: calculatedLevel,
-            locations: org.locations,
-            errors: org.errors,
-            warnings: org.warnings,
-            rawRows: org.rawRows
-          };
+        setProgressStep('เตรียมพร้อมโครงสร้าง (Background Processing)...');
+        await delay(50);
+
+        const idMap = new Map();
+        orgList.forEach(org => {
+          idMap.set(org.name, `org-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
         });
+
+        const rootsInPreview2 = orgList.filter(node => !parentMap.get(node.name) || !idMap.has(parentMap.get(node.name)));
+
+        const finalOrgs = [];
+        const chunkSize = 5000;
+
+        for (let i = 0; i < orgList.length; i += chunkSize) {
+          const chunk = orgList.slice(i, i + chunkSize);
+          
+          const chunkOrgs = chunk.map(org => {
+            let parentId = parentMap.get(org.name) && idMap.has(parentMap.get(org.name)) ? idMap.get(parentMap.get(org.name)) : null;
+            let warnings = [...(org.warnings || [])];
+            let errors = [...(org.errors || [])];
+            const calculatedLevel = getLevel(org.name, parentMap);
+
+            // Enforce single root constraint
+            if (rootsInPreview2.length > 1 && !parentMap.get(org.name) && org.name !== rootsInPreview2[0].name) {
+              parentId = idMap.get(rootsInPreview2[0].name);
+              const warningMsg = `⚠️ ถูกปรับให้อยู่ภายใต้ ${rootsInPreview2[0].name} เนื่องจากระบบกำหนดให้มีหน่วยงานสูงสุดได้เพียง 1 แห่ง`;
+              if (!warnings.includes(warningMsg)) {
+                warnings.push(warningMsg);
+              }
+            }
+
+            return {
+              id: idMap.get(org.name),
+              name: org.name,
+              level: calculatedLevel,
+              parentId,
+              logo: null,
+              areas: {
+                locations: org.locations || []
+              },
+              errors,
+              warnings,
+              rawRows: org.rawRows
+            };
+          });
+
+          finalOrgs.push(...chunkOrgs);
+          setProgressStep(`ประกอบโครงสร้าง... (${Math.min(i + chunkSize, orgList.length).toLocaleString()} จาก ${orgList.length.toLocaleString()})`);
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
 
         setProgressStep('เตรียมการแสดงผล (Rendering)...');
         await delay(50);
 
-        setValidatedNodes(validated);
+        setValidatedNodes(finalOrgs);
         setParsedFile({ name: sourceName, size: sourceSize });
-        setShowDocumentation(false);
         setIsProcessing(false);
       } catch (err) {
         console.error(err);
@@ -719,80 +745,15 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
 
   const handleConfirm = async () => {
     setIsFinalImporting(true);
-    setFinalImportProgress(10);
-    setFinalImportStepText('กำลังเตรียมข้อมูลหน่วยงาน...');
-    await delay(100);
-
-    const nodesToImport = validatedNodes.filter(node => !excludedNodes.has(node.name));
-    setFinalImportProgress(30);
-    setFinalImportStepText(`กำลังคัดกรองหน่วยงานที่เลือก (${nodesToImport.length.toLocaleString()} โหนด)...`);
-    await delay(100);
-
-    const idMap = new Map();
-    nodesToImport.forEach(node => {
-      idMap.set(node.name, `org-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
-    });
-
     setFinalImportProgress(50);
-    setFinalImportStepText('กำลังสร้างรหัสอ้างอิง (ID) ให้กับหน่วยงาน...');
+    setFinalImportStepText('กำลังโหลดข้อมูลเข้าสู่หน้าจอ Canvas...');
     await delay(100);
 
-    const roots = nodesToImport.filter(node => !node.parentName || !idMap.has(node.parentName));
-
-    const finalOrgs = [];
-    const chunkSize = 5000;
-
-    for (let i = 0; i < nodesToImport.length; i += chunkSize) {
-      const chunk = nodesToImport.slice(i, i + chunkSize);
-      
-      const chunkOrgs = chunk.map(node => {
-        let parentId = node.parentName && idMap.has(node.parentName) ? idMap.get(node.parentName) : null;
-        let warnings = [...(node.warnings || [])];
-        let errors = [...(node.errors || [])];
-
-        // Enforce single root constraint (in case exclusions changed the roots)
-        if (roots.length > 1 && !node.parentName && node.name !== roots[0].name) {
-          parentId = idMap.get(roots[0].name);
-          const warningMsg = `⚠️ ถูกปรับให้อยู่ภายใต้ ${roots[0].name} เนื่องจากระบบกำหนดให้มีหน่วยงานสูงสุดได้เพียง 1 แห่ง`;
-          if (!warnings.includes(warningMsg)) {
-            warnings.push(warningMsg);
-          }
-        }
-
-        return {
-          id: idMap.get(node.name),
-          name: node.name,
-          level: node.level,
-          parentId,
-          logo: null,
-          areas: {
-            locations: node.locations
-          },
-          errors,
-          warnings
-        };
-      });
-
-      finalOrgs.push(...chunkOrgs);
-
-      // Progress scales from 50% to 80%
-      const currentProgress = Math.floor(50 + ((i + chunk.length) / nodesToImport.length * 30));
-      setFinalImportProgress(currentProgress);
-      setFinalImportStepText(`กำลังประกอบโครงสร้างความสัมพันธ์... (${(i + chunk.length).toLocaleString()} จาก ${nodesToImport.length.toLocaleString()} หน่วยงาน)`);
-      
-      // Yield to browser to paint UI
-      await new Promise(resolve => setTimeout(resolve, 0));
-    }
-
-    setFinalImportProgress(80);
-    setFinalImportStepText(`จัดเตรียมข้อมูลเสร็จสมบูรณ์ (${nodesToImport.length.toLocaleString()} หน่วยงาน)\nกำลังเข้าสู่กระบวนการวาดหน้าจอ (อาจใช้เวลา 10-30 วินาที)...`);
-    await delay(100);
-
-    onImportData(finalOrgs);
+    onImportData(validatedNodes);
 
     setFinalImportProgress(100);
     setFinalImportStepText('เสร็จสมบูรณ์! กำลังแสดงผล...');
-    await delay(400);
+    await delay(200);
 
     setIsFinalImporting(false);
     setFinalImportProgress(0);
@@ -803,11 +764,6 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
   const resetState = () => {
     setParsedFile(null);
     setValidatedNodes([]);
-    setShowDocumentation(true);
-    setFilterType('all');
-    setFilterLevel('all');
-    setExcludedNodes(new Set());
-    setPreviewSearchQuery('');
     setSheetLink('');
   };
 
@@ -815,26 +771,6 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
     resetState();
     onClose();
   };
-
-  // Filter logic for preview list
-  const filteredNodes = validatedNodes.filter(node => {
-    // Search filter
-    if (previewSearchQuery.trim() && !node.name.toLowerCase().includes(previewSearchQuery.toLowerCase())) {
-      return false;
-    }
-    // Tab filter
-    if (filterType === 'issues') {
-      if (node.errors.length === 0 && node.warnings.length === 0) return false;
-    }
-    if (filterType === 'valid') {
-      if (node.errors.length > 0 || node.warnings.length > 0) return false;
-    }
-    // Level filter
-    if (filterLevel !== 'all' && String(node.level) !== String(filterLevel)) {
-      return false;
-    }
-    return true;
-  });
 
   const issueCount = validatedNodes.filter(n => n.errors.length > 0 || n.warnings.length > 0).length;
   const validCount = validatedNodes.length - issueCount;
@@ -865,11 +801,27 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
         </div>
 
         {/* Body */}
-        <div className="flex flex-col md:flex-row bg-white flex-1 overflow-hidden">
-          {/* Left Panel */}
-          <div className="md:w-[65%] p-6 border-r border-slate-200 bg-slate-50/50 overflow-y-auto flex flex-col min-h-0">
-            {showDocumentation ? (
-              <div>
+        <div className="flex flex-col bg-white flex-1 overflow-hidden p-6 gap-6">
+          {!parsedFile ? (
+            isProcessing ? (
+              <div className="flex-1 flex flex-col justify-center items-center bg-slate-50/50 rounded-2xl border border-slate-100 p-8 text-center animate-in fade-in duration-300">
+                <div className="relative w-16 h-16 mb-6">
+                  <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
+                  <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Layers className="text-blue-600 animate-pulse w-6 h-6" />
+                  </div>
+                </div>
+                <h3 className="text-lg font-bold text-slate-800 mb-2">กำลังเตรียมความพร้อมของข้อมูล...</h3>
+                <p className="text-sm text-blue-700 font-bold bg-blue-50 px-4 py-2 rounded-xl inline-flex shadow-sm border border-blue-100 animate-pulse">
+                  {progressStep}
+                </p>
+                <p className="mt-4 text-xs text-slate-500 font-semibold max-w-[200px] leading-relaxed">
+                  ระบบกำลังผูกความสัมพันธ์อัตโนมัติ (อาจใช้เวลาสักครู่)
+                </p>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col overflow-y-auto">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                      <Database size={16} className="text-blue-600" /> Data Dictionary (โครงสร้างไฟล์ที่รองรับ)
@@ -883,7 +835,7 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
                 </div>
                 
                 {/* Data Dictionary Table */}
-                <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm bg-white mb-6">
+                <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm bg-white mb-6 shrink-0">
                   <table className="w-full text-left text-[11px]">
                     <thead className="bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-200">
                       <tr>
@@ -906,322 +858,47 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
                       <tr>
                         <td className="px-3 py-2 font-mono font-bold text-slate-700">province</td>
                         <td className="px-3 py-2 text-slate-600">Optional</td>
-                        <td className="px-3 py-2 font-medium">ชื่อจังหวัด (เช่น กรุงเทพมหานคร, ชลบุรี) (หากปล่อยว่างจะสร้างหน่วยงานโดยไม่มีพื้นที่รับผิดชอบ)</td>
+                        <td className="px-3 py-2 font-medium">ชื่อจังหวัด (หากปล่อยว่างจะถือว่าไม่มีพื้นที่รับผิดชอบ)</td>
                       </tr>
                       <tr>
                         <td className="px-3 py-2 font-mono font-bold text-slate-700">amphoe</td>
                         <td className="px-3 py-2 text-slate-600">Optional</td>
-                        <td className="px-3 py-2 font-medium">ชื่ออำเภอ หรือ เขต (เช่น อำเภอเมืองชลบุรี, เขตจตุจักร)</td>
+                        <td className="px-3 py-2 font-medium">ชื่ออำเภอ หรือ เขต</td>
                       </tr>
                       <tr>
                         <td className="px-3 py-2 font-mono font-bold text-slate-700">tambon</td>
                         <td className="px-3 py-2 text-slate-600">Optional</td>
-                        <td className="px-3 py-2 font-medium">ชื่อตำบล หรือ แขวง (เช่น ตำบลบางปลาสร้อย, แขวงลาดยาว)</td>
+                        <td className="px-3 py-2 font-medium">ชื่อตำบล หรือ แขวง</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
 
-                {/* Data Examples */}
-                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-3">
-                   <Table size={16} className="text-green-700" /> ตัวอย่างข้อมูล (1 แถว = 1 พื้นที่รับผิดชอบ)
-                </h3>
-                <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm bg-white">
-                  <table className="w-full text-left text-[10px] whitespace-nowrap">
-                    <thead className="bg-green-50 text-green-800 uppercase font-bold border-b border-green-100">
-                      <tr>
-                        <th className="px-3 py-2">org_name</th>
-                        <th className="px-3 py-2">parent_name</th>
-                        <th className="px-3 py-2">province</th>
-                        <th className="px-3 py-2">amphoe</th>
-                        <th className="px-3 py-2">tambon</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
-                      <tr className="hover:bg-slate-50">
-                        <td className="px-3 py-2 text-blue-800 font-bold">กรุงเทพมหานคร</td>
-                        <td className="px-3 py-2 text-slate-500 italic">null</td>
-                        <td className="px-3 py-2">กรุงเทพมหานคร</td>
-                        <td className="px-3 py-2 text-slate-400">-</td>
-                        <td className="px-3 py-2 text-slate-400">-</td>
-                      </tr>
-                      <tr className="hover:bg-slate-50">
-                        <td className="px-3 py-2">เขตจตุจักร</td>
-                        <td className="px-3 py-2 text-blue-800 font-bold">กรุงเทพมหานคร</td>
-                        <td className="px-3 py-2">กรุงเทพมหานคร</td>
-                        <td className="px-3 py-2">เขตจตุจักร</td>
-                        <td className="px-3 py-2 text-slate-400">-</td>
-                      </tr>
-                      <tr className="bg-blue-50/50 hover:bg-blue-50">
-                        <td className="px-3 py-2 font-bold text-blue-800">ศูนย์ปฏิบัติการน้ำ</td>
-                        <td className="px-3 py-2">กรมชลประทาน</td>
-                        <td className="px-3 py-2">ชลบุรี</td>
-                        <td className="px-3 py-2 text-slate-400">-</td>
-                        <td className="px-3 py-2 text-slate-400">-</td>
-                      </tr>
-                      <tr className="bg-blue-50/50 hover:bg-blue-50">
-                        <td className="px-3 py-2 font-bold text-blue-800">ศูนย์ปฏิบัติการน้ำ</td>
-                        <td className="px-3 py-2 text-slate-500">กรมชลประทาน</td>
-                        <td className="px-3 py-2">ระยอง</td>
-                        <td className="px-3 py-2 text-slate-400">-</td>
-                        <td className="px-3 py-2 text-slate-400">-</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col flex-1 min-h-0">
-                <div className="flex items-center justify-between mb-4 shrink-0">
-                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                     <Layers size={16} className="text-blue-600" /> โครงสร้างพรีวิว ({filteredNodes.length} หน่วยงาน)
-                  </h3>
-                  <button 
-                    onClick={() => setShowDocumentation(true)}
-                    className="text-xs font-bold text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-1"
-                  >
-                    ดูคำอธิบายคอลัมน์/ตัวอย่างไฟล์
-                  </button>
-                </div>
-
-                {/* Filter Controls */}
-                <div className="flex flex-col gap-3 mb-4 shrink-0">
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <div className="relative flex-1">
-                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input 
-                        type="text"
-                        placeholder="ค้นหารายชื่อหน่วยงานพรีวิว..."
-                        value={previewSearchQuery}
-                        onChange={(e) => setPreviewSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-500 bg-white"
-                      />
-                    </div>
-                    <div className="flex bg-slate-200 p-0.5 rounded-xl border border-slate-300 self-start text-xs font-bold">
-                      <button 
-                        onClick={() => setFilterType('all')} 
-                        className={`px-3 py-1.5 rounded-lg transition-colors ${filterType === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-                      >
-                        ทั้งหมด ({validatedNodes.length})
-                      </button>
-                      <button 
-                        onClick={() => setFilterType('issues')} 
-                        className={`px-3 py-1.5 rounded-lg transition-colors ${filterType === 'issues' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'} flex items-center gap-1`}
-                      >
-                        พบปัญหา ({issueCount})
-                      </button>
-                      <button 
-                        onClick={() => setFilterType('valid')} 
-                        className={`px-3 py-1.5 rounded-lg transition-colors ${filterType === 'valid' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
-                      >
-                        ผ่านการตรวจ ({validCount})
-                      </button>
+                <div className="flex flex-col md:flex-row gap-4 mt-2">
+                  <div className="flex-1 flex flex-col justify-center items-center">
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      accept=".xlsx, .xls, .csv" 
+                      onChange={handleFileChange} 
+                    />
+                    <div 
+                      onClick={triggerFileInput}
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      className="w-full flex-1 border-2 border-dashed border-green-300 bg-green-50/30 rounded-2xl p-8 flex flex-col items-center justify-center text-center hover:bg-green-50/60 transition-all cursor-pointer group"
+                    >
+                      <Upload size={40} className="text-green-700 mb-4 group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300" strokeWidth={1.5} />
+                      <h3 className="text-md font-bold text-slate-800 mb-2">ลากไฟล์มาวางที่นี่</h3>
+                      <p className="text-xs text-slate-700 font-semibold mb-1">หรือคลิกเพื่อเลือกไฟล์จากคอมพิวเตอร์</p>
                     </div>
                   </div>
-                  
-                  <div className="flex justify-between items-center bg-slate-100 p-2 rounded-xl border border-slate-200">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-700 ml-1">กรองระดับชั้น (Level):</span>
-                      <select 
-                        value={filterLevel}
-                        onChange={(e) => setFilterLevel(e.target.value)}
-                        className="text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg px-2 py-1 outline-none focus:border-blue-500"
-                      >
-                        <option value="all">แสดงทุกระดับ</option>
-                        {availableLevels.map(lvl => (
-                          <option key={lvl} value={lvl}>Level {lvl}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setExcludedNodes(new Set())}
-                        className="text-xs font-bold text-blue-700 hover:underline px-2"
-                      >
-                        นำเข้าทั้งหมด
-                      </button>
-                      <button
-                        onClick={() => setExcludedNodes(new Set(validatedNodes.map(n => n.name)))}
-                        className="text-xs font-bold text-slate-600 hover:underline px-2"
-                      >
-                        ไม่นำเข้าเลย
-                      </button>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Node List */}
-                <div className="flex-1 overflow-y-auto space-y-3 pr-1 min-h-0">
-                  {filteredNodes.length === 0 ? (
-                    <div className="text-center py-12 text-slate-600 font-medium text-xs">
-                      ไม่พบหน่วยงานตามตัวกรองที่เลือก
-                    </div>
-                  ) : (
-                    <>
-                      {filteredNodes.slice(0, 100).map((node, index) => {
-                      const hasErrors = node.errors.length > 0;
-                      const hasWarnings = node.warnings.length > 0;
-                      const isExcluded = excludedNodes.has(node.name);
-                      
-                      let cardStyle = "border-slate-200 bg-white hover:border-blue-300";
-                      if (hasErrors) cardStyle = "border-red-500 bg-red-50/70";
-                      else if (hasWarnings) cardStyle = "border-amber-500 bg-amber-50/70";
-                      
-                      if (isExcluded) cardStyle = "border-slate-200 bg-slate-100 opacity-60 grayscale";
-
-                      return (
-                        <div key={index} className={`p-4 rounded-xl border-2 transition-all shadow-sm flex flex-col ${cardStyle}`}>
-                          <div className="flex justify-between items-start gap-2 mb-2">
-                            <div className="flex items-start gap-3 flex-1 min-w-0">
-                              <label className="flex items-center gap-2 cursor-pointer mt-0.5">
-                                <input
-                                  type="checkbox"
-                                  checked={!isExcluded}
-                                  onChange={(e) => {
-                                    const newSet = new Set(excludedNodes);
-                                    if (e.target.checked) newSet.delete(node.name);
-                                    else newSet.add(node.name);
-                                    setExcludedNodes(newSet);
-                                  }}
-                                  className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500"
-                                />
-                              </label>
-                              <div className="min-w-0 flex-1">
-                                <h4 className={`font-bold text-sm ${isExcluded ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{node.name}</h4>
-                                <div className="text-[11px] font-semibold text-slate-600 mt-0.5">
-                                  ระดับ: <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">Level {node.level}</span>
-                                  {node.parentName ? (
-                                    <> • ต้นสังกัด: <span className="text-blue-800">{node.parentName}</span></>
-                                  ) : (
-                                    <> • <span className="text-slate-500 italic">หน่วยงานสูงสุด</span></>
-                                  )}
-                                </div>
-                                {node.originalParentName !== node.parentName && node.originalParentName && (
-                                  <p className="text-[10px] text-red-600 font-bold mt-1">
-                                    ⚠️ สังกัดเดิมในไฟล์: "{node.originalParentName}" (ถูกปรับปรุงอัตโนมัติ)
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-1 rounded-lg shrink-0">
-                              รับผิดชอบ {node.locations.length} พื้นที่
-                            </span>
-                          </div>
-
-                          {/* Error/Warning Messages */}
-                          {(hasErrors || hasWarnings) && (
-                            <div className="mt-3 space-y-1.5 border-t border-slate-200/55 pt-2.5">
-                              {node.errors.map((err, i) => (
-                                <div key={i} className="text-[10px] font-bold text-red-700 bg-red-100/50 p-2 rounded-lg flex items-center gap-1.5">
-                                  <AlertTriangle size={12} className="shrink-0 text-red-700" />
-                                  <span>{err}</span>
-                                </div>
-                              ))}
-                              {node.warnings.map((warn, i) => (
-                                <div key={i} className="text-[10px] font-bold text-amber-900 bg-amber-100/50 p-2.5 rounded-lg flex flex-col gap-2">
-                                  <div className="flex items-center gap-1.5">
-                                    <AlertTriangle size={12} className="shrink-0 text-amber-700" />
-                                    <span>{warn}</span>
-                                  </div>
-                                  
-                                  {/* แสดงตารางแถวขัดแย้งหากคำเตือนเกี่ยวข้องกับความขัดแย้งต้นสังกัด */}
-                                  {warn.includes("ขัดแย้งกัน") && node.rawRows && node.rawRows.length > 0 && (
-                                    <div className="overflow-x-auto rounded border border-amber-200 bg-white mt-1">
-                                      <table className="w-full text-left text-[9px] font-semibold text-slate-700 whitespace-nowrap">
-                                        <thead className="bg-amber-50 text-amber-955 uppercase font-bold border-b border-amber-100">
-                                          <tr>
-                                            <th className="px-2 py-1 border-r border-slate-100 text-center">บรรทัดที่ (Row)</th>
-                                            <th className="px-2 py-1 border-r border-slate-100">ชื่อหน่วยงาน (org_name)</th>
-                                            <th className="px-2 py-1">ต้นสังกัด (parent_name)</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                          {node.rawRows.map((r, idx) => (
-                                            <tr key={idx} className="hover:bg-amber-50/20">
-                                              <td className="px-2 py-1 border-r border-slate-100 font-mono text-center">{r.rowNumber}</td>
-                                              <td className="px-2 py-1 border-r border-slate-100">{r.orgName}</td>
-                                              <td className="px-2 py-1 font-bold text-red-650">{r.parentName || <span className="italic text-slate-400 font-normal">null (ว่าง)</span>}</td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {filteredNodes.length > 100 && (
-                      <div className="text-center py-4 mt-2 bg-slate-50 border border-slate-200 rounded-lg shadow-sm">
-                        <p className="text-sm text-slate-700 font-medium">
-                          แสดงตัวอย่างข้อมูล 100 รายการแรก จากทั้งหมด <span className="font-bold text-blue-700">{filteredNodes.length.toLocaleString()}</span> รายการ
-                        </p>
-                        <p className="text-[11px] text-slate-500 mt-1">
-                          ระบบจะนำเข้าข้อมูลทั้งหมดตามปกติเมื่อกดยืนยัน
-                        </p>
-                      </div>
-                    )}
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Right Panel */}
-          <div className="md:w-[35%] p-6 flex flex-col justify-between bg-white shrink-0">
-            {!parsedFile ? (
-              isProcessing ? (
-                <div className="flex-1 flex flex-col justify-center items-center bg-slate-50/50 rounded-2xl border border-slate-100 p-8 text-center animate-in fade-in duration-300">
-                  <div className="relative w-16 h-16 mb-6">
-                    <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
-                    <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Layers className="text-blue-600 animate-pulse w-6 h-6" />
-                    </div>
-                  </div>
-                  <h3 className="text-lg font-bold text-slate-800 mb-2">กำลังประมวลผลไฟล์...</h3>
-                  <p className="text-sm text-blue-700 font-bold bg-blue-50 px-4 py-2 rounded-xl inline-flex shadow-sm border border-blue-100 animate-pulse">
-                    {progressStep}
-                  </p>
-                  <p className="mt-4 text-xs text-slate-500 font-semibold max-w-[200px] leading-relaxed">
-                    กรุณารอสักครู่ ระบบกำลังจัดเตรียมข้อมูลโครงสร้างองค์กรของคุณ
-                  </p>
-                </div>
-              ) : (
-                <div className="flex-1 flex flex-col justify-center items-center">
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    accept=".xlsx, .xls, .csv" 
-                    onChange={handleFileChange} 
-                  />
-                  <div 
-                    onClick={triggerFileInput}
-                    onDragOver={handleDragOver}
-                    onDrop={handleDrop}
-                    className="w-full flex-1 border-2 border-dashed border-green-300 bg-green-50/30 rounded-2xl p-8 flex flex-col items-center justify-center text-center hover:bg-green-50/60 transition-all cursor-pointer group"
-                  >
-                    <Upload size={40} className="text-green-700 mb-4 group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300" strokeWidth={1.5} />
-                    <h3 className="text-md font-bold text-slate-800 mb-2">ลากไฟล์มาวางที่นี่</h3>
-                    <p className="text-xs text-slate-700 font-semibold mb-1">หรือคลิกเพื่อเลือกไฟล์จากคอมพิวเตอร์</p>
-                    <p className="text-[10px] text-slate-600 font-bold">รองรับไฟล์ Excel (.xlsx, .xls) และ CSV</p>
-                  </div>
-                  <button 
-                    onClick={triggerFileInput} 
-                    className="mt-4 px-6 py-3 w-full bg-slate-800 text-white rounded-xl text-sm font-bold shadow-md hover:bg-slate-900 hover:shadow-lg transition-all active:scale-95 cursor-pointer"
-                  >
-                    เลือกไฟล์สำหรับอัปโหลด
-                  </button>
-
-                  <div className="mt-6 w-full flex flex-col gap-2 border-t border-slate-200 pt-6">
-                    <p className="text-sm font-bold text-slate-800 text-left">หรือ นำเข้าจาก Google Sheets Link</p>
+                  <div className="md:w-1/3 w-full flex flex-col gap-2">
+                    <p className="text-sm font-bold text-slate-800 text-left mt-2">หรือ นำเข้าจาก Google Sheets Link</p>
                     <p className="text-[10px] text-slate-600 font-bold text-left mb-1">
-                      (ต้องตั้งค่าสิทธิ์เป็น <span className="text-blue-600">Anyone with the link can view</span>)
+                      (ต้องตั้งค่าเป็น <span className="text-blue-600">Anyone with the link</span>)
                     </p>
                     <div className="flex flex-col gap-2">
                       <input 
@@ -1241,92 +918,103 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
                     </div>
                   </div>
                 </div>
-              )
-            ) : (
-              <div className="flex-1 flex flex-col justify-between">
-                {/* Summary Info */}
-                <div className="space-y-5">
-                  <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex gap-3 items-center">
-                    <CheckCircle className="text-green-700 shrink-0 w-8 h-8" />
+              </div>
+            )
+          ) : (
+            <div className="flex flex-col h-full overflow-hidden">
+              {/* Summary Info */}
+              <div className="flex items-center gap-4 mb-6 shrink-0">
+                <div className="flex-1 bg-green-50 border border-green-200 rounded-2xl p-4 flex gap-4 items-center">
+                  <CheckCircle className="text-green-700 shrink-0 w-8 h-8" />
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-sm">อ่านไฟล์เรียบร้อย</h4>
+                    <p className="text-[11px] font-semibold text-slate-700 truncate max-w-[300px]">{parsedFile.name} (ขนาด: {Math.round(parsedFile.size / 1024)} KB)</p>
+                  </div>
+                </div>
+
+                <div className="flex-1 border border-slate-200 rounded-2xl p-4 bg-slate-50 flex items-center justify-between">
+                  <div className="text-center">
+                    <p className="text-xs text-slate-500 font-bold">หน่วยงานทั้งหมด</p>
+                    <p className="text-lg font-bold text-slate-900">{validatedNodes.length.toLocaleString()}</p>
+                  </div>
+                  <div className="h-10 w-px bg-slate-200"></div>
+                  <div className="text-center">
+                    <p className="text-xs text-green-700 font-bold">สมบูรณ์ (ไม่มีปัญหา)</p>
+                    <p className="text-lg font-bold text-green-755">{validCount.toLocaleString()}</p>
+                  </div>
+                  <div className="h-10 w-px bg-slate-200"></div>
+                  <div className="text-center">
+                    <p className="text-xs text-amber-600 font-bold">มีข้อขัดแย้ง/แจ้งเตือน</p>
+                    <p className="text-lg font-bold text-amber-650">{issueCount.toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+
+              {issueGroups.length > 0 ? (
+                <div className="border border-slate-200 rounded-2xl bg-white overflow-hidden flex flex-col flex-1 min-h-0">
+                  <div className="bg-amber-50 p-4 border-b border-amber-200 flex items-center gap-2 shrink-0">
+                    <AlertTriangle className="text-amber-600 w-5 h-5 shrink-0" />
                     <div>
-                      <h4 className="font-bold text-slate-800 text-sm">อ่านไฟล์เรียบร้อย</h4>
-                      <p className="text-[11px] font-semibold text-slate-700 truncate max-w-[200px]">{parsedFile.name}</p>
-                      <p className="text-[10px] text-slate-600 font-bold">ขนาด: {Math.round(parsedFile.size / 1024)} KB</p>
+                      <h5 className="font-bold text-amber-800 text-sm">พบข้อมูลขัดแย้ง (ระบบได้ทำการปรับโครงสร้างให้อัตโนมัติแล้วบางส่วน)</h5>
+                      <p className="text-[11px] text-amber-700/80 font-semibold mt-0.5">คุณสามารถกดนำเข้าได้ทันที และไปแก้ไขความสัมพันธ์ที่ขัดแย้งในแถบตั้งค่าภายหลัง</p>
                     </div>
                   </div>
-
-                  <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-3">
-                    <h5 className="font-bold text-slate-700 text-xs uppercase tracking-wider">ผลสรุปโครงสร้าง</h5>
-                    <div className="divide-y divide-slate-200/60 text-xs font-semibold text-slate-700">
-                      <div className="flex justify-between py-2">
-                        <span>หน่วยงานนำเข้าทั้งหมด</span>
-                        <span className="font-bold text-slate-900">{validatedNodes.length} โหนด</span>
-                      </div>
-                      <div className="flex justify-between py-2 text-green-755 font-bold">
-                        <span>ผ่านการตรวจสอบทันที</span>
-                        <span className="font-bold">{validCount} โหนด</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {issueGroups.length > 0 && (
-                    <div className="border border-slate-200 rounded-2xl bg-white overflow-hidden flex flex-col max-h-[35vh]">
-                      <div className="bg-amber-50 p-3 border-b border-amber-200 flex items-center gap-2">
-                        <AlertTriangle className="text-amber-600 w-4 h-4 shrink-0" />
-                        <h5 className="font-bold text-amber-800 text-xs">รายการแจ้งเตือนที่พบ (ระบบพยายามแก้ไขให้อัตโนมัติแล้ว)</h5>
-                      </div>
-                      <div className="overflow-y-auto p-3 space-y-2 bg-slate-50">
-                        {issueGroups.map(group => (
-                          <div key={group.id} className={`border ${group.border} ${group.bg} rounded-xl overflow-hidden`}>
-                            <button
-                              onClick={() => setExpandedGroupId(expandedGroupId === group.id ? null : group.id)}
-                              className="w-full p-2.5 flex justify-between items-center hover:bg-black/5 transition-colors text-left"
-                            >
-                              <span className={`text-xs font-bold ${group.color}`}>
-                                {group.label} ({group.items.length.toLocaleString()} แห่ง)
-                              </span>
-                              {expandedGroupId === group.id ? <ChevronUp size={14} className={group.color} /> : <ChevronDown size={14} className={group.color} />}
-                            </button>
-                            {expandedGroupId === group.id && (
-                              <div className="p-3 bg-white/50 border-t border-black/5 max-h-40 overflow-y-auto space-y-1.5">
-                                {group.items.slice(0, 50).map((item, idx) => (
-                                  <div key={idx} className="text-[10px] text-slate-700 font-semibold flex flex-col">
-                                    <span className="font-bold">{item.name}</span>
-                                    <span className="text-slate-500">{item.msg}</span>
-                                  </div>
-                                ))}
-                                {group.items.length > 50 && (
-                                  <div className="text-[10px] text-center font-bold text-slate-500 pt-2">
-                                    ...และอีก {(group.items.length - 50).toLocaleString()} แห่ง
-                                  </div>
-                                )}
+                  <div className="overflow-y-auto p-4 space-y-3 bg-slate-50 flex-1">
+                    {issueGroups.map(group => (
+                      <div key={group.id} className={`border ${group.border} ${group.bg} rounded-xl overflow-hidden shadow-sm`}>
+                        <button
+                          onClick={() => setExpandedGroupId(expandedGroupId === group.id ? null : group.id)}
+                          className="w-full p-3.5 flex justify-between items-center hover:bg-black/5 transition-colors text-left"
+                        >
+                          <span className={`text-sm font-bold ${group.color}`}>
+                            {group.label} ({group.items.length.toLocaleString()} แห่ง)
+                          </span>
+                          {expandedGroupId === group.id ? <ChevronUp size={16} className={group.color} /> : <ChevronDown size={16} className={group.color} />}
+                        </button>
+                        {expandedGroupId === group.id && (
+                          <div className="p-4 bg-white/50 border-t border-black/5 space-y-2">
+                            {group.items.slice(0, 50).map((item, idx) => (
+                              <div key={idx} className="text-[11px] text-slate-700 font-semibold flex flex-col bg-white p-2 rounded border border-slate-100">
+                                <span className="font-bold text-slate-800">{item.name}</span>
+                                <span className="text-slate-500 mt-0.5">{item.msg}</span>
+                              </div>
+                            ))}
+                            {group.items.length > 50 && (
+                              <div className="text-xs text-center font-bold text-slate-500 pt-2 pb-1">
+                                ...และมีหน่วยงานที่ติดปัญหานี้อีก {(group.items.length - 50).toLocaleString()} แห่ง
                               </div>
                             )}
                           </div>
-                        ))}
+                        )}
                       </div>
-                    </div>
-                  )}
+                    ))}
+                  </div>
                 </div>
+              ) : (
+                <div className="flex-1 flex flex-col justify-center items-center bg-slate-50 border border-slate-200 rounded-2xl">
+                  <CheckCircle size={48} className="text-green-500 mb-4" />
+                  <h3 className="text-lg font-bold text-slate-800">ข้อมูลสมบูรณ์ 100%</h3>
+                  <p className="text-slate-500 font-medium">พร้อมสำหรับนำเข้าสู่ระบบ</p>
+                </div>
+              )}
 
-                {/* Import Confirm Button */}
-                <div className="space-y-3 mt-6">
-                  <button 
-                    onClick={handleConfirm}
-                    className="w-full py-3.5 bg-green-700 hover:bg-green-800 text-white rounded-xl text-sm font-bold shadow-lg shadow-green-100 flex justify-center items-center gap-2 hover:shadow-xl transition-all cursor-pointer"
-                  >
-                    <Check size={16} strokeWidth={3} /> ยืนยันการนำเข้าข้อมูล
-                  </button>
-                  <button 
-                    onClick={resetState}
-                    className="w-full py-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 hover:text-slate-950 rounded-xl text-sm font-bold transition-colors cursor-pointer"
-                  >
-                    เลือกไฟล์ใหม่
-                  </button>
-                </div>
+              {/* Import Confirm Button */}
+              <div className="flex gap-4 mt-6 shrink-0">
+                <button 
+                  onClick={resetState}
+                  className="w-48 py-3 bg-white border border-slate-300 hover:bg-slate-50 text-red-600 rounded-xl text-sm font-bold transition-colors cursor-pointer text-center"
+                >
+                  ยกเลิกการนำเข้า
+                </button>
+                <button 
+                  onClick={handleConfirm}
+                  className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-green-100/50 flex justify-center items-center gap-2 transition-all cursor-pointer"
+                >
+                  <Check size={18} strokeWidth={2.5} /> นำเข้าและแก้ไขด้วยตนเอง
+                </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Final Import Progress Overlay */}
