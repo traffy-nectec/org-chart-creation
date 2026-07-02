@@ -2245,7 +2245,7 @@ export default function OrgManagerApp() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [isIssueSidebarOpen, setIsIssueSidebarOpen] = useState(true);
-  const [expandedIssueCategories, setExpandedIssueCategories] = useState(new Set(['circle', 'missingParent', 'noArea', 'duplicate', 'others']));
+  const [expandedIssueCategories, setExpandedIssueCategories] = useState(new Set(['circle', 'missingParent', 'noArea', 'invalidArea', 'duplicate', 'others']));
   const [viewMode, setViewMode] = useState('canvas'); // 'canvas' or 'table'
   const [deleteConfirmNode, setDeleteConfirmNode] = useState(null);
   const [moveMode, setMoveMode] = useState('branch'); // 'branch' or 'single'
@@ -2554,7 +2554,8 @@ export default function OrgManagerApp() {
     const groups = {
       circle: { id: 'circle', label: 'ความสัมพันธ์เป็นวงกลม', items: [], color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
       missingParent: { id: 'missingParent', label: 'ไม่พบต้นสังกัด', items: [], color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200' },
-      noArea: { id: 'noArea', label: 'ไม่มีพื้นที่รับผิดชอบ', items: [], subGroups: {}, color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
+      noArea: { id: 'noArea', label: 'ไม่มีพื้นที่รับผิดชอบ (เป็นหน่วยงานลอย)', items: [], color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
+      invalidArea: { id: 'invalidArea', label: 'พื้นที่ไม่พบในระบบ', items: [], subGroups: {}, color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
       duplicate: { id: 'duplicate', label: 'ชื่อหน่วยงานซ้ำกัน', items: [], color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
       others: { id: 'others', label: 'ขัดแย้งอื่นๆ', items: [], color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-200' },
     };
@@ -2567,25 +2568,27 @@ export default function OrgManagerApp() {
       if (msg.includes('วงกลม')) groups.circle.items.push(org);
       else if (msg.includes('ไม่พบต้นสังกัด')) groups.missingParent.items.push(org);
       else if (msg.includes('ชื่อหน่วยงานซ้ำกัน')) groups.duplicate.items.push(org);
-      else if (msg.includes('ไม่มีพื้นที่รับผิดชอบ') || msg.includes('ไม่พบข้อมูลพื้นที่รับผิดชอบ')) {
-        groups.noArea.items.push(org);
+      else if (msg.includes('ไม่พบข้อมูลพื้นที่รับผิดชอบ')) {
+        groups.invalidArea.items.push(org);
         
-        // Extract location name if it exists (e.g. "ไม่พบข้อมูลพื้นที่รับผิดชอบในระบบ จะถูกข้ามไป: เชียงใหม่")
         let locName = 'ไม่ระบุพื้นที่';
         const match = msg.match(/จะถูกข้ามไป(?: \("([^"]+)"\)|:\s*(.+))/);
         if (match) {
           locName = (match[1] || match[2] || '').trim();
         }
         
-        if (!groups.noArea.subGroups[locName]) {
-          groups.noArea.subGroups[locName] = [];
+        if (!groups.invalidArea.subGroups[locName]) {
+          groups.invalidArea.subGroups[locName] = [];
         }
-        groups.noArea.subGroups[locName].push(org);
+        groups.invalidArea.subGroups[locName].push(org);
+      }
+      else if (msg.includes('ไม่มีพื้นที่รับผิดชอบ')) {
+        groups.noArea.items.push(org);
       }
       else groups.others.items.push(org);
     });
 
-    return Object.values(groups).filter(g => g.items.length > 0);
+    return Object.values(groups);
   }, [organizations, nodeIssues]);
 
   const toggleIssueCategory = (categoryId) => {
@@ -3224,11 +3227,15 @@ export default function OrgManagerApp() {
       <div className="flex-1 flex gap-4 overflow-hidden relative">
         
         {/* Left Issue Sidebar */}
-        {viewMode === 'canvas' && unifiedIssueGroups.length > 0 && (
+        {viewMode === 'canvas' && (
           <div className={`transition-all duration-300 flex flex-col bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden shrink-0 ${isIssueSidebarOpen ? 'w-[340px] opacity-100' : 'w-0 opacity-0 border-none'}`}>
             <div className="flex items-center justify-between border-b border-slate-200 p-4 bg-slate-50 cursor-pointer select-none shrink-0" onClick={() => setIsIssueSidebarOpen(false)}>
-              <div className="flex items-center gap-2 text-amber-700 font-bold text-sm uppercase tracking-wider">
-                <AlertTriangle size={18} className="text-amber-600 shrink-0 animate-pulse" />
+              <div className={`flex items-center gap-2 font-bold text-sm uppercase tracking-wider ${unifiedIssueGroups.reduce((acc, g) => acc + g.items.length, 0) === 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                {unifiedIssueGroups.reduce((acc, g) => acc + g.items.length, 0) === 0 ? (
+                  <CheckCircle size={18} className="text-emerald-500 shrink-0" />
+                ) : (
+                  <AlertTriangle size={18} className="text-amber-600 shrink-0 animate-pulse" />
+                )}
                 <span>การแจ้งเตือน ({unifiedIssueGroups.reduce((acc, g) => acc + g.items.length, 0).toLocaleString()} แห่ง)</span>
               </div>
               <button className="text-slate-400 hover:text-slate-650 transition-colors p-1 bg-white rounded-md border border-slate-200 hover:bg-slate-100">
@@ -3240,21 +3247,32 @@ export default function OrgManagerApp() {
               <div className="text-xs text-slate-600 font-semibold leading-relaxed p-3 bg-blue-50 text-blue-700 rounded-xl border border-blue-100">
                 ⚠️ รายชื่อหน่วยงานด้านล่างเกิดความสัมพันธ์ขัดแย้งหรือมีข้อสังเกตที่ควรตรวจสอบ คุณสามารถกด "แก้ไข" เพื่อไปจัดการได้ทันที
               </div>
-              {unifiedIssueGroups.map(group => (
-                <div key={group.id} className={`border ${group.border} ${group.bg} rounded-xl overflow-hidden shadow-sm`}>
+              {unifiedIssueGroups.map(group => {
+                const isEmpty = group.items.length === 0;
+                const groupBorder = isEmpty ? 'border-emerald-200' : group.border;
+                const groupBg = isEmpty ? 'bg-emerald-50' : group.bg;
+                const groupColor = isEmpty ? 'text-emerald-700' : group.color;
+                
+                return (
+                <div key={group.id} className={`border ${groupBorder} ${groupBg} rounded-xl overflow-hidden shadow-sm`}>
                   <div 
                     className="w-full p-3 flex justify-between items-center text-left bg-white/60 border-b border-black/5 cursor-pointer hover:bg-black/5 transition-colors"
                     onClick={() => toggleIssueCategory(group.id)}
                   >
-                    <span className={`text-sm font-bold ${group.color}`}>
+                    <span className={`text-sm font-bold ${groupColor}`}>
                       {group.label} ({group.items.length.toLocaleString()})
                     </span>
-                    {expandedIssueCategories.has(group.id) ? <ChevronUp size={16} className={group.color} /> : <ChevronDown size={16} className={group.color} />}
+                    {expandedIssueCategories.has(group.id) ? <ChevronUp size={16} className={groupColor} /> : <ChevronDown size={16} className={groupColor} />}
                   </div>
                   
                   {expandedIssueCategories.has(group.id) && (
                     <div className="p-3 space-y-3 bg-white">
-                    {group.subGroups && Object.keys(group.subGroups).length > 0 ? (
+                    {isEmpty ? (
+                      <div className="text-center p-4 text-xs font-bold text-emerald-600 bg-emerald-50/50 rounded-xl border border-emerald-100 flex flex-col items-center gap-2">
+                        <CheckCircle size={24} className="text-emerald-500" />
+                        ยอดเยี่ยม! ไม่พบปัญหาในหมวดหมู่นี้
+                      </div>
+                    ) : group.subGroups && Object.keys(group.subGroups).length > 0 ? (
                       Object.entries(group.subGroups).map(([locName, nodes]) => (
                         <div key={locName} className="mb-3">
                           <div className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-1.5 mb-2 border border-slate-200">
@@ -3323,7 +3341,8 @@ export default function OrgManagerApp() {
                   </div>
                   )}
                 </div>
-              ))}
+              );
+              })}
             </div>
           </div>
         )}
@@ -3332,13 +3351,17 @@ export default function OrgManagerApp() {
         <div className={`flex-1 bg-[#f8fafc] border border-slate-200 shadow-inner overflow-hidden flex flex-col transition-all duration-300 ${isFullscreen ? 'fixed inset-0 z-50 rounded-none w-full h-full' : 'relative rounded-2xl'}`} style={viewMode === 'canvas' ? { backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' } : {}}>
           
           {/* Toggle Sidebar Button (Floating on Canvas) */}
-          {viewMode === 'canvas' && unifiedIssueGroups.length > 0 && !isIssueSidebarOpen && (
+          {viewMode === 'canvas' && !isIssueSidebarOpen && (
             <button 
               onClick={() => setIsIssueSidebarOpen(true)}
-              className="absolute left-6 bottom-6 z-40 p-3.5 bg-white border border-amber-200 rounded-full shadow-xl text-amber-600 hover:bg-amber-50 hover:scale-105 transition-all group pointer-events-auto"
+              className={`absolute left-6 bottom-6 z-40 p-3.5 bg-white border rounded-full shadow-xl hover:scale-105 transition-all group pointer-events-auto ${unifiedIssueGroups.reduce((acc, g) => acc + g.items.length, 0) === 0 ? 'border-emerald-200 text-emerald-600 hover:bg-emerald-50' : 'border-amber-200 text-amber-600 hover:bg-amber-50'}`}
               title="เปิดแถบแจ้งเตือน"
             >
-              <AlertTriangle size={24} className="animate-pulse" />
+              {unifiedIssueGroups.reduce((acc, g) => acc + g.items.length, 0) === 0 ? (
+                <CheckCircle size={24} className="text-emerald-500" />
+              ) : (
+                <AlertTriangle size={24} className="animate-pulse" />
+              )}
               <div className="absolute left-full ml-3 px-3 py-1.5 bg-slate-800 text-white text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity shadow-lg">
                 เปิดแถบแจ้งเตือน ({unifiedIssueGroups.reduce((acc, g) => acc + g.items.length, 0).toLocaleString()} แห่ง)
                 <div className="absolute top-1/2 -left-1 -mt-1 w-2 h-2 bg-slate-800 rotate-45"></div>
