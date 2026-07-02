@@ -289,7 +289,6 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
         setElapsedSeconds(prev => prev + 1);
       }, 1000);
     } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setElapsedSeconds(0);
     }
     return () => clearInterval(interval);
@@ -300,6 +299,33 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
   const availableLevels = useMemo(() => {
     return Array.from(new Set(validatedNodes.map(n => n.level))).sort((a,b) => a - b);
   }, [validatedNodes]);
+
+  const issueGroups = React.useMemo(() => {
+    const groups = {
+      circle: { id: 'circle', label: 'ความสัมพันธ์เป็นวงกลม (ถูกตัดให้เป็นสูงสุด)', items: [], color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
+      missingParent: { id: 'missingParent', label: 'ไม่พบต้นสังกัด (แขวนลอยเป็นสูงสุด)', items: [], color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200' },
+      noArea: { id: 'noArea', label: 'ไม่มีพื้นที่รับผิดชอบ (หน่วยงานลอย)', items: [], color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
+      multipleRoots: { id: 'multipleRoots', label: 'ถูกปรับยอด (ให้มี 1 หัวหน้าสูงสุด)', items: [], color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
+      others: { id: 'others', label: 'แจ้งเตือนอื่นๆ', items: [], color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-200' },
+    };
+
+    validatedNodes.forEach(node => {
+      node.errors.forEach(err => {
+        if (err.includes('วงกลม')) groups.circle.items.push({ name: node.name, msg: err });
+        else groups.others.items.push({ name: node.name, msg: err });
+      });
+      node.warnings.forEach(warn => {
+        if (warn.includes('ไม่พบต้นสังกัด')) groups.missingParent.items.push({ name: node.name, msg: warn });
+        else if (warn.includes('ไม่มีพื้นที่รับผิดชอบ')) groups.noArea.items.push({ name: node.name, msg: warn });
+        else if (warn.includes('ถูกปรับให้อยู่ภายใต้')) groups.multipleRoots.items.push({ name: node.name, msg: warn });
+        else groups.others.items.push({ name: node.name, msg: warn });
+      });
+    });
+
+    return Object.values(groups).filter(g => g.items.length > 0);
+  }, [validatedNodes]);
+
+  const [expandedGroupId, setExpandedGroupId] = useState(null);
 
   if (!isOpen) return null;
 
@@ -635,6 +661,11 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
             org.errors.push(`❌ ตรวจพบความสัมพันธ์เป็นวงกลม: ${cycleRes.cyclePath.join(' -> ')} (ระบบจะตัดให้เป็นหน่วยงานสูงสุด)`);
             parentMap.set(org.name, null); // break cycle
           }
+          
+          // Missing Area Check
+          if (!org.locations || org.locations.length === 0) {
+            org.warnings.push(`⚠️ ไม่มีพื้นที่รับผิดชอบ (เป็นหน่วยงานลอย)`);
+          }
         });
 
         // Enforce Single Root Constraint in preview
@@ -807,8 +838,6 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
 
   const issueCount = validatedNodes.filter(n => n.errors.length > 0 || n.warnings.length > 0).length;
   const validCount = validatedNodes.length - issueCount;
-  const cycleCount = validatedNodes.filter(n => n.errors.length > 0).length;
-  const warningCount = validatedNodes.filter(n => n.warnings.length > 0 && n.errors.length === 0).length;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
@@ -1233,14 +1262,6 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
                         <span>หน่วยงานนำเข้าทั้งหมด</span>
                         <span className="font-bold text-slate-900">{validatedNodes.length} โหนด</span>
                       </div>
-                      <div className="flex justify-between py-2 text-red-600">
-                        <span>พบสังกัดเป็นวงกลม</span>
-                        <span className="font-bold">{cycleCount} โหนด</span>
-                      </div>
-                      <div className="flex justify-between py-2 text-amber-700">
-                        <span>ไม่พบต้นสังกัด/ขัดแย้ง</span>
-                        <span className="font-bold">{warningCount} โหนด</span>
-                      </div>
                       <div className="flex justify-between py-2 text-green-755 font-bold">
                         <span>ผ่านการตรวจสอบทันที</span>
                         <span className="font-bold">{validCount} โหนด</span>
@@ -1248,9 +1269,42 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
                     </div>
                   </div>
 
-                  {(cycleCount > 0 || warningCount > 0) && (
-                    <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-[10px] font-semibold text-blue-900 leading-relaxed">
-                      💡 <b>ข้อมูลเพิ่มเติม:</b> มีหน่วยงานที่มีโครงสร้างขัดแย้ง ระบบจะช่วยปรับโครงสร้างความสัมพันธ์ให้อัตโนมัติ (เช่น ตัดสังกัดที่เป็นวงกลม และตั้งเป็นหน่วยงานสูงสุด Level 1) เพื่อให้สร้างโครงสร้างแผนผังที่ถูกต้องได้สำเร็จ
+                  {issueGroups.length > 0 && (
+                    <div className="border border-slate-200 rounded-2xl bg-white overflow-hidden flex flex-col max-h-[35vh]">
+                      <div className="bg-amber-50 p-3 border-b border-amber-200 flex items-center gap-2">
+                        <AlertTriangle className="text-amber-600 w-4 h-4 shrink-0" />
+                        <h5 className="font-bold text-amber-800 text-xs">รายการแจ้งเตือนที่พบ (ระบบพยายามแก้ไขให้อัตโนมัติแล้ว)</h5>
+                      </div>
+                      <div className="overflow-y-auto p-3 space-y-2 bg-slate-50">
+                        {issueGroups.map(group => (
+                          <div key={group.id} className={`border ${group.border} ${group.bg} rounded-xl overflow-hidden`}>
+                            <button
+                              onClick={() => setExpandedGroupId(expandedGroupId === group.id ? null : group.id)}
+                              className="w-full p-2.5 flex justify-between items-center hover:bg-black/5 transition-colors text-left"
+                            >
+                              <span className={`text-xs font-bold ${group.color}`}>
+                                {group.label} ({group.items.length.toLocaleString()} แห่ง)
+                              </span>
+                              {expandedGroupId === group.id ? <ChevronUp size={14} className={group.color} /> : <ChevronDown size={14} className={group.color} />}
+                            </button>
+                            {expandedGroupId === group.id && (
+                              <div className="p-3 bg-white/50 border-t border-black/5 max-h-40 overflow-y-auto space-y-1.5">
+                                {group.items.slice(0, 50).map((item, idx) => (
+                                  <div key={idx} className="text-[10px] text-slate-700 font-semibold flex flex-col">
+                                    <span className="font-bold">{item.name}</span>
+                                    <span className="text-slate-500">{item.msg}</span>
+                                  </div>
+                                ))}
+                                {group.items.length > 50 && (
+                                  <div className="text-[10px] text-center font-bold text-slate-500 pt-2">
+                                    ...และอีก {(group.items.length - 50).toLocaleString()} แห่ง
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2552,6 +2606,7 @@ export default function OrgManagerApp() {
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [showWarningsDropdown, setShowWarningsDropdown] = useState(false);
   const [isConflictPanelExpanded, setIsConflictPanelExpanded] = useState(true);
+  const [expandedConflictGroupId, setExpandedConflictGroupId] = useState(null);
   const [viewMode, setViewMode] = useState('canvas'); // 'canvas' or 'table'
   const [deleteConfirmNode, setDeleteConfirmNode] = useState(null);
   const [moveMode, setMoveMode] = useState('branch'); // 'branch' or 'single'
@@ -2805,6 +2860,16 @@ export default function OrgManagerApp() {
           });
         }
       }
+
+      // 5. Missing Area check
+      const locations = getSelectedLocations(node.areas);
+      if (locations.length === 0) {
+        unreachable.push({
+          ...node,
+          causeType: 'warning',
+          causeMessage: `ไม่มีพื้นที่รับผิดชอบ (เป็นหน่วยงานลอย)`
+        });
+      }
     });
 
     return unreachable;
@@ -2845,6 +2910,27 @@ export default function OrgManagerApp() {
 
     return issues;
   }, [conflictingNodes, organizations]);
+
+  const conflictGroups = useMemo(() => {
+    const groups = {
+      circle: { id: 'circle', label: 'ความสัมพันธ์เป็นวงกลม', items: [], color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
+      missingParent: { id: 'missingParent', label: 'ไม่พบต้นสังกัด', items: [], color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200' },
+      noArea: { id: 'noArea', label: 'ไม่มีพื้นที่รับผิดชอบ', items: [], color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
+      duplicate: { id: 'duplicate', label: 'ชื่อหน่วยงานซ้ำกัน', items: [], color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
+      others: { id: 'others', label: 'ขัดแย้งอื่นๆ', items: [], color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-200' },
+    };
+
+    conflictingNodes.forEach(node => {
+      const msg = node.causeMessage || '';
+      if (msg.includes('วงกลม')) groups.circle.items.push(node);
+      else if (msg.includes('ไม่พบต้นสังกัด')) groups.missingParent.items.push(node);
+      else if (msg.includes('ไม่มีพื้นที่รับผิดชอบ')) groups.noArea.items.push(node);
+      else if (msg.includes('ชื่อหน่วยงานซ้ำกัน')) groups.duplicate.items.push(node);
+      else groups.others.items.push(node);
+    });
+
+    return Object.values(groups).filter(g => g.items.length > 0);
+  }, [conflictingNodes]);
 
   const orgsWithIssues = useMemo(() => {
     return organizations.filter(org => nodeIssues.has(org.id));
@@ -3497,44 +3583,59 @@ export default function OrgManagerApp() {
                   <div className="text-[10px] text-slate-600 font-semibold mb-1 leading-normal">
                     ⚠️ หน่วยงานด้านล่างเกิดความสัมพันธ์ขัดแย้ง (เช่น สังกัดเป็นวงกลม หรือไม่มีต้นสังกัด) ทำให้ไม่สามารถนำมาแสดงในผังหลักได้
                   </div>
-                  {conflictingNodes.slice(0, 50).map(node => (
-                    <div 
-                      key={node.id} 
-                      className={`p-2.5 rounded-xl border border-red-200 bg-red-50/50 hover:bg-red-50 hover:border-red-300 transition-all flex flex-col gap-1.5`}
-                    >
-                      <div className="flex justify-between items-start gap-1">
-                        <span className="font-bold text-[11px] text-slate-800 break-all">{node.name || <span className="italic text-slate-500">ไม่ระบุชื่อ</span>}</span>
-                        <div className="flex gap-1 shrink-0">
-                          <button 
-                            onClick={() => setSelectedNodeId(node.id)}
-                            className="px-1.5 py-0.5 bg-white border border-red-300 text-red-600 hover:bg-red-50 rounded text-[9px] font-bold shadow-xs transition-colors cursor-pointer"
-                            title="เลือกเพื่อแก้ไขความสัมพันธ์ในแผงตั้งค่า"
-                            aria-label="เลือกโหนดเพื่อแก้ไขความสัมพันธ์"
-                          >
-                            แก้ไข
-                          </button>
-                          <button 
-                            onClick={() => handleUpdateNode(node.id, 'parentId', null)}
-                            className="px-1.5 py-0.5 bg-red-700 text-white hover:bg-red-800 rounded text-[9px] font-bold shadow-xs transition-colors cursor-pointer"
-                            title="ตั้งเป็นหน่วยงานสูงสุดทันทีเพื่อดึงกลับเข้าผังหลัก"
-                            aria-label="ตั้งเป็นหน่วยงานสูงสุด"
-                          >
-                            ตั้งสูงสุด
-                          </button>
-                        </div>
-                      </div>
+                  {conflictGroups.map(group => (
+                    <div key={group.id} className={`border ${group.border} ${group.bg} rounded-xl overflow-hidden`}>
+                      <button
+                        onClick={() => setExpandedConflictGroupId(expandedConflictGroupId === group.id ? null : group.id)}
+                        className="w-full p-2.5 flex justify-between items-center hover:bg-black/5 transition-colors text-left"
+                      >
+                        <span className={`text-xs font-bold ${group.color}`}>
+                          {group.label} ({group.items.length.toLocaleString()})
+                        </span>
+                        {expandedConflictGroupId === group.id ? <ChevronUp size={14} className={group.color} /> : <ChevronDown size={14} className={group.color} />}
+                      </button>
                       
-                      <div className="text-[9px] font-bold text-red-700 bg-red-100/50 p-1.5 rounded flex items-center gap-1 leading-normal">
-                        <AlertTriangle size={10} className="shrink-0 text-red-700" />
-                        <span>{node.causeMessage}</span>
-                      </div>
+                      {expandedConflictGroupId === group.id && (
+                        <div className="p-3 bg-white/50 border-t border-black/5 max-h-48 overflow-y-auto space-y-2">
+                          {group.items.slice(0, 50).map(node => (
+                            <div 
+                              key={node.id} 
+                              className={`p-2.5 rounded-xl border border-red-200 bg-red-50/50 hover:bg-red-50 hover:border-red-300 transition-all flex flex-col gap-1.5`}
+                            >
+                              <div className="flex justify-between items-start gap-1">
+                                <span className="font-bold text-[11px] text-slate-800 break-all">{node.name || <span className="italic text-slate-500">ไม่ระบุชื่อ</span>}</span>
+                                <div className="flex gap-1 shrink-0">
+                                  <button 
+                                    onClick={() => setSelectedNodeId(node.id)}
+                                    className="px-1.5 py-0.5 bg-white border border-red-300 text-red-600 hover:bg-red-50 rounded text-[9px] font-bold shadow-xs transition-colors cursor-pointer"
+                                    title="เลือกเพื่อแก้ไขความสัมพันธ์ในแผงตั้งค่า"
+                                  >
+                                    แก้ไข
+                                  </button>
+                                  <button 
+                                    onClick={() => handleUpdateNode(node.id, 'parentId', null)}
+                                    className="px-1.5 py-0.5 bg-red-700 text-white hover:bg-red-800 rounded text-[9px] font-bold shadow-xs transition-colors cursor-pointer"
+                                    title="ตั้งเป็นหน่วยงานสูงสุดทันทีเพื่อดึงกลับเข้าผังหลัก"
+                                  >
+                                    ตั้งสูงสุด
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="text-[9px] font-bold text-red-700 bg-red-100/50 p-1.5 rounded flex items-center gap-1 leading-normal">
+                                <AlertTriangle size={10} className="shrink-0 text-red-700" />
+                                <span>{node.causeMessage}</span>
+                              </div>
+                            </div>
+                          ))}
+                          {group.items.length > 50 && (
+                            <div className="text-center p-2 text-xs font-bold text-slate-500 bg-slate-50 rounded-xl border border-slate-200 mt-2">
+                              ...และหน่วยงานที่ขัดแย้งอีก {(group.items.length - 50).toLocaleString()} แห่ง
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
-                  {conflictingNodes.length > 50 && (
-                    <div className="text-center p-2 text-xs font-bold text-slate-500 bg-slate-50 rounded-xl border border-slate-200 mt-2">
-                      ...และหน่วยงานที่ขัดแย้งอีก {(conflictingNodes.length - 50).toLocaleString()} แห่ง
-                    </div>
-                  )}
                 </div>
               )}
             </div>
