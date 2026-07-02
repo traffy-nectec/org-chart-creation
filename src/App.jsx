@@ -2078,19 +2078,33 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose
 };
 
 const recalculateAllLevels = (orgs) => {
-  return orgs.map(org => {
-    let level = 1;
-    let curr = org;
-    const visited = new Set();
-    while (curr && curr.parentId && !visited.has(curr.id)) {
-      visited.add(curr.id);
-      const parent = orgs.find(o => o.id === curr.parentId);
-      if (!parent) break;
-      curr = parent;
-      level++;
+  const orgMap = new Map();
+  orgs.forEach(org => orgMap.set(org.id, org));
+  
+  const levelCache = new Map();
+
+  const getLevel = (orgId) => {
+    if (!orgId) return 0;
+    if (levelCache.has(orgId)) return levelCache.get(orgId);
+    
+    const org = orgMap.get(orgId);
+    if (!org || !org.parentId) {
+      levelCache.set(orgId, 1);
+      return 1;
     }
-    return { ...org, level };
-  });
+    
+    // Temporary set to 1 to break recursion if circular dependency exists
+    levelCache.set(orgId, 1);
+    const parentLevel = getLevel(org.parentId);
+    const lvl = parentLevel + 1;
+    levelCache.set(orgId, lvl);
+    return lvl;
+  };
+
+  return orgs.map(org => ({
+    ...org,
+    level: getLevel(org.id)
+  }));
 };
 
 const WelcomeModal = ({ isOpen, onClose }) => {
@@ -2452,14 +2466,22 @@ export default function OrgManagerApp() {
 
   const handleSaveDraft = () => {
     setIsDraftSaving(true);
-    localStorage.setItem('org_builder_draft', JSON.stringify(organizations));
+    try {
+      localStorage.setItem('org_builder_draft', JSON.stringify(organizations));
+    } catch (e) {
+      console.warn("Could not save draft to localStorage: Quota exceeded", e);
+    }
     setTimeout(() => setIsDraftSaving(false), 1500);
   };
 
   // Auto-save draft on organization changes
   useEffect(() => {
     if (isDraftRestored) {
-      localStorage.setItem('org_builder_draft', JSON.stringify(organizations));
+      try {
+        localStorage.setItem('org_builder_draft', JSON.stringify(organizations));
+      } catch (e) {
+        console.warn("Could not auto-save draft to localStorage: Quota exceeded", e);
+      }
     }
   }, [organizations, isDraftRestored]);
 
@@ -2492,8 +2514,19 @@ export default function OrgManagerApp() {
     const visited = new Set();
     
     // Find potential roots: parentId is null or invalid
-    const potentialRoots = organizations.filter(org => !org.parentId || !organizations.some(n => n.id === org.parentId));
+    const orgIdSet = new Set(organizations.map(org => org.id));
+    const potentialRoots = organizations.filter(org => !org.parentId || !orgIdSet.has(org.parentId));
     
+    const childrenMap = new Map();
+    organizations.forEach(org => {
+      if (org.parentId) {
+        if (!childrenMap.has(org.parentId)) {
+          childrenMap.set(org.parentId, []);
+        }
+        childrenMap.get(org.parentId).push(org);
+      }
+    });
+
     if (potentialRoots.length > 0) {
       const primaryRoot = potentialRoots[0];
       roots.push(nodeMap[primaryRoot.id]);
@@ -2501,7 +2534,7 @@ export default function OrgManagerApp() {
       
       const traverse = (node) => {
         if (!node) return;
-        const children = organizations.filter(org => org.parentId === node.id);
+        const children = childrenMap.get(node.id) || [];
         children.forEach(child => {
           const childNode = nodeMap[child.id];
           if (childNode && !visited.has(childNode.id)) {
@@ -2539,7 +2572,7 @@ export default function OrgManagerApp() {
       
       const traverse = (node) => {
         if (!node) return;
-        const children = organizations.filter(org => org.parentId === node.id);
+        const children = childrenMap.get(node.id) || [];
         children.forEach(child => {
           const childNode = nodeMap[child.id];
           if (childNode && !visited.has(childNode.id)) {
