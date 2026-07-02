@@ -264,31 +264,12 @@ const DraftRestoreModal = ({ isOpen, draftCount, onResume, onStartFresh }) => {
   );
 };
 
-const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locationDb }) => {
+const ImportModal = ({ isOpen, onClose, onImportData, onCancelImport, onDownloadTemplate, locationDb }) => {
   const fileInputRef = useRef(null);
   const [parsedFile, setParsedFile] = useState(null);
   const [validatedNodes, setValidatedNodes] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progressStep, setProgressStep] = useState('');
-  const [isFinalImporting, setIsFinalImporting] = useState(false);
-  const [finalImportProgress, setFinalImportProgress] = useState(0);
-  const [finalImportStepText, setFinalImportStepText] = useState('');
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  useEffect(() => {
-    let interval;
-    if (isFinalImporting) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setElapsedSeconds(0);
-      interval = setInterval(() => {
-        setElapsedSeconds(prev => prev + 1);
-      }, 1000);
-    } else {
-      setElapsedSeconds(0);
-    }
-    return () => clearInterval(interval);
-  }, [isFinalImporting]);
-
   const [sheetLink, setSheetLink] = useState('');
 
   const issueGroups = React.useMemo(() => {
@@ -736,6 +717,10 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
         setValidatedNodes(finalOrgs);
         setParsedFile({ name: sourceName, size: sourceSize });
         setIsProcessing(false);
+        
+        // **Pre-render:** Send data to Canvas immediately so it renders in background!
+        onImportData(finalOrgs);
+        
       } catch (err) {
         console.error(err);
         alert(`เกิดข้อผิดพลาดในการประมวลผลข้อมูล: ${err.message}`);
@@ -744,20 +729,9 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
   };
 
   const handleConfirm = async () => {
-    setIsFinalImporting(true);
-    setFinalImportProgress(50);
-    setFinalImportStepText('กำลังโหลดข้อมูลเข้าสู่หน้าจอ Canvas...');
-    await delay(100);
-
-    onImportData(validatedNodes);
-
-    setFinalImportProgress(100);
-    setFinalImportStepText('เสร็จสมบูรณ์! กำลังแสดงผล...');
-    await delay(200);
-
-    setIsFinalImporting(false);
-    setFinalImportProgress(0);
-    setFinalImportStepText('');
+    // Canvas is already pre-rendered in background!
+    // Just close the modal seamlessly.
+    onClose();
     resetState();
   };
 
@@ -768,6 +742,9 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
   };
 
   const handleCloseModal = () => {
+    if (parsedFile) {
+      onCancelImport();
+    }
     resetState();
     onClose();
   };
@@ -1001,7 +978,7 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
               {/* Import Confirm Button */}
               <div className="flex gap-4 mt-6 shrink-0">
                 <button 
-                  onClick={resetState}
+                  onClick={handleCloseModal}
                   className="w-48 py-3 bg-white border border-slate-300 hover:bg-slate-50 text-red-600 rounded-xl text-sm font-bold transition-colors cursor-pointer text-center"
                 >
                   ยกเลิกการนำเข้า
@@ -1016,31 +993,6 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
             </div>
           )}
         </div>
-
-        {/* Final Import Progress Overlay */}
-        {isFinalImporting && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/20 backdrop-blur-sm animate-in fade-in">
-            <div className="text-center max-w-sm w-full p-8 bg-white rounded-2xl shadow-2xl border border-slate-100 scale-in-center">
-              <div className="mb-4 text-[#553923] flex justify-center">
-                <Database size={48} strokeWidth={1.5} className="animate-bounce" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">กำลังนำเข้าข้อมูล...</h3>
-              <p className="text-sm text-slate-500 mb-6 font-medium min-h-[40px] whitespace-pre-line">{finalImportStepText}</p>
-              <div className="w-full bg-slate-100 rounded-full h-3 mb-3 overflow-hidden shadow-inner">
-                <div 
-                  className="bg-[#553923] h-3 rounded-full transition-all duration-300 ease-out" 
-                  style={{ width: `${finalImportProgress}%` }}
-                ></div>
-              </div>
-              <div className="flex justify-between items-center text-xs font-bold text-slate-600">
-                <span>{finalImportProgress}% เสร็จสมบูรณ์</span>
-                <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                  ใช้เวลา {elapsedSeconds} วินาที
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
 
       </div>
     </div>
@@ -2292,7 +2244,6 @@ export default function OrgManagerApp() {
   const [showWelcomeModal, setShowWelcomeModal] = useState(() => !localStorage.getItem('hideWelcomeModal'));
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
-  const [showWarningsDropdown, setShowWarningsDropdown] = useState(false);
   const [isConflictPanelExpanded, setIsConflictPanelExpanded] = useState(true);
   const [expandedConflictGroupId, setExpandedConflictGroupId] = useState(null);
   const [viewMode, setViewMode] = useState('canvas'); // 'canvas' or 'table'
@@ -2599,30 +2550,45 @@ export default function OrgManagerApp() {
     return issues;
   }, [conflictingNodes, organizations]);
 
-  const conflictGroups = useMemo(() => {
+  const unifiedIssueGroups = useMemo(() => {
     const groups = {
       circle: { id: 'circle', label: 'ความสัมพันธ์เป็นวงกลม', items: [], color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
       missingParent: { id: 'missingParent', label: 'ไม่พบต้นสังกัด', items: [], color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200' },
-      noArea: { id: 'noArea', label: 'ไม่มีพื้นที่รับผิดชอบ', items: [], color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
+      noArea: { id: 'noArea', label: 'ไม่มีพื้นที่รับผิดชอบ', items: [], subGroups: {}, color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
       duplicate: { id: 'duplicate', label: 'ชื่อหน่วยงานซ้ำกัน', items: [], color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
       others: { id: 'others', label: 'ขัดแย้งอื่นๆ', items: [], color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-200' },
     };
 
-    conflictingNodes.forEach(node => {
-      const msg = node.causeMessage || '';
-      if (msg.includes('วงกลม')) groups.circle.items.push(node);
-      else if (msg.includes('ไม่พบต้นสังกัด')) groups.missingParent.items.push(node);
-      else if (msg.includes('ไม่มีพื้นที่รับผิดชอบ')) groups.noArea.items.push(node);
-      else if (msg.includes('ชื่อหน่วยงานซ้ำกัน')) groups.duplicate.items.push(node);
-      else groups.others.items.push(node);
+    organizations.forEach(org => {
+      const issue = nodeIssues.get(org.id);
+      if (!issue) return;
+      const msg = issue.message || '';
+      
+      if (msg.includes('วงกลม')) groups.circle.items.push(org);
+      else if (msg.includes('ไม่พบต้นสังกัด')) groups.missingParent.items.push(org);
+      else if (msg.includes('ชื่อหน่วยงานซ้ำกัน')) groups.duplicate.items.push(org);
+      else if (msg.includes('ไม่มีพื้นที่รับผิดชอบ') || msg.includes('ไม่พบข้อมูลพื้นที่รับผิดชอบ')) {
+        groups.noArea.items.push(org);
+        
+        // Extract location name if it exists (e.g. "ไม่พบข้อมูลพื้นที่รับผิดชอบในระบบ จะถูกข้ามไป: เชียงใหม่")
+        let locName = 'ไม่ระบุพื้นที่';
+        const match = msg.match(/จะถูกข้ามไป:\s*(.+)/);
+        if (match && match[1]) {
+          locName = match[1].trim();
+        }
+        
+        if (!groups.noArea.subGroups[locName]) {
+          groups.noArea.subGroups[locName] = [];
+        }
+        groups.noArea.subGroups[locName].push(org);
+      }
+      else groups.others.items.push(org);
     });
 
     return Object.values(groups).filter(g => g.items.length > 0);
-  }, [conflictingNodes]);
-
-  const orgsWithIssues = useMemo(() => {
-    return organizations.filter(org => nodeIssues.has(org.id));
   }, [organizations, nodeIssues]);
+
+
 
   const handleAddNode = (parentId, currentLevel) => {
     const newNode = {
@@ -3250,16 +3216,16 @@ export default function OrgManagerApp() {
           
 
 
-          {/* แผงแสดงหน่วยงานที่ขัดแย้ง (แยกโครงสร้างและเน้นให้เด่น) */}
-          {viewMode === 'canvas' && conflictingNodes.length > 0 && (
-            <div className={`absolute bottom-6 left-6 z-30 w-80 bg-white/95 backdrop-blur border border-red-200 rounded-2xl shadow-2xl flex flex-col p-4 transition-all duration-300 pointer-events-auto`}>
+          {/* แผงแสดงหน่วยงานที่มีปัญหาและข้อขัดแย้ง (รวมทุกอย่างไว้ที่เดียว) */}
+          {viewMode === 'canvas' && unifiedIssueGroups.length > 0 && (
+            <div className={`absolute bottom-6 left-6 z-30 w-80 bg-white/95 backdrop-blur border border-amber-200 rounded-2xl shadow-2xl flex flex-col p-4 transition-all duration-300 pointer-events-auto`}>
               <div 
                 className="flex items-center justify-between border-b border-slate-100 pb-2 cursor-pointer select-none"
                 onClick={() => setIsConflictPanelExpanded(!isConflictPanelExpanded)}
               >
-                <div className="flex items-center gap-2 text-red-700 font-bold text-xs uppercase tracking-wider">
-                  <AlertTriangle size={16} className="text-red-650 shrink-0 animate-pulse" />
-                  <span>พบข้อขัดแย้ง ({conflictingNodes.length})</span>
+                <div className="flex items-center gap-2 text-amber-700 font-bold text-xs uppercase tracking-wider">
+                  <AlertTriangle size={16} className="text-amber-600 shrink-0 animate-pulse" />
+                  <span>รายการแจ้งเตือน ({unifiedIssueGroups.reduce((acc, g) => acc + g.items.length, 0).toLocaleString()} แห่ง)</span>
                 </div>
                 <div className="text-slate-400 hover:text-slate-650 transition-colors">
                   {isConflictPanelExpanded ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
@@ -3267,11 +3233,11 @@ export default function OrgManagerApp() {
               </div>
 
               {isConflictPanelExpanded && (
-                <div className="mt-3 space-y-2 max-h-48 overflow-y-auto pr-1">
+                <div className="mt-3 space-y-2 max-h-64 overflow-y-auto pr-1">
                   <div className="text-[10px] text-slate-600 font-semibold mb-1 leading-normal">
-                    ⚠️ หน่วยงานด้านล่างเกิดความสัมพันธ์ขัดแย้ง (เช่น สังกัดเป็นวงกลม หรือไม่มีต้นสังกัด) ทำให้ไม่สามารถนำมาแสดงในผังหลักได้
+                    ⚠️ รายชื่อหน่วยงานด้านล่างเกิดความสัมพันธ์ขัดแย้งหรือมีข้อสังเกตที่ควรตรวจสอบ
                   </div>
-                  {conflictGroups.map(group => (
+                  {unifiedIssueGroups.map(group => (
                     <div key={group.id} className={`border ${group.border} ${group.bg} rounded-xl overflow-hidden`}>
                       <button
                         onClick={() => setExpandedConflictGroupId(expandedConflictGroupId === group.id ? null : group.id)}
@@ -3284,37 +3250,79 @@ export default function OrgManagerApp() {
                       </button>
                       
                       {expandedConflictGroupId === group.id && (
-                        <div className="p-3 bg-white/50 border-t border-black/5 max-h-48 overflow-y-auto space-y-2">
-                          {group.items.slice(0, 50).map(node => (
-                            <div 
-                              key={node.id} 
-                              className={`p-2.5 rounded-xl border border-red-200 bg-red-50/50 hover:bg-red-50 hover:border-red-300 transition-all flex flex-col gap-1.5`}
-                            >
-                              <div className="flex justify-between items-start gap-1">
-                                <span className="font-bold text-[11px] text-slate-800 break-all">{node.name || <span className="italic text-slate-500">ไม่ระบุชื่อ</span>}</span>
-                                <div className="flex gap-1 shrink-0">
-                                  <button 
-                                    onClick={() => setSelectedNodeId(node.id)}
-                                    className="px-1.5 py-0.5 bg-white border border-red-300 text-red-600 hover:bg-red-50 rounded text-[9px] font-bold shadow-xs transition-colors cursor-pointer"
-                                    title="เลือกเพื่อแก้ไขความสัมพันธ์ในแผงตั้งค่า"
-                                  >
-                                    แก้ไข
-                                  </button>
-                                  <button 
-                                    onClick={() => handleUpdateNode(node.id, 'parentId', null)}
-                                    className="px-1.5 py-0.5 bg-red-700 text-white hover:bg-red-800 rounded text-[9px] font-bold shadow-xs transition-colors cursor-pointer"
-                                    title="ตั้งเป็นหน่วยงานสูงสุดทันทีเพื่อดึงกลับเข้าผังหลัก"
-                                  >
-                                    ตั้งสูงสุด
-                                  </button>
+                        <div className="p-3 bg-white/50 border-t border-black/5 max-h-64 overflow-y-auto space-y-2">
+                          {group.subGroups && Object.keys(group.subGroups).length > 0 ? (
+                            // Render Sub-groups for Missing Area
+                            Object.entries(group.subGroups).map(([locName, nodes]) => (
+                              <div key={locName} className="mb-2">
+                                <div className="text-[10px] font-bold text-slate-700 bg-slate-200/50 px-2 py-1 rounded flex items-center gap-1 mb-1">
+                                  <MapPin size={10} className="text-slate-500" /> พื้นที่: {locName} ({nodes.length})
+                                </div>
+                                <div className="space-y-1.5 pl-2 border-l border-slate-200 ml-1">
+                                  {nodes.slice(0, 20).map(node => (
+                                    <div key={node.id} className="p-2 rounded-lg border border-amber-200 bg-amber-50/50 hover:bg-amber-50 flex flex-col gap-1.5 transition-all">
+                                      <div className="flex justify-between items-start gap-1">
+                                        <span className="font-bold text-[11px] text-slate-800 break-all">{node.name || <span className="italic text-slate-500">ไม่ระบุชื่อ</span>}</span>
+                                        <button 
+                                          onClick={() => {
+                                            setSelectedNodeId(node.id);
+                                            setFocusNodeId(node.parentId || node.id);
+                                            setSearchedNodeId(node.id);
+                                          }}
+                                          className="px-1.5 py-0.5 bg-white border border-amber-300 text-amber-700 hover:bg-amber-100 rounded text-[9px] font-bold shadow-xs cursor-pointer"
+                                        >
+                                          แก้ไข
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  {nodes.length > 20 && (
+                                    <div className="text-[10px] text-amber-700 font-bold text-center mt-1">
+                                      ...ยังมีอีก {(nodes.length - 20).toLocaleString()} แห่ง
+                                    </div>
+                                  )}
                                 </div>
                               </div>
-                              <div className="text-[9px] font-bold text-red-700 bg-red-100/50 p-1.5 rounded flex items-center gap-1 leading-normal">
-                                <AlertTriangle size={10} className="shrink-0 text-red-700" />
-                                <span>{node.causeMessage}</span>
+                            ))
+                          ) : (
+                            // Render Normal Items
+                            group.items.slice(0, 50).map(node => (
+                              <div 
+                                key={node.id} 
+                                className={`p-2.5 rounded-xl border ${group.id === 'circle' || group.id === 'missingParent' ? 'border-red-200 bg-red-50/50 hover:bg-red-50' : 'border-amber-200 bg-amber-50/50 hover:bg-amber-50'} transition-all flex flex-col gap-1.5`}
+                              >
+                                <div className="flex justify-between items-start gap-1">
+                                  <span className="font-bold text-[11px] text-slate-800 break-all">{node.name || <span className="italic text-slate-500">ไม่ระบุชื่อ</span>}</span>
+                                  <div className="flex gap-1 shrink-0">
+                                    <button 
+                                      onClick={() => {
+                                        setSelectedNodeId(node.id);
+                                        setFocusNodeId(node.parentId || node.id);
+                                        setSearchedNodeId(node.id);
+                                      }}
+                                      className={`px-1.5 py-0.5 bg-white border ${group.id === 'circle' || group.id === 'missingParent' ? 'border-red-300 text-red-600 hover:bg-red-50' : 'border-amber-300 text-amber-700 hover:bg-amber-100'} rounded text-[9px] font-bold shadow-xs cursor-pointer`}
+                                    >
+                                      แก้ไข
+                                    </button>
+                                    {(group.id === 'circle' || group.id === 'missingParent') && (
+                                      <button 
+                                        onClick={() => handleUpdateNode(node.id, 'parentId', null)}
+                                        className="px-1.5 py-0.5 bg-red-700 text-white hover:bg-red-800 rounded text-[9px] font-bold shadow-xs transition-colors cursor-pointer"
+                                        title="ตั้งเป็นหน่วยงานสูงสุดทันทีเพื่อดึงกลับเข้าผังหลัก"
+                                      >
+                                        ตั้งสูงสุด
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className={`text-[9px] font-bold ${group.id === 'circle' || group.id === 'missingParent' ? 'text-red-700 bg-red-100/50' : 'text-amber-700 bg-amber-100/50'} p-1.5 rounded flex items-center gap-1 leading-normal`}>
+                                  <AlertTriangle size={10} className="shrink-0" />
+                                  <span>{nodeIssues.get(node.id)?.message || ''}</span>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))
+                          )}
+
                           {group.items.length > 50 && (
                             <div className="text-center p-2 text-xs font-bold text-slate-500 bg-slate-50 rounded-xl border border-slate-200 mt-2">
                               ...และหน่วยงานที่ขัดแย้งอีก {(group.items.length - 50).toLocaleString()} แห่ง
@@ -3389,53 +3397,8 @@ export default function OrgManagerApp() {
                       ))}
                     </div>
 
-                    {/* Warnings & Search Bar */}
+                    {/* Search Bar */}
                     <div className="flex gap-2 items-center">
-                      {orgsWithIssues.length > 0 && (
-                        <div className="relative">
-                          <button
-                            onClick={() => setShowWarningsDropdown(!showWarningsDropdown)}
-                            onBlur={() => setTimeout(() => setShowWarningsDropdown(false), 200)}
-                            className="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
-                          >
-                            <AlertTriangle size={14} />
-                            {orgsWithIssues.length} แจ้งเตือน
-                          </button>
-                          {showWarningsDropdown && (
-                            <ul className="absolute left-0 top-[110%] z-50 mt-1 w-72 sm:w-80 max-w-[90vw] max-h-64 overflow-y-auto bg-white/95 backdrop-blur border border-amber-200 rounded-xl shadow-lg divide-y divide-amber-100/50 text-xs font-semibold text-slate-700">
-                              {orgsWithIssues.map(node => {
-                                const issue = nodeIssues.get(node.id);
-                                return (
-                                  <li 
-                                    key={node.id}
-                                    onMouseDown={() => {
-                                      setSelectedNodeId(node.id);
-                                      setShowWarningsDropdown(false);
-                                      setFocusNodeId(node.parentId || node.id);
-                                      setSearchedNodeId(node.id);
-                                      setTimeout(() => {
-                                        const el = document.getElementById(node.id);
-                                        if (el) {
-                                          el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-                                          el.classList.add('animate-pulse-highlight');
-                                          setTimeout(() => el.classList.remove('animate-pulse-highlight'), 1500);
-                                        }
-                                      }, 100);
-                                    }}
-                                    className="px-3 py-2 hover:bg-amber-50 cursor-pointer transition-colors flex flex-col gap-1"
-                                  >
-                                    <span className="whitespace-normal break-words">{node.name || 'ไม่ได้ระบุชื่อ'}</span>
-                                    <span className={`text-[10px] ${issue?.type === 'error' ? 'text-red-600' : 'text-amber-600'}`}>
-                                      {issue?.message}
-                                    </span>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          )}
-                        </div>
-                      )}
-
                       <div className="bg-white/90 backdrop-blur border border-slate-200 rounded-xl flex items-center px-3 py-1.5 gap-2 w-64 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all shadow-sm">
                         <Search size={14} className="text-slate-500 shrink-0" />
                         <input 
@@ -3527,6 +3490,9 @@ export default function OrgManagerApp() {
         isOpen={isImportModalOpen} 
         onClose={() => setIsImportModalOpen(false)} 
         onImportData={handleFileImport}
+        onCancelImport={() => {
+          setOrganizations([]);
+        }}
         onDownloadTemplate={handleDownloadTemplate}
         locationDb={locationDb}
       />
