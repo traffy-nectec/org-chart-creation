@@ -371,13 +371,15 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
             const levels = [
               row['กระทรวง'],
               row['ชื่อหน่วยงานระดับกรม'],
-              row['ชื่อหน่วยงานระดับกอง'],
-              row['ชื่อหน่วยงานระดับกลุ่ม']
+              row['ชื่อหน่วยงานระดับกอง'] || row['ชื่อหน่วยงานภายใต้กระทรวง'],
+              row['ชื่อหน่วยงานระดับกลุ่ม'] || row['ชื่อหน่วยงานย่อย'],
+              row['ชื่อหน่วยงานย่อย_1'],
+              row['ชื่อหน่วยงานย่อย_2']
             ];
             
-            const province = row['จังหวัด'];
-            const amphoe = row['อำเภอ'];
-            const tambon = row['ตำบล'];
+            const province = row['จังหวัด'] || row['จังหวัดที่รับผิดชอบ'];
+            const amphoe = row['อำเภอ'] || row['อำเภอที่รับผิดชอบ'];
+            const tambon = row['ตำบล'] || row['ตำบลที่รับผิดชอบ'];
             const location = { province, amphoe, tambon };
 
             let parent = null;
