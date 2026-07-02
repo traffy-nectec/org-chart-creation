@@ -2,124 +2,28 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Plus, Trash2, MapPin, CheckCircle, 
   Layers, Network, ChevronDown, ChevronRight, ChevronUp, ChevronLeft,
-  ChevronsDown, ChevronsUp,
-  Image as ImageIcon, Upload, ZoomIn, ZoomOut, Maximize, Minimize,
-  FileSpreadsheet, X, Download, Table, LayoutTemplate, LayoutList,
-  AlertTriangle, Code, Copy, Check, Braces, Database, AlignLeft, Search, ExternalLink, Undo2, HelpCircle
+  ChevronsDown, Upload, FileSpreadsheet, X, Download, Table,
+  AlertTriangle, Check, Database, Search, HelpCircle
 } from 'lucide-react';
-import { ThailandAddressTypeahead, ThailandAddressValue, useAddressTypeaheadContext } from "react-thailand-address-typeahead";
+import { ThailandAddressTypeahead } from "react-thailand-address-typeahead";
 import * as XLSX from 'xlsx';
+import { getOrgPath } from './utils/exportUtils';
 import toast, { Toaster } from 'react-hot-toast';
 import ReactFlowOrgChart from './ReactFlowOrgChart';
-
-// สร้างข้อมูลจำลองพื้นที่ 77 จังหวัด และพื้นที่ย่อยสำหรับตัวอย่าง
-
-const MOCK_LOCATION_DATA = {
-  "กรุงเทพมหานคร": {
-    "เขตจตุจักร": ["ลาดยาว", "เสนานิคม", "จันทรเกษม", "จอมพล", "พหลโยธิน"],
-    "เขตพญาไท": ["สามเสนใน", "พญาไท"],
-    "เขตดินแดง": ["ดินแดง", "รัชดาภิเษก"]
-  },
-  "ชลบุรี": {
-    "อำเภอเมืองชลบุรี": ["บางปลาสร้อย", "มะขามหย่ง", "บ้านโขด", "แสนสุข"],
-    "อำเภอบางละมุง": ["หนองปรือ", "นาเกลือ", "หนองปลาไหล"]
-  }
-};
-
-// --- Component สำหรับเรนเดอร์ JSON แบบย่อ/ขยายได้ (Tree View) ---
-const JsonTreeViewer = ({ data, level = 0, isLast = true }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const isArray = Array.isArray(data);
-  const isObject = data !== null && typeof data === 'object';
-
-  if (!isObject) {
-    // ประเภทข้อมูลพื้นฐาน (String, Number, Boolean, Null)
-    const renderValue = () => {
-      if (typeof data === 'string') return <span className="text-green-400">"{data}"</span>;
-      if (typeof data === 'number') return <span className="text-orange-400">{data}</span>;
-      if (typeof data === 'boolean') return <span className="text-blue-400">{data ? 'true' : 'false'}</span>;
-      if (data === null) return <span className="text-slate-500">null</span>;
-      return <span>{String(data)}</span>;
-    };
-    return <span>{renderValue()}{!isLast && <span className="text-slate-400">,</span>}</span>;
-  }
-
-  const keys = Object.keys(data);
-  const openBracket = isArray ? '[' : '{';
-  const closeBracket = isArray ? ']' : '}';
-
-  if (keys.length === 0) {
-    return <span className="text-slate-300">{openBracket}{closeBracket}{!isLast && <span className="text-slate-400">,</span>}</span>;
-  }
-
-  return (
-    <div className="font-mono text-[12px] leading-5 text-slate-300">
-      <div className="flex items-start group">
-        <button 
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="w-4 h-4 flex items-center justify-center shrink-0 text-slate-500 hover:text-white transition-colors relative -left-1"
-        >
-          {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-        </button>
-        <div>
-          <span className="text-slate-300">{openBracket}</span>
-          {isCollapsed && (
-            <span className="text-slate-500 italic ml-1 cursor-pointer hover:text-slate-400" onClick={() => setIsCollapsed(false)}>
-              {isArray ? `... ${keys.length} items ...` : '...'}
-            </span>
-          )}
-          {isCollapsed && <span>{closeBracket}{!isLast && <span className="text-slate-400">,</span>}</span>}
-        </div>
-      </div>
-
-      {!isCollapsed && (
-        <div className="pl-6 border-l border-slate-700/50 ml-1.5">
-          {keys.map((key, index) => {
-            const childIsLast = index === keys.length - 1;
-            return (
-              <div key={key} className="flex">
-                {!isArray && (
-                  <span className="text-blue-300 mr-1 shrink-0">
-                    "{key}":
-                  </span>
-                )}
-                <div className="flex-1 min-w-0">
-                  <JsonTreeViewer 
-                    data={data[key]} 
-                    level={level + 1} 
-                    isLast={childIsLast} 
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {!isCollapsed && (
-        <div className="pl-1 text-slate-300">
-          {closeBracket}{!isLast && <span className="text-slate-400">,</span>}
-        </div>
-      )}
-      <div className="pl-1 text-slate-300">{Array.isArray(data) ? ']' : '}'}{!isLast && <span className="text-slate-500">,</span>}</div>
-    </div>
-  );
-};
-
-
 
 // ==========================================
 // CONFIGURATION: Data Cleansing & Alias Dictionary
 // ==========================================
 // Dictionary for converting abbreviations to official terms.
 // Easily extendable - just add key-value pairs here.
-export const FULL_TO_ABBREV_DICT = {
+const FULL_TO_ABBREV_DICT = {
   'องค์การบริหารส่วนตำบล': 'อบต.',
   'องค์การบริหารส่วนจังหวัด': 'อบจ.',
   'สถานีตำรวจภูธร': 'สภ.',
   'สถานีตำรวจนครบาล': 'สน.',
 };
 
-export const ABBREV_TO_FULL_DICT = {
+const ABBREV_TO_FULL_DICT = {
   'อ.': 'อำเภอ',
   'ทน.': 'เทศบาลนคร',
   'ทม.': 'เทศบาลเมือง',
@@ -142,7 +46,7 @@ export const ABBREV_TO_FULL_DICT = {
  * - Converts specific full names to abbreviations (FULL_TO_ABBREV_DICT)
  * - Expands specific abbreviations to full names (ABBREV_TO_FULL_DICT)
  */
-export const sanitizeString = (str, options = { showToast: false }) => {
+const sanitizeString = (str, options = { showToast: false }) => {
   if (!str) return '';
   let cleaned = String(str);
 
@@ -170,7 +74,7 @@ export const sanitizeString = (str, options = { showToast: false }) => {
   cleaned = cleaned.replace(/์+/g, '์');
 
   // 3. Remove unwanted special characters, keep safe punctuation (- _ / \ ( ) [ ] . ,)
-  cleaned = cleaned.replace(/[^\u0E00-\u0E7FA-Za-z0-9\s\-_/\\\(\)\[\]\.,]/g, '');
+  cleaned = cleaned.replace(/[^\u0E00-\u0E7FA-Za-z0-9\s\-_/\\()[\].,]/g, '');
 
   // 4. Normalize spacing
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
@@ -252,7 +156,7 @@ const cleanInput = (val, type) => {
   return cleaned;
 };
 
-export const getLocationCode = (loc, db) => {
+const getLocationCode = (loc, db) => {
   if (!db || db.length === 0 || !loc || !loc.province) return '';
   const cleanProv = cleanInput(loc.province, 'province');
   const cleanAmp = cleanInput(loc.amphoe, 'amphoe');
@@ -1305,7 +1209,6 @@ const formatAreaLabel = (areas) => {
         parts.push(`${prefix}${loc.amphoe}`);
       }
       if (loc.province) {
-        const prefix = loc.province === "กรุงเทพมหานcor" ? "" : "จ.";
         const prefix2 = loc.province === "กรุงเทพมหานคร" ? "" : "จ.";
         parts.push(`${prefix2}${loc.province}`);
       }
@@ -1352,176 +1255,7 @@ const formatAreaLabel = (areas) => {
   return "ไม่ระบุพื้นที่";
 };
 
-const OrgNode = ({ node, selectedNodeId, setSelectedNodeId, handleAddNode, handleDeleteNode, treeLayout, parentName, nodeIssues, treeExpansionTrigger }) => {
-  const isSelected = selectedNodeId === node.id;
-  const hasChildren = node.children && node.children.length > 0;
-  // Default to expanding only the first level to prevent browser freeze with 2500+ nodes
-  const [isExpanded, setIsExpanded] = useState((node?.level || 1) <= 1);
-  const isVert = treeLayout === 'vertical';
 
-  useEffect(() => {
-    if (treeExpansionTrigger) {
-      if (treeExpansionTrigger.action === 'expand') setIsExpanded(true);
-      else if (treeExpansionTrigger.action === 'collapse') setIsExpanded((node?.level || 1) <= 1);
-    }
-  }, [treeExpansionTrigger, node?.level]);
-
-  const issue = nodeIssues?.get(node.id);
-  const hasError = issue?.type === 'error';
-  const hasWarning = issue?.type === 'warning';
-
-  return (
-    <div className={`flex ${isVert ? 'flex-col' : 'flex-row'} items-center`}>
-      {/* กล่องหน่วยงาน */}
-      <div 
-        onClick={(e) => { e.stopPropagation(); setSelectedNodeId(node.id); }}
-        onMouseDown={(e) => e.stopPropagation()}
-        id={node.id}
-        className={`relative group min-w-[200px] max-w-[240px] p-3 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
-          isSelected 
-            ? 'bg-blue-50 border-blue-500 shadow-lg shadow-blue-100 z-10 ring-4 ring-blue-500/20 scale-105' 
-            : hasError
-              ? 'bg-red-50 border-red-500 shadow-sm hover:border-red-600 hover:shadow-md'
-              : hasWarning
-                ? 'bg-amber-50 border-amber-500 shadow-sm hover:border-amber-600 hover:shadow-md'
-                : 'bg-white border-slate-200 shadow-sm hover:border-blue-300 hover:shadow-md'
-        }`}
-      >
-        <div className="text-[10px] font-bold uppercase tracking-wider mb-2 flex justify-between items-center">
-          <span className={`px-1.5 py-0.5 rounded font-bold ${
-            hasError 
-              ? 'bg-red-100 text-red-700' 
-              : hasWarning 
-                ? 'bg-amber-100 text-amber-700' 
-                : 'text-slate-650 bg-slate-100'
-          }`}>Level {node.level}</span>
-          <div className={`flex gap-1 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-            <button 
-              onClick={(e) => { e.stopPropagation(); handleAddNode(node.id, node.level); setIsExpanded(true); }}
-              className="w-6 h-6 bg-blue-50 text-blue-700 rounded flex items-center justify-center hover:bg-blue-600 hover:text-white transition-colors"
-              title="เพิ่มหน่วยงานย่อย"
-              aria-label="เพิ่มหน่วยงานย่อย"
-            >
-              <Plus size={14} strokeWidth={3} />
-            </button>
-            <button 
-              onClick={(e) => { e.stopPropagation(); handleDeleteNode(node.id); }}
-              className="w-6 h-6 bg-red-50 text-red-700 rounded flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors"
-              title="ลบหน่วยงานนี้"
-              aria-label="ลบหน่วยงานนี้"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-3 mb-1 min-w-0">
-          {node.logo ? (
-            <img src={node.logo} alt={`โลโก้ของ ${node.name || 'หน่วยงาน'}`} className="w-10 h-10 rounded-md object-cover border border-slate-200 shadow-sm shrink-0" />
-          ) : (
-            <div className="w-10 h-10 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 text-slate-600">
-              <Network size={18} />
-            </div>
-          )}
-          <div className="font-bold text-sm text-slate-800 break-words leading-tight flex-1 flex items-center gap-1.5 min-w-0">
-            <span className="whitespace-normal break-words">{node.name || <span className="text-slate-500 italic">ไม่ได้ระบุชื่อ</span>}</span>
-            {issue && (
-              <span 
-                className={`${hasError ? 'text-red-700' : 'text-amber-700'} shrink-0`} 
-                title={issue.message}
-              >
-                <AlertTriangle size={14} className="animate-pulse" />
-              </span>
-            )}
-          </div>
-        </div>
-        
-        {(() => {
-          const count = getAreaCount(node.areas);
-          if (count === 0) {
-            return (
-              <div className="mt-2 text-[10px] flex items-center gap-1.5 text-slate-600 bg-slate-50 border border-slate-100 p-1.5 rounded-lg w-full font-medium">
-                <MapPin size={12} className="shrink-0 text-slate-500" />
-                <span className="truncate">ไม่มีพื้นที่รับผิดชอบ</span>
-              </div>
-            );
-          } else {
-            return (
-              <div className="mt-2 text-[10px] flex items-center gap-1.5 text-blue-700 bg-blue-50/70 border border-blue-100/50 p-1.5 rounded-lg w-full font-semibold" title={formatAreaLabel(node.areas)}>
-                <MapPin size={12} className="shrink-0 text-blue-700" />
-                <span className="truncate">รับผิดชอบ {count} พื้นที่</span>
-              </div>
-            );
-          }
-        })()}
-
-        {/* Expand/Collapse Button */}
-        {hasChildren && (
-          <button 
-            onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-            className={`absolute ${
-              isVert 
-                ? '-bottom-3 left-1/2 -translate-x-1/2' 
-                : '-right-3 top-1/2 -translate-y-1/2'
-            } px-2 py-0.5 bg-white border border-slate-300 text-slate-700 hover:text-blue-700 hover:border-blue-400 hover:bg-blue-50 rounded-full text-[10px] font-bold shadow-sm flex items-center gap-1 z-20 transition-all`}
-            title={isExpanded ? "ย่อส่วน" : "ขยายส่วน"}
-            aria-label={isExpanded ? "ย่อส่วน" : "ขยายส่วน"}
-          >
-            {node.children.length} 
-            {isExpanded 
-              ? (isVert ? <ChevronUp size={12} /> : <ChevronLeft size={12} />) 
-              : (isVert ? <ChevronDown size={12} /> : <ChevronRight size={12} />)
-            }
-          </button>
-        )}
-      </div>
-
-      {/* เส้นเชื่อมกิ่งลูก (Lines and Children) */}
-      {hasChildren && isExpanded && (
-        <div className={`flex ${isVert ? 'flex-col items-center mt-3' : 'flex-row items-center ml-3'}`}>
-          <div className={`${isVert ? 'w-[2px] h-6' : 'h-[2px] w-6'} bg-slate-300`}></div>
-          <div className={`flex ${isVert ? 'flex-row gap-4 relative' : 'flex-col gap-4 relative'}`}>
-            {node.children.map((child, index) => (
-              <div key={child.id} className={`relative flex ${isVert ? 'flex-col items-center pt-4' : 'flex-row items-center pl-4'}`}>
-                {/* Connection lines logic */}
-                {node.children.length > 1 && (
-                  <>
-                     {isVert ? (
-                      <>
-                        <div className={`absolute top-0 left-0 w-1/2 h-[2px] bg-slate-300 ${index === 0 ? 'hidden' : ''}`}></div>
-                        <div className={`absolute top-0 right-0 w-1/2 h-[2px] bg-slate-300 ${index === node.children.length - 1 ? 'hidden' : ''}`}></div>
-                      </>
-                    ) : (
-                      <>
-                        <div className={`absolute top-0 left-0 w-[2px] h-1/2 bg-slate-300 ${index === 0 ? 'hidden' : ''}`}></div>
-                        <div className={`absolute bottom-0 left-0 w-[2px] h-1/2 bg-slate-300 ${index === node.children.length - 1 ? 'hidden' : ''}`}></div>
-                      </>
-                    )}
-                  </>
-                )}
-                {/* Line to child */}
-                <div className={`absolute ${isVert ? 'top-0 w-[2px] h-4' : 'left-0 h-[2px] w-4'} bg-slate-300`}></div>
-
-                {/* Recursive Node */}
-                <OrgNode 
-                  node={child} 
-                  selectedNodeId={selectedNodeId}
-                  setSelectedNodeId={setSelectedNodeId}
-                  handleAddNode={handleAddNode}
-                  handleDeleteNode={handleDeleteNode}
-                  treeLayout={treeLayout}
-                  parentName={node.name}
-                  nodeIssues={nodeIssues}
-                  treeExpansionTrigger={treeExpansionTrigger}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
 
 // Custom address search input component searching all fields: tambon (s), amphoe (d), province (p), and postalCode (po)
 const CustomAddressInput = ({ placeholder, className }) => {
@@ -1542,6 +1276,7 @@ const CustomAddressInput = ({ placeholder, className }) => {
   // Clear query text when addressInput values are reset
   useEffect(() => {
     if (!value.subdistrict && !value.district && !value.province && !value.postalCode) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setQuery('');
     }
   }, [value]);
@@ -1677,7 +1412,7 @@ const CustomAddressInput = ({ placeholder, className }) => {
         <ul className="absolute left-0 right-0 z-[120] mt-1 max-h-60 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl divide-y divide-slate-100 text-xs font-semibold text-slate-700">
           {suggestions.map((item, idx) => {
             const isHighlighted = highlightedItemIndex === idx;
-            let label = "";
+            let label;
             let badge = null;
 
             if (item.isWholeProvince) {
@@ -1717,7 +1452,7 @@ const CustomAddressInput = ({ placeholder, className }) => {
   );
 };
 
-const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose, organizations, nodeIssues, moveMode, setMoveMode, locationDb, setFocusNodeId, setSearchedNodeId }) => {
+const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose, organizations, nodeIssues, setMoveMode, locationDb, setFocusNodeId, setSearchedNodeId, setSelectedNodeId }) => {
   const [addressInput, setAddressInput] = React.useState({
     subdistrict: '',
     district: '',
@@ -1748,6 +1483,7 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose
   }, [organizations, selectedNode]);
 
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAddressInput({
       subdistrict: '',
       district: '',
@@ -1756,21 +1492,12 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose
     });
   }, [selectedNode?.id]);
 
-  if (!selectedNode) return null;
-
   const selectedLocations = getSelectedLocations(selectedNode.areas);
-
-  const parentOrg = React.useMemo(() => {
-    if (!organizations || !selectedNode) return null;
-    return organizations.find(o => o.id === selectedNode.parentId);
-  }, [organizations, selectedNode?.parentId]);
-  
-  const parentName = parentOrg ? parentOrg.name : '';
 
   const childCountForSetting = React.useMemo(() => {
     if (!organizations || !selectedNode) return 0;
     return organizations.filter(org => org.parentId === selectedNode.id).length;
-  }, [organizations, selectedNode?.id]);
+  }, [organizations, selectedNode]);
 
   const hasChildren = childCountForSetting > 0;
 
@@ -1796,7 +1523,7 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose
       });
     }
     return descendants;
-  }, [selectedNode?.id, organizations]);
+  }, [organizations, selectedNode]);
 
   const parentOptions = React.useMemo(() => {
     if (!organizations || !selectedNode) return [];
@@ -1806,7 +1533,7 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose
       options = options.filter(org => org.name && org.name.toLowerCase().includes(q));
     }
     return options;
-  }, [organizations, selectedNode?.id, descendantIds, parentSearchQuery]);
+  }, [organizations, selectedNode, descendantIds, parentSearchQuery]);
 
   const nodeIssue = nodeIssues?.get(selectedNode.id);
 
@@ -2073,7 +1800,7 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose
               <div className="space-y-2 relative">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">ค้นหาพื้นที่ (ตำบล / อำเภอ / จังหวัด / รหัสไปรษณีย์)</label>
-                  <CustomAddressInput 
+                  <ThailandAddressTypeahead.SubdistrictInput 
                     placeholder="พิมพ์เพื่อค้นหาตำบล, อำเภอ, จังหวัด หรือรหัสไปรษณีย์..."
                     className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg outline-none text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-50 transition-all font-medium"
                   />
@@ -2566,31 +2293,7 @@ export default function OrgManagerApp() {
   ];
 
   const [organizations, setOrganizations] = useState(DEFAULT_ORGS);
-  const [history, setHistory] = useState([]);
 
-  const setOrganizationsWithHistory = (updater) => {
-    setOrganizations(prevOrgs => {
-      const nextOrgs = typeof updater === 'function' ? updater(prevOrgs) : updater;
-      // Only push to history if there is an actual change
-      if (prevOrgs !== nextOrgs && JSON.stringify(prevOrgs) !== JSON.stringify(nextOrgs)) {
-        setHistory(prev => {
-          const newHistory = [...prev, prevOrgs];
-          if (newHistory.length > 50) return newHistory.slice(-50);
-          return newHistory;
-        });
-      }
-      return nextOrgs;
-    });
-  };
-
-  const handleUndo = () => {
-    setHistory(prev => {
-      if (prev.length === 0) return prev;
-      const lastState = prev[prev.length - 1];
-      setOrganizations(lastState);
-      return prev.slice(0, -1);
-    });
-  };
   
   const [draftData, setDraftData] = useState(null);
   const [showDraftModal, setShowDraftModal] = useState(false);
@@ -2602,6 +2305,7 @@ export default function OrgManagerApp() {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 4) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setDraftData(parsed);
           setShowDraftModal(true);
           return;
@@ -2628,6 +2332,7 @@ export default function OrgManagerApp() {
   // Resolve location codes once the DB is loaded
   useEffect(() => {
     if (locationDb.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOrganizations(orgs => orgs.map(org => {
         const locations = getSelectedLocations(org.areas);
         if (locations.length > 0) {
@@ -2654,11 +2359,9 @@ export default function OrgManagerApp() {
   const [selectedNodeId, setSelectedNodeId] = useState('root-1');
   const [searchedNodeId, setSearchedNodeId] = useState(null);
   const [focusNodeId, setFocusNodeId] = useState(null);
-  const [zoomScale, setZoomScale] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(() => !localStorage.getItem('hideWelcomeModal'));
-  const [treeLayout, setTreeLayout] = useState('horizontal'); // 'vertical' or 'horizontal'
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [showWarningsDropdown, setShowWarningsDropdown] = useState(false);
@@ -2669,7 +2372,6 @@ export default function OrgManagerApp() {
   const [isDataMenuOpen, setIsDataMenuOpen] = useState(false);
   const [collapsedTableNodes, setCollapsedTableNodes] = useState(new Set());
   const [isDraftSaving, setIsDraftSaving] = useState(false);
-  const [treeExpansionTrigger, setTreeExpansionTrigger] = useState(null);
 
   const handleSaveDraft = () => {
     setIsDraftSaving(true);
@@ -2699,92 +2401,11 @@ export default function OrgManagerApp() {
     }
     return path;
   }, [focusNodeId, organizations]);
-  
-  // Pan and Drag State
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-
-  const handleMouseDown = (e) => {
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isDragging) return;
-    setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const handleWheel = (e) => {
-    // If user is zooming, ignore (e.g., pinch-to-zoom on trackpad sets ctrlKey)
-    if (e.ctrlKey || e.metaKey) return;
-    
-    setPan(prev => ({
-      x: prev.x - e.deltaX,
-      y: prev.y - e.deltaY
-    }));
-  };
-
-  // ให้ JSON Editor ซ่อนเป็นค่าเริ่มต้น (false) ตามคำขอ
-  const [isJsonExpanded, setIsJsonExpanded] = useState(false); 
-  const [jsonViewMode, setJsonViewMode] = useState('tree'); // 'tree' หรือ 'raw'
-
-  const [jsonText, setJsonText] = useState('');
-  const [jsonError, setJsonError] = useState(null);
-  const [copied, setCopied] = useState(false);
-  const jsonTextAreaRef = useRef(null);
-
-  useEffect(() => {
-    if (document.activeElement !== jsonTextAreaRef.current) {
-      setJsonText(JSON.stringify(organizations, null, 2));
-      setJsonError(null);
-    }
-  }, [organizations]);
-
   useEffect(() => {
     const handleKeyDown = (e) => { if (e.key === 'Escape' && isFullscreen) setIsFullscreen(false); };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isFullscreen]);
-
-  const handleJsonChange = (e) => {
-    const val = e.target.value;
-    setJsonText(val);
-    try {
-      const parsed = JSON.parse(val);
-      if (Array.isArray(parsed)) {
-        setOrganizations(recalculateAllLevels(parsed));
-        setJsonError(null);
-      } else {
-        setJsonError("ต้องเป็นรูปแบบ JSON Array [...]");
-      }
-    } catch (err) {
-      setJsonError(err.message);
-    }
-  };
-
-  const handleBeautifyJson = () => {
-    try {
-      const parsed = JSON.parse(jsonText);
-      setJsonText(JSON.stringify(parsed, null, 2));
-      setJsonError(null);
-    } catch(err) {}
-  };
-
-  const handleCopyJson = () => {
-    navigator.clipboard.writeText(jsonText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const toggleFullscreen = () => setIsFullscreen(!isFullscreen);
-  const handleZoomIn = () => setZoomScale(prev => Math.min(prev + 0.1, 2));
-  const handleZoomOut = () => setZoomScale(prev => Math.max(prev - 0.1, 0.4));
-  const handleZoomReset = () => setZoomScale(1);
 
   const orgTree = useMemo(() => {
     const nodeMap = {};
@@ -2868,6 +2489,7 @@ export default function OrgManagerApp() {
   // Auto-focus on root if there is only one root
   useEffect(() => {
     if (orgTree.length === 1 && focusNodeId === null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFocusNodeId(orgTree[0].id);
     }
   }, [orgTree, focusNodeId]);
@@ -2877,6 +2499,7 @@ export default function OrgManagerApp() {
     if (focusNodeId) {
       const exists = organizations.some(o => o.id === focusNodeId);
       if (!exists) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setFocusNodeId(null);
       }
     }
@@ -2887,6 +2510,7 @@ export default function OrgManagerApp() {
     if (selectedNodeId) {
       const exists = organizations.some(o => o.id === selectedNodeId);
       if (!exists) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedNodeId(null);
       }
     }
@@ -3028,12 +2652,12 @@ export default function OrgManagerApp() {
       id: `node-${Date.now()}`, name: '', level: currentLevel + 1, parentId: parentId, logo: null,
       areas: { locations: [] }
     };
-    setOrganizationsWithHistory(orgs => recalculateAllLevels([...orgs, newNode]));
+    setOrganizations(orgs => recalculateAllLevels([...orgs, newNode]));
     setSelectedNodeId(newNode.id);
   };
 
   const handleUpdateNode = (id, field, value) => {
-    setOrganizationsWithHistory(orgs => {
+    setOrganizations(orgs => {
       let nextOrgs = [...orgs];
       if (field === 'parentId') {
         const targetNode = orgs.find(org => org.id === id);
@@ -3059,7 +2683,7 @@ export default function OrgManagerApp() {
       currentSize = idsToDelete.size;
       organizations.forEach(org => { if (idsToDelete.has(org.parentId)) idsToDelete.add(org.id); });
     }
-    setOrganizationsWithHistory(orgs => recalculateAllLevels(orgs.filter(org => !idsToDelete.has(org.id))));
+    setOrganizations(orgs => recalculateAllLevels(orgs.filter(org => !idsToDelete.has(org.id))));
     if (selectedNodeId === id) setSelectedNodeId(null);
   };
 
@@ -3069,7 +2693,7 @@ export default function OrgManagerApp() {
     const parentIdOfDeleted = targetNode.parentId;
     const directChildren = organizations.filter(org => org.parentId === id);
 
-    setOrganizationsWithHistory(orgs => {
+    setOrganizations(orgs => {
       let nextOrgs = orgs.filter(org => org.id !== id);
       
       if (!parentIdOfDeleted) {
@@ -3115,13 +2739,14 @@ export default function OrgManagerApp() {
   };
 
   const handleExportCSV = () => {
-    const headers = ['org_name', 'parent_name', 'level', 'province', 'amphoe', 'tambon', 'postal_code', 'area_code'];
+    const headers = ['org_name', 'parent_name', 'level', 'province', 'amphoe', 'tambon', 'postal_code', 'area_code', 'path'];
     const rows = [];
 
     organizations.forEach(org => {
       const parentOrg = organizations.find(o => o.id === org.parentId);
       const parentName = parentOrg ? parentOrg.name : '';
       const locations = getSelectedLocations(org.areas);
+      const pathValue = getOrgPath(org.id, organizations);
 
       if (locations.length === 0) {
         rows.push([
@@ -3132,7 +2757,8 @@ export default function OrgManagerApp() {
           '',
           '',
           '',
-          ''
+          '',
+          pathValue
         ]);
       } else {
         locations.forEach(loc => {
@@ -3144,7 +2770,8 @@ export default function OrgManagerApp() {
             loc.amphoe || '',
             loc.tambon || '',
             loc.postalCode || '',
-            loc.code || ''
+            loc.code || '',
+            pathValue
           ]);
         });
       }
@@ -3172,6 +2799,7 @@ export default function OrgManagerApp() {
       const parentOrg = organizations.find(o => o.id === org.parentId);
       const parentName = parentOrg ? parentOrg.name : '';
       const locations = getSelectedLocations(org.areas);
+      const pathValue = getOrgPath(org.id, organizations);
 
       if (locations.length === 0) {
         data.push({
@@ -3182,7 +2810,8 @@ export default function OrgManagerApp() {
           'amphoe': '',
           'tambon': '',
           'postal_code': '',
-          'area_code': ''
+          'area_code': '',
+          'path': pathValue
         });
       } else {
         locations.forEach(loc => {
@@ -3194,7 +2823,8 @@ export default function OrgManagerApp() {
             'amphoe': loc.amphoe || '',
             'tambon': loc.tambon || '',
             'postal_code': loc.postalCode || '',
-            'area_code': loc.code || ''
+            'area_code': loc.code || '',
+            'path': pathValue
           });
         });
       }
@@ -3226,7 +2856,7 @@ export default function OrgManagerApp() {
 
   const handleFileImport = (newOrgs) => {
     if (newOrgs && newOrgs.length > 0) {
-      setOrganizationsWithHistory(recalculateAllLevels(newOrgs));
+      setOrganizations(recalculateAllLevels(newOrgs));
       setSelectedNodeId(newOrgs[0].id);
       setIsImportModalOpen(false);
     } else {
@@ -3361,9 +2991,6 @@ export default function OrgManagerApp() {
               ) : (
                 filteredOrgs.map(org => {
                   const isSelected = selectedNodeId === org.id;
-                  const parentOrg = organizations.find(o => o.id === org.parentId);
-                  const hasParent = Boolean(org.parentId && parentOrg);
-                  const parentName = parentOrg ? (parentOrg.name || 'ไม่ได้ระบุชื่อ') : '';
                   const areaCount = getAreaCount(org.areas);
                   const issue = nodeIssues?.get(org.id);
                   const hasError = issue?.type === 'error';
@@ -3501,7 +3128,7 @@ export default function OrgManagerApp() {
   };
 
   const handleCleanAllData = () => {
-    setOrganizationsWithHistory(prevOrgs => {
+    setOrganizations(prevOrgs => {
       const cleaned = prevOrgs.map(org => ({
         ...org,
         name: sanitizeString(org.name)
@@ -3885,9 +3512,7 @@ export default function OrgManagerApp() {
                   setSearchedNodeId={setSearchedNodeId}
                   handleAddNode={handleAddNode}
                   handleDeleteNode={handleDeleteNode}
-                  treeLayout={treeLayout}
                   nodeIssues={nodeIssues}
-                  treeExpansionTrigger={treeExpansionTrigger}
                 />
                 </>
               )}

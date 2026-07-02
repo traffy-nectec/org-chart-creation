@@ -9,4 +9,15 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'lucide-react'],
+          xyflow: ['@xyflow/react'],
+          xlsx: ['xlsx']
+        }
+      }
+    }
+  }
 })

@@ -1,11 +1,9 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useEffect } from 'react';
 import { 
   ReactFlow, 
   ReactFlowProvider, 
   Controls, 
   Background, 
-  Handle, 
-  Position,
   useNodesState,
   useEdgesState,
   useReactFlow,
@@ -14,7 +12,7 @@ import {
   getViewportForBounds
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Plus, Trash2, MapPin, Network, AlertTriangle, ChevronDown, ChevronRight, ChevronUp, ChevronLeft, Settings, Download, ArrowUp } from 'lucide-react';
+import { AlertTriangle, Download, ArrowUp } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
 const getAreaCount = (areas) => {
@@ -27,29 +25,9 @@ const getAreaCount = (areas) => {
   return count;
 };
 
-const formatAreaLabel = (areas) => {
-  if (!areas) return '';
-  const parts = [];
-  if (areas.tambon) {
-    const prefix = areas.province === "กรุงเทพมหานคร" ? "แขวง" : "ต.";
-    parts.push(`${prefix}${areas.tambon}`);
-  }
-  if (areas.amphoe) {
-    const prefix = areas.province === "กรุงเทพมหานคร" ? "เขต" : "อ.";
-    parts.push(`${prefix}${areas.amphoe}`);
-  }
-  if (areas.province) {
-    const prefix = areas.province === "กรุงเทพมหานคร" ? "" : "จ.";
-    parts.push(`${prefix}${areas.province}`);
-  }
-  return parts.join(' ');
-};
-
 // --- Custom Node ---
-const OrgNodeFlow = ({ id, data }) => {
-  const { node, isSelected, hasError, hasWarning, issue, treeLayout, isDrillable, setFocusNodeId, handleAddNode, handleDeleteNode, isParent, childCount, setSelectedNodeId } = data;
-  const isVert = treeLayout === 'vertical';
-
+const OrgNodeFlow = ({ data }) => {
+  const { node, isSelected, hasError, hasWarning, issue, isDrillable, setFocusNodeId, handleAddNode, isParent, childCount, setSelectedNodeId } = data;
   const lvl = node.level || 1;
   let levelColorClass = "bg-slate-100 text-slate-700 border-slate-200";
   if (lvl === 1) levelColorClass = "bg-purple-100 text-purple-800 border-purple-200";
@@ -251,7 +229,7 @@ const getGridLayoutedElements = (nodes, edges) => {
 };
 
 // --- Main Flow Component ---
-const FlowInner = ({ orgTree, organizations, focusNodeId, setFocusNodeId, selectedNodeId, setSelectedNodeId, searchedNodeId, setSearchedNodeId, handleAddNode, handleDeleteNode, treeLayout, nodeIssues }) => {
+const FlowInner = ({ orgTree, focusNodeId, setFocusNodeId, selectedNodeId, setSelectedNodeId, searchedNodeId, setSearchedNodeId, handleAddNode, treeLayout, nodeIssues }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { fitView, setViewport } = useReactFlow();
@@ -307,7 +285,6 @@ const FlowInner = ({ orgTree, organizations, focusNodeId, setFocusNodeId, select
           isDrillable: depth === 1,
           setFocusNodeId,
           handleAddNode,
-          handleDeleteNode,
           setSelectedNodeId
         }
       });
@@ -370,6 +347,7 @@ const FlowInner = ({ orgTree, organizations, focusNodeId, setFocusNodeId, select
     prevNodeCountRef.current = totalNodesCount;
     prevFocusNodeIdRef.current = focusNodeId;
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgTree, focusNodeId, treeLayout, selectedNodeId, nodeIssues]);
 
   const onDownload = () => {
