@@ -437,6 +437,27 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
         await delay(50);
 
         const orgMap = new Map();
+        
+        // O(1) Lookup Indices for Locations
+        const locIndex = { province: new Map(), amphoe: new Map(), tambon: new Map() };
+        if (locationDb && locationDb.length > 0) {
+          locationDb.forEach(r => {
+            const p = cleanInput(r.province, 'province');
+            const a = cleanInput(r.amphoe, 'amphoe');
+            const t = cleanInput(r.district, 'tambon');
+            if (p) {
+              if (!locIndex.province.has(p)) locIndex.province.set(p, r.province_code ? String(r.province_code) : '');
+            }
+            if (p && a) {
+              const keyAmp = `${p}|${a}`;
+              if (!locIndex.amphoe.has(keyAmp)) locIndex.amphoe.set(keyAmp, r.amphoe_code ? String(r.amphoe_code) : (r.province_code ? String(r.province_code) : ''));
+            }
+            if (p && a && t) {
+              const keyTam = `${p}|${a}|${t}`;
+              if (!locIndex.tambon.has(keyTam)) locIndex.tambon.set(keyTam, r.district_code ? String(r.district_code) : (r.amphoe_code ? String(r.amphoe_code) : (r.province_code ? String(r.province_code) : '')));
+            }
+          });
+        }
 
         rawRows.forEach((row, index) => {
           const rawOrgName = getVal(row, ['org_name', 'orgName', 'หน่วยงาน']);
@@ -510,26 +531,39 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
                 loc.tambon === tambon
               );
               if (!exists) {
-                const locObj = {
-                  province,
-                  amphoe,
-                  tambon,
-                  postalCode
-                };
-                locObj.code = getLocationCode(locObj, locationDb);
-                
                 let isValidLoc = false;
+                let locCode = '';
+                
                 const cleanProv = cleanInput(province, 'province');
                 const cleanAmp = cleanInput(amphoe, 'amphoe');
                 const cleanTam = cleanInput(tambon, 'tambon');
 
                 if (cleanTam) {
-                   isValidLoc = locationDb.some(r => cleanInput(r.province, 'province') === cleanProv && cleanInput(r.amphoe, 'amphoe') === cleanAmp && cleanInput(r.district, 'tambon') === cleanTam);
+                   const key = `${cleanProv}|${cleanAmp}|${cleanTam}`;
+                   if (locIndex.tambon.has(key)) {
+                     isValidLoc = true;
+                     locCode = locIndex.tambon.get(key);
+                   }
                 } else if (cleanAmp) {
-                   isValidLoc = locationDb.some(r => cleanInput(r.province, 'province') === cleanProv && cleanInput(r.amphoe, 'amphoe') === cleanAmp);
+                   const key = `${cleanProv}|${cleanAmp}`;
+                   if (locIndex.amphoe.has(key)) {
+                     isValidLoc = true;
+                     locCode = locIndex.amphoe.get(key);
+                   }
                 } else if (cleanProv) {
-                   isValidLoc = locationDb.some(r => cleanInput(r.province, 'province') === cleanProv);
+                   if (locIndex.province.has(cleanProv)) {
+                     isValidLoc = true;
+                     locCode = locIndex.province.get(cleanProv);
+                   }
                 }
+                
+                const locObj = {
+                  province,
+                  amphoe,
+                  tambon,
+                  postalCode,
+                  code: locCode
+                };
 
                 if (!isValidLoc) {
                    const locStr = [rawProvItem, rawAmphoe, rawTambon].filter(Boolean).join(' ');
