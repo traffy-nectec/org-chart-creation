@@ -1669,7 +1669,7 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose
       const q = parentSearchQuery.toLowerCase();
       options = options.filter(org => org.name && org.name.toLowerCase().includes(q));
     }
-    return options;
+    return options.slice(0, 50); // Limit to 50 items to prevent DOM freezing on massive datasets
   }, [organizations, selectedNode, descendantIds, parentSearchQuery]);
 
   const nodeIssue = nodeIssues?.get(selectedNode.id);
