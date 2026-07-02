@@ -8,6 +8,7 @@ import {
 import { ThailandAddressTypeahead, useAddressTypeaheadContext } from "react-thailand-address-typeahead";
 import * as XLSX from 'xlsx';
 import { getOrgPath } from './utils/exportUtils';
+import { extractGoogleSheetIds, fetchGoogleSheetAsCSV } from './utils/googleSheetUtils';
 import toast, { Toaster } from 'react-hot-toast';
 import ReactFlowOrgChart from './ReactFlowOrgChart';
 
@@ -275,6 +276,7 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
   const [progressStep, setProgressStep] = useState('');
   const [isFinalImporting, setIsFinalImporting] = useState(false);
   const [finalImportProgress, setFinalImportProgress] = useState(0);
+  const [sheetLink, setSheetLink] = useState('');
 
   const availableLevels = useMemo(() => {
     return Array.from(new Set(validatedNodes.map(n => n.level))).sort((a,b) => a - b);
@@ -307,6 +309,33 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
     fileInputRef.current?.click();
   };
 
+  const handleLinkImport = async () => {
+    const ids = extractGoogleSheetIds(sheetLink);
+    if (!ids) {
+      alert("รูปแบบลิงก์ Google Sheets ไม่ถูกต้อง");
+      return;
+    }
+
+    setIsProcessing(true);
+    setProgressStep('กำลังเชื่อมต่อ Google Sheets...');
+    
+    try {
+      const csvText = await fetchGoogleSheetAsCSV(ids.spreadsheetId, ids.gid);
+      setProgressStep('กำลังแปลงโครงสร้างข้อมูล (Parsing)...');
+      await delay(50);
+      const workbook = XLSX.read(csvText, { type: 'string' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rawRows = XLSX.utils.sheet_to_json(firstSheet);
+      
+      const sizeBytes = new Blob([csvText]).size;
+      await processRawRows(rawRows, 'Google Sheets Link', sizeBytes);
+    } catch (err) {
+      console.error(err);
+      alert(`เกิดข้อผิดพลาดในการดึงข้อมูลจาก Google Sheets: ${err.message}`);
+      setIsProcessing(false);
+    }
+  };
+
   const processFile = async (file) => {
     setIsProcessing(true);
     setProgressStep('กำลังอ่านไฟล์...');
@@ -321,7 +350,19 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
         const workbook = XLSX.read(data, { type: 'array' });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         let rawRows = XLSX.utils.sheet_to_json(firstSheet);
+        
+        await processRawRows(rawRows, file.name, file.size);
+      } catch (err) {
+        console.error(err);
+        alert(`เกิดข้อผิดพลาดในการอ่านไฟล์: ${err.message}`);
+        setIsProcessing(false);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
 
+  const processRawRows = async (rawRows, sourceName, sourceSize) => {
+    try {
         if (rawRows.length > 0 && ('กระทรวง' in rawRows[0] || 'ชื่อหน่วยงานระดับกรม' in rawRows[0])) {
           const normalized = [];
           const locationMap = new Map();
@@ -580,16 +621,14 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
         await delay(50);
 
         setValidatedNodes(validated);
-        setParsedFile({ name: file.name, size: file.size });
+        setParsedFile({ name: sourceName, size: sourceSize });
         setShowDocumentation(false);
         setIsProcessing(false);
       } catch (err) {
         console.error(err);
-        alert(`เกิดข้อผิดพลาดในการอ่านไฟล์: ${err.message}`);
+        alert(`เกิดข้อผิดพลาดในการประมวลผลข้อมูล: ${err.message}`);
         setIsProcessing(false);
       }
-    };
-    reader.readAsArrayBuffer(file);
   };
 
   const handleConfirm = async () => {
@@ -660,6 +699,7 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
     setFilterLevel('all');
     setExcludedNodes(new Set());
     setPreviewSearchQuery('');
+    setSheetLink('');
   };
 
   const handleCloseModal = () => {
@@ -1058,6 +1098,29 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
                   >
                     เลือกไฟล์สำหรับอัปโหลด
                   </button>
+
+                  <div className="mt-6 w-full flex flex-col gap-2 border-t border-slate-200 pt-6">
+                    <p className="text-sm font-bold text-slate-800 text-left">หรือ นำเข้าจาก Google Sheets Link</p>
+                    <p className="text-[10px] text-slate-600 font-bold text-left mb-1">
+                      (ต้องตั้งค่าสิทธิ์เป็น <span className="text-blue-600">Anyone with the link can view</span>)
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      <input 
+                        type="text"
+                        placeholder="วางลิงก์ Google Sheets..."
+                        value={sheetLink}
+                        onChange={(e) => setSheetLink(e.target.value)}
+                        className="w-full px-4 py-3 border border-slate-300 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-500 bg-white"
+                      />
+                      <button 
+                        onClick={handleLinkImport}
+                        disabled={!sheetLink.trim()}
+                        className={`px-6 py-3 w-full rounded-xl text-sm font-bold shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 ${sheetLink.trim() ? 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-lg cursor-pointer' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                      >
+                        <Download size={16} /> ดึงข้อมูลจากลิงก์
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )
             ) : (
