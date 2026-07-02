@@ -3497,7 +3497,7 @@ export default function OrgManagerApp() {
                   <div className="text-[10px] text-slate-600 font-semibold mb-1 leading-normal">
                     ⚠️ หน่วยงานด้านล่างเกิดความสัมพันธ์ขัดแย้ง (เช่น สังกัดเป็นวงกลม หรือไม่มีต้นสังกัด) ทำให้ไม่สามารถนำมาแสดงในผังหลักได้
                   </div>
-                  {conflictingNodes.map(node => (
+                  {conflictingNodes.slice(0, 50).map(node => (
                     <div 
                       key={node.id} 
                       className={`p-2.5 rounded-xl border border-red-200 bg-red-50/50 hover:bg-red-50 hover:border-red-300 transition-all flex flex-col gap-1.5`}
@@ -3530,6 +3530,11 @@ export default function OrgManagerApp() {
                       </div>
                     </div>
                   ))}
+                  {conflictingNodes.length > 50 && (
+                    <div className="text-center p-2 text-xs font-bold text-slate-500 bg-slate-50 rounded-xl border border-slate-200 mt-2">
+                      ...และหน่วยงานที่ขัดแย้งอีก {(conflictingNodes.length - 50).toLocaleString()} แห่ง
+                    </div>
+                  )}
                 </div>
               )}
             </div>
