@@ -2801,7 +2801,7 @@ export default function OrgManagerApp() {
     if (newOrgs && newOrgs.length > 0) {
       setOrganizations(recalculateAllLevels(newOrgs));
       setSelectedNodeId(newOrgs[0].id);
-      setIsImportModalOpen(false);
+      // setIsImportModalOpen(false); -> removed so user can see the confirm button
     } else {
       alert("ไม่พบข้อมูลหน่วยงานที่ถูกต้องในไฟล์");
     }

@@ -54,7 +54,7 @@ test.describe('Import and Export Functionality', () => {
     });
 
     // Wait for file parsing to complete and the confirm button to appear
-    const confirmButton = page.locator('button:has-text("ยืนยันการนำเข้าข้อมูล")');
+    const confirmButton = page.locator('button:has-text("นำเข้าและแก้ไขด้วยตนเอง")');
     await expect(confirmButton).toBeVisible({ timeout: 10000 });
 
     // Click confirm
@@ -97,7 +97,7 @@ test.describe('Import and Export Functionality', () => {
     await page.click('button:has-text("ดึงข้อมูลจากลิงก์")');
 
     // Wait for file parsing to complete and the confirm button to appear
-    const confirmButton = page.locator('button:has-text("ยืนยันการนำเข้าข้อมูล")');
+    const confirmButton = page.locator('button:has-text("นำเข้าและแก้ไขด้วยตนเอง")');
     await expect(confirmButton).toBeVisible({ timeout: 10000 });
 
     // Click confirm
