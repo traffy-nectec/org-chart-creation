@@ -274,10 +274,12 @@ const ImportModal = ({ isOpen, onClose, onImportData, onCancelImport, onDownload
 
   const issueGroups = React.useMemo(() => {
     const groups = {
-      circle: { id: 'circle', label: 'ความสัมพันธ์เป็นวงกลม (ถูกตัดให้เป็นสูงสุด)', items: [], color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
-      missingParent: { id: 'missingParent', label: 'ไม่พบต้นสังกัด (แขวนลอยเป็นสูงสุด)', items: [], color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200' },
+      circle: { id: 'circle', label: 'ความสัมพันธ์เป็นวงกลม', items: [], color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
+      missingParent: { id: 'missingParent', label: 'ไม่พบต้นสังกัด', items: [], color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200' },
+      multipleRoots: { id: 'multipleRoots', label: 'ถูกปรับยอด (มีหัวหน้าสูงสุดได้ 1 แห่ง)', items: [], color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
       noArea: { id: 'noArea', label: 'ไม่มีพื้นที่รับผิดชอบ (หน่วยงานลอย)', items: [], color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
-      multipleRoots: { id: 'multipleRoots', label: 'ถูกปรับยอด (ให้มี 1 หัวหน้าสูงสุด)', items: [], color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
+      invalidArea: { id: 'invalidArea', label: 'พื้นที่ไม่พบในระบบ', items: [], color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
+      duplicate: { id: 'duplicate', label: 'ชื่อหน่วยงานซ้ำกัน', items: [], color: 'text-indigo-700', bg: 'bg-indigo-50', border: 'border-indigo-200' },
       others: { id: 'others', label: 'แจ้งเตือนอื่นๆ', items: [], color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-200' },
     };
 
@@ -288,8 +290,10 @@ const ImportModal = ({ isOpen, onClose, onImportData, onCancelImport, onDownload
       });
       node.warnings.forEach(warn => {
         if (warn.includes('ไม่พบต้นสังกัด')) groups.missingParent.items.push({ name: node.name, msg: warn });
-        else if (warn.includes('ไม่มีพื้นที่รับผิดชอบ')) groups.noArea.items.push({ name: node.name, msg: warn });
         else if (warn.includes('ถูกปรับให้อยู่ภายใต้')) groups.multipleRoots.items.push({ name: node.name, msg: warn });
+        else if (warn.includes('ชื่อหน่วยงานซ้ำกัน')) groups.duplicate.items.push({ name: node.name, msg: warn });
+        else if (warn.includes('ไม่พบข้อมูลพื้นที่รับผิดชอบ')) groups.invalidArea.items.push({ name: node.name, msg: warn });
+        else if (warn.includes('ไม่มีพื้นที่รับผิดชอบ')) groups.noArea.items.push({ name: node.name, msg: warn });
         else groups.others.items.push({ name: node.name, msg: warn });
       });
     });
@@ -2577,6 +2581,7 @@ export default function OrgManagerApp() {
     const groups = {
       circle: { id: 'circle', label: 'ความสัมพันธ์เป็นวงกลม', items: [], color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
       missingParent: { id: 'missingParent', label: 'ไม่พบต้นสังกัด', items: [], color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200' },
+      multipleRoots: { id: 'multipleRoots', label: 'ถูกปรับยอด (มีหัวหน้าสูงสุดได้ 1 แห่ง)', items: [], color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
       noArea: { id: 'noArea', label: 'ไม่มีพื้นที่รับผิดชอบ (เป็นหน่วยงานลอย)', items: [], color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
       invalidArea: { id: 'invalidArea', label: 'พื้นที่ไม่พบในระบบ', items: [], subGroups: {}, color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
       duplicate: { id: 'duplicate', label: 'ชื่อหน่วยงานซ้ำกัน', items: [], color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
@@ -2590,6 +2595,7 @@ export default function OrgManagerApp() {
       
       if (msg.includes('วงกลม')) groups.circle.items.push(org);
       else if (msg.includes('ไม่พบต้นสังกัด')) groups.missingParent.items.push(org);
+      else if (msg.includes('ถูกปรับให้อยู่ภายใต้') || msg.includes('ต้องการหน่วยงานสูงสุดเพียงแห่งเดียว')) groups.multipleRoots.items.push(org);
       else if (msg.includes('ชื่อหน่วยงานซ้ำกัน')) groups.duplicate.items.push(org);
       else if (msg.includes('ไม่พบข้อมูลพื้นที่รับผิดชอบ')) {
         groups.invalidArea.items.push(org);
