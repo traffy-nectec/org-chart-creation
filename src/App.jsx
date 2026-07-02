@@ -2534,14 +2534,36 @@ export default function OrgManagerApp() {
             type: 'warning',
             message: node.warnings.join(' | ')
           });
+        } else {
+          let combinedMsg = existing.message;
+          node.warnings.forEach(w => {
+            if (!combinedMsg.includes(w)) {
+              combinedMsg += ' | ' + w;
+            }
+          });
+          issues.set(node.id, {
+            type: existing.type,
+            message: combinedMsg
+          });
         }
       }
       if (node.errors && node.errors.length > 0) {
         const existing = issues.get(node.id);
-        if (!existing || existing.type !== 'error') {
+        if (!existing) {
           issues.set(node.id, {
             type: 'error',
             message: node.errors.join(' | ')
+          });
+        } else {
+          let combinedMsg = existing.message;
+          node.errors.forEach(e => {
+            if (!combinedMsg.includes(e)) {
+              combinedMsg += ' | ' + e;
+            }
+          });
+          issues.set(node.id, {
+            type: 'error',
+            message: combinedMsg
           });
         }
       }
