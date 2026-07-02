@@ -2244,8 +2244,7 @@ export default function OrgManagerApp() {
   const [showWelcomeModal, setShowWelcomeModal] = useState(() => !localStorage.getItem('hideWelcomeModal'));
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
-  const [isConflictPanelExpanded, setIsConflictPanelExpanded] = useState(true);
-  const [expandedConflictGroupId, setExpandedConflictGroupId] = useState(null);
+  const [isIssueSidebarOpen, setIsIssueSidebarOpen] = useState(true);
   const [viewMode, setViewMode] = useState('canvas'); // 'canvas' or 'table'
   const [deleteConfirmNode, setDeleteConfirmNode] = useState(null);
   const [moveMode, setMoveMode] = useState('branch'); // 'branch' or 'single'
@@ -3208,136 +3207,125 @@ export default function OrgManagerApp() {
         </div>
       </header>
 
-      {/* Main Workspace (Vertical Split) */}
-      <div className="flex-1 flex flex-col gap-4 overflow-hidden relative">
+            {/* Main Workspace (Horizontal Split) */}
+      <div className="flex-1 flex gap-4 overflow-hidden relative">
         
+        {/* Left Issue Sidebar */}
+        {viewMode === 'canvas' && unifiedIssueGroups.length > 0 && (
+          <div className={`transition-all duration-300 flex flex-col bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden shrink-0 ${isIssueSidebarOpen ? 'w-[340px] opacity-100' : 'w-0 opacity-0 border-none'}`}>
+            <div className="flex items-center justify-between border-b border-slate-200 p-4 bg-slate-50 cursor-pointer select-none shrink-0" onClick={() => setIsIssueSidebarOpen(false)}>
+              <div className="flex items-center gap-2 text-amber-700 font-bold text-sm uppercase tracking-wider">
+                <AlertTriangle size={18} className="text-amber-600 shrink-0 animate-pulse" />
+                <span>การแจ้งเตือน ({unifiedIssueGroups.reduce((acc, g) => acc + g.items.length, 0).toLocaleString()} แห่ง)</span>
+              </div>
+              <button className="text-slate-400 hover:text-slate-650 transition-colors p-1 bg-white rounded-md border border-slate-200 hover:bg-slate-100">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+              <div className="text-xs text-slate-600 font-semibold leading-relaxed p-3 bg-blue-50 text-blue-700 rounded-xl border border-blue-100">
+                ⚠️ รายชื่อหน่วยงานด้านล่างเกิดความสัมพันธ์ขัดแย้งหรือมีข้อสังเกตที่ควรตรวจสอบ คุณสามารถกด "แก้ไข" เพื่อไปจัดการได้ทันที
+              </div>
+              {unifiedIssueGroups.map(group => (
+                <div key={group.id} className={`border ${group.border} ${group.bg} rounded-xl overflow-hidden shadow-sm`}>
+                  <div className="w-full p-3 flex justify-between items-center text-left bg-white/60 border-b border-black/5">
+                    <span className={`text-sm font-bold ${group.color}`}>
+                      {group.label} ({group.items.length.toLocaleString()})
+                    </span>
+                  </div>
+                  
+                  <div className="p-3 space-y-3 bg-white">
+                    {group.subGroups && Object.keys(group.subGroups).length > 0 ? (
+                      Object.entries(group.subGroups).map(([locName, nodes]) => (
+                        <div key={locName} className="mb-3">
+                          <div className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-1.5 mb-2 border border-slate-200">
+                            <MapPin size={12} className="text-slate-500" /> พื้นที่: {locName} ({nodes.length})
+                          </div>
+                          <div className="space-y-2 pl-3 border-l-2 border-slate-200 ml-1.5">
+                            {nodes.map(node => (
+                              <div key={node.id} className="p-2.5 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 flex flex-col gap-1.5 transition-all shadow-sm">
+                                <div className="flex justify-between items-start gap-2">
+                                  <span className="font-bold text-xs text-slate-800 break-words">{node.name || <span className="italic text-slate-500">ไม่ระบุชื่อ</span>}</span>
+                                  <button 
+                                    onClick={() => {
+                                      setSelectedNodeId(node.id);
+                                      setFocusNodeId(node.parentId || node.id);
+                                      setSearchedNodeId(node.id);
+                                    }}
+                                    className="px-2 py-1 bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 rounded-md text-[10px] font-bold shadow-sm cursor-pointer shrink-0"
+                                  >
+                                    แก้ไข
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="space-y-2">
+                        {group.items.map(node => (
+                          <div 
+                            key={node.id} 
+                            className={`p-3 rounded-lg border ${group.id === 'circle' || group.id === 'missingParent' ? 'border-red-200 bg-red-50 hover:bg-red-100' : 'border-amber-200 bg-amber-50 hover:bg-amber-100'} transition-all flex flex-col gap-2 shadow-sm`}
+                          >
+                            <div className="flex justify-between items-start gap-2">
+                              <span className="font-bold text-xs text-slate-800 break-words">{node.name || <span className="italic text-slate-500">ไม่ระบุชื่อ</span>}</span>
+                              <div className="flex gap-1.5 shrink-0">
+                                <button 
+                                  onClick={() => {
+                                    setSelectedNodeId(node.id);
+                                    setFocusNodeId(node.parentId || node.id);
+                                    setSearchedNodeId(node.id);
+                                  }}
+                                  className={`px-2 py-1 bg-white border ${group.id === 'circle' || group.id === 'missingParent' ? 'border-red-300 text-red-600 hover:bg-red-50' : 'border-amber-300 text-amber-700 hover:bg-amber-50'} rounded-md text-[10px] font-bold shadow-sm cursor-pointer`}
+                                >
+                                  แก้ไข
+                                </button>
+                                {(group.id === 'circle' || group.id === 'missingParent') && (
+                                  <button 
+                                    onClick={() => handleUpdateNode(node.id, 'parentId', null)}
+                                    className="px-2 py-1 bg-red-600 text-white hover:bg-red-700 rounded-md text-[10px] font-bold shadow-sm transition-colors cursor-pointer"
+                                    title="ตั้งเป็นหน่วยงานสูงสุดทันทีเพื่อดึงกลับเข้าผังหลัก"
+                                  >
+                                    ตั้งสูงสุด
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <div className={`text-[10px] font-bold ${group.id === 'circle' || group.id === 'missingParent' ? 'text-red-700 bg-red-100/60' : 'text-amber-700 bg-amber-100/60'} p-2 rounded-md flex items-center gap-1.5 leading-normal`}>
+                              <AlertTriangle size={12} className="shrink-0" />
+                              <span>{nodeIssues.get(node.id)?.message || ''}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* TOP: Visual Mind Map Canvas (Combined with Floating Config Panel) */}
         <div className={`flex-1 bg-[#f8fafc] border border-slate-200 shadow-inner overflow-hidden flex flex-col transition-all duration-300 ${isFullscreen ? 'fixed inset-0 z-50 rounded-none w-full h-full' : 'relative rounded-2xl'}`} style={viewMode === 'canvas' ? { backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' } : {}}>
           
-
-
-          {/* แผงแสดงหน่วยงานที่มีปัญหาและข้อขัดแย้ง (รวมทุกอย่างไว้ที่เดียว) */}
-          {viewMode === 'canvas' && unifiedIssueGroups.length > 0 && (
-            <div className={`absolute bottom-6 left-6 z-30 w-80 bg-white/95 backdrop-blur border border-amber-200 rounded-2xl shadow-2xl flex flex-col p-4 transition-all duration-300 pointer-events-auto`}>
-              <div 
-                className="flex items-center justify-between border-b border-slate-100 pb-2 cursor-pointer select-none"
-                onClick={() => setIsConflictPanelExpanded(!isConflictPanelExpanded)}
-              >
-                <div className="flex items-center gap-2 text-amber-700 font-bold text-xs uppercase tracking-wider">
-                  <AlertTriangle size={16} className="text-amber-600 shrink-0 animate-pulse" />
-                  <span>รายการแจ้งเตือน ({unifiedIssueGroups.reduce((acc, g) => acc + g.items.length, 0).toLocaleString()} แห่ง)</span>
-                </div>
-                <div className="text-slate-400 hover:text-slate-650 transition-colors">
-                  {isConflictPanelExpanded ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-                </div>
+          {/* Toggle Sidebar Button (Floating on Canvas) */}
+          {viewMode === 'canvas' && unifiedIssueGroups.length > 0 && !isIssueSidebarOpen && (
+            <button 
+              onClick={() => setIsIssueSidebarOpen(true)}
+              className="absolute left-6 bottom-6 z-40 p-3.5 bg-white border border-amber-200 rounded-full shadow-xl text-amber-600 hover:bg-amber-50 hover:scale-105 transition-all group pointer-events-auto"
+              title="เปิดแถบแจ้งเตือน"
+            >
+              <AlertTriangle size={24} className="animate-pulse" />
+              <div className="absolute left-full ml-3 px-3 py-1.5 bg-slate-800 text-white text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity shadow-lg">
+                เปิดแถบแจ้งเตือน ({unifiedIssueGroups.reduce((acc, g) => acc + g.items.length, 0).toLocaleString()} แห่ง)
+                <div className="absolute top-1/2 -left-1 -mt-1 w-2 h-2 bg-slate-800 rotate-45"></div>
               </div>
-
-              {isConflictPanelExpanded && (
-                <div className="mt-3 space-y-2 max-h-64 overflow-y-auto pr-1">
-                  <div className="text-[10px] text-slate-600 font-semibold mb-1 leading-normal">
-                    ⚠️ รายชื่อหน่วยงานด้านล่างเกิดความสัมพันธ์ขัดแย้งหรือมีข้อสังเกตที่ควรตรวจสอบ
-                  </div>
-                  {unifiedIssueGroups.map(group => (
-                    <div key={group.id} className={`border ${group.border} ${group.bg} rounded-xl overflow-hidden`}>
-                      <button
-                        onClick={() => setExpandedConflictGroupId(expandedConflictGroupId === group.id ? null : group.id)}
-                        className="w-full p-2.5 flex justify-between items-center hover:bg-black/5 transition-colors text-left"
-                      >
-                        <span className={`text-xs font-bold ${group.color}`}>
-                          {group.label} ({group.items.length.toLocaleString()})
-                        </span>
-                        {expandedConflictGroupId === group.id ? <ChevronUp size={14} className={group.color} /> : <ChevronDown size={14} className={group.color} />}
-                      </button>
-                      
-                      {expandedConflictGroupId === group.id && (
-                        <div className="p-3 bg-white/50 border-t border-black/5 max-h-64 overflow-y-auto space-y-2">
-                          {group.subGroups && Object.keys(group.subGroups).length > 0 ? (
-                            // Render Sub-groups for Missing Area
-                            Object.entries(group.subGroups).map(([locName, nodes]) => (
-                              <div key={locName} className="mb-2">
-                                <div className="text-[10px] font-bold text-slate-700 bg-slate-200/50 px-2 py-1 rounded flex items-center gap-1 mb-1">
-                                  <MapPin size={10} className="text-slate-500" /> พื้นที่: {locName} ({nodes.length})
-                                </div>
-                                <div className="space-y-1.5 pl-2 border-l border-slate-200 ml-1">
-                                  {nodes.slice(0, 20).map(node => (
-                                    <div key={node.id} className="p-2 rounded-lg border border-amber-200 bg-amber-50/50 hover:bg-amber-50 flex flex-col gap-1.5 transition-all">
-                                      <div className="flex justify-between items-start gap-1">
-                                        <span className="font-bold text-[11px] text-slate-800 break-all">{node.name || <span className="italic text-slate-500">ไม่ระบุชื่อ</span>}</span>
-                                        <button 
-                                          onClick={() => {
-                                            setSelectedNodeId(node.id);
-                                            setFocusNodeId(node.parentId || node.id);
-                                            setSearchedNodeId(node.id);
-                                          }}
-                                          className="px-1.5 py-0.5 bg-white border border-amber-300 text-amber-700 hover:bg-amber-100 rounded text-[9px] font-bold shadow-xs cursor-pointer"
-                                        >
-                                          แก้ไข
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ))}
-                                  {nodes.length > 20 && (
-                                    <div className="text-[10px] text-amber-700 font-bold text-center mt-1">
-                                      ...ยังมีอีก {(nodes.length - 20).toLocaleString()} แห่ง
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            // Render Normal Items
-                            group.items.slice(0, 50).map(node => (
-                              <div 
-                                key={node.id} 
-                                className={`p-2.5 rounded-xl border ${group.id === 'circle' || group.id === 'missingParent' ? 'border-red-200 bg-red-50/50 hover:bg-red-50' : 'border-amber-200 bg-amber-50/50 hover:bg-amber-50'} transition-all flex flex-col gap-1.5`}
-                              >
-                                <div className="flex justify-between items-start gap-1">
-                                  <span className="font-bold text-[11px] text-slate-800 break-all">{node.name || <span className="italic text-slate-500">ไม่ระบุชื่อ</span>}</span>
-                                  <div className="flex gap-1 shrink-0">
-                                    <button 
-                                      onClick={() => {
-                                        setSelectedNodeId(node.id);
-                                        setFocusNodeId(node.parentId || node.id);
-                                        setSearchedNodeId(node.id);
-                                      }}
-                                      className={`px-1.5 py-0.5 bg-white border ${group.id === 'circle' || group.id === 'missingParent' ? 'border-red-300 text-red-600 hover:bg-red-50' : 'border-amber-300 text-amber-700 hover:bg-amber-100'} rounded text-[9px] font-bold shadow-xs cursor-pointer`}
-                                    >
-                                      แก้ไข
-                                    </button>
-                                    {(group.id === 'circle' || group.id === 'missingParent') && (
-                                      <button 
-                                        onClick={() => handleUpdateNode(node.id, 'parentId', null)}
-                                        className="px-1.5 py-0.5 bg-red-700 text-white hover:bg-red-800 rounded text-[9px] font-bold shadow-xs transition-colors cursor-pointer"
-                                        title="ตั้งเป็นหน่วยงานสูงสุดทันทีเพื่อดึงกลับเข้าผังหลัก"
-                                      >
-                                        ตั้งสูงสุด
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className={`text-[9px] font-bold ${group.id === 'circle' || group.id === 'missingParent' ? 'text-red-700 bg-red-100/50' : 'text-amber-700 bg-amber-100/50'} p-1.5 rounded flex items-center gap-1 leading-normal`}>
-                                  <AlertTriangle size={10} className="shrink-0" />
-                                  <span>{nodeIssues.get(node.id)?.message || ''}</span>
-                                </div>
-                              </div>
-                            ))
-                          )}
-
-                          {group.items.length > 50 && (
-                            <div className="text-center p-2 text-xs font-bold text-slate-500 bg-slate-50 rounded-xl border border-slate-200 mt-2">
-                              ...และหน่วยงานที่ขัดแย้งอีก {(group.items.length - 50).toLocaleString()} แห่ง
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            </button>
           )}
-
-
 
           {/* Floating Config Panel */}
           {!isFullscreen && selectedNode && (
