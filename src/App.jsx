@@ -2162,6 +2162,101 @@ const WelcomeModal = ({ isOpen, onClose }) => {
     </div>
   );
 };
+const BulkEditLocationModal = ({ isOpen, onClose, locationName, orgs, locationDb, handleUpdateBulkLocations }) => {
+  const [addressInput, setAddressInput] = useState('');
+  const [selectedLocations, setSelectedLocations] = useState([]);
+
+
+
+  const handleAddressSelect = (nextVal) => {
+    if (nextVal.province) {
+      const newLoc = {
+        province: nextVal.province || '',
+        amphoe: nextVal.district || '',
+        tambon: nextVal.subdistrict || '',
+        postalCode: nextVal.postalCode || ''
+      };
+
+      const exists = selectedLocations.some(loc => 
+        loc.province === newLoc.province &&
+        loc.amphoe === newLoc.amphoe &&
+        loc.tambon === newLoc.tambon
+      );
+
+      if (!exists) {
+        newLoc.code = getLocationCode(newLoc, locationDb);
+        setSelectedLocations([...selectedLocations, newLoc]);
+      }
+      setAddressInput('');
+    }
+  };
+
+  const handleRemoveLocation = (index) => {
+    setSelectedLocations(selectedLocations.filter((_, i) => i !== index));
+  };
+
+  const handleSave = () => {
+    const orgIds = orgs.map(o => o.id);
+    handleUpdateBulkLocations(orgIds, selectedLocations);
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden relative border border-slate-200">
+        <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 text-blue-700 rounded-lg">
+              <MapPin size={20} />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800">แก้ไขพื้นที่รับผิดชอบทั้งหมด</h2>
+              <p className="text-xs text-slate-600 font-semibold mt-0.5">กลุ่ม: {locationName} ({orgs.length} หน่วยงาน)</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"><X size={20}/></button>
+        </div>
+        <div className="p-5 flex flex-col gap-4 bg-white">
+          <div className="space-y-3">
+            <ThailandAddressTypeahead value={addressInput} onValueChange={handleAddressSelect}>
+              <div className="space-y-2 relative">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">ค้นหาพื้นที่ที่ถูกต้อง (ตำบล / อำเภอ / จังหวัด / รหัสไปรษณีย์)</label>
+                  <CustomAddressInput 
+                    placeholder="พิมพ์เพื่อค้นหาตำบล, อำเภอ, จังหวัด หรือรหัสไปรษณีย์..."
+                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg outline-none text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-50 transition-all font-medium"
+                  />
+                </div>
+              </div>
+            </ThailandAddressTypeahead>
+          </div>
+          {selectedLocations.length > 0 && (
+            <div className="space-y-2 mt-2 pt-3 border-t border-slate-100">
+              <label className="block text-[10px] font-bold text-slate-600 uppercase">พื้นที่ที่รับผิดชอบ ({selectedLocations.length})</label>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                {selectedLocations.map((loc, idx) => (
+                  <div key={idx} className="flex justify-between items-center bg-blue-50 border border-blue-100 rounded-xl p-2.5 text-xs font-semibold text-blue-700">
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="truncate">{loc.tambon ? `ต.${loc.tambon} ` : ''}{loc.amphoe ? `อ.${loc.amphoe} ` : ''}จ.${loc.province} {loc.postalCode}</span>
+                      {loc.code && <span className="text-[10px] text-blue-600/70 font-mono mt-0.5">รหัส: {loc.code}</span>}
+                    </div>
+                    <button onClick={() => handleRemoveLocation(idx)} className="p-1.5 hover:bg-blue-100 hover:text-red-700 rounded-lg cursor-pointer"><X size={14}/></button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="px-5 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 border border-slate-300 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-700 transition-colors cursor-pointer">ยกเลิก</button>
+          <button onClick={handleSave} className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-md cursor-pointer transition-colors">บันทึก ({orgs.length} หน่วยงาน)</button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function OrgManagerApp() {
   const DEFAULT_ORGS = [
@@ -2251,6 +2346,8 @@ export default function OrgManagerApp() {
   const [isIssueSidebarOpen, setIsIssueSidebarOpen] = useState(true);
   const [collapsedCategories, setCollapsedCategories] = useState(new Set());
   const [expandedEmptyCategories, setExpandedEmptyCategories] = useState(new Set());
+  const [collapsedSubGroups, setCollapsedSubGroups] = useState(new Set());
+  const [bulkEditGroup, setBulkEditGroup] = useState(null);
   const [viewMode, setViewMode] = useState('canvas'); // 'canvas' or 'table'
   const [deleteConfirmNode, setDeleteConfirmNode] = useState(null);
   const [moveMode, setMoveMode] = useState('branch'); // 'branch' or 'single'
@@ -2638,6 +2735,15 @@ export default function OrgManagerApp() {
     }
   };
 
+  const toggleSubGroup = (locName) => {
+    setCollapsedSubGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(locName)) next.delete(locName);
+      else next.add(locName);
+      return next;
+    });
+  };
+
 
 
   const handleAddNode = (parentId, currentLevel) => {
@@ -2648,6 +2754,24 @@ export default function OrgManagerApp() {
     setOrganizations(orgs => recalculateAllLevels([...orgs, newNode]));
     setSelectedNodeId(newNode.id);
   };
+  const handleUpdateBulkLocations = (nodeIds, locations) => {
+    setOrganizations(orgs => {
+      const updated = orgs.map(org => {
+        if (nodeIds.includes(org.id)) {
+          return {
+            ...org,
+            areas: {
+              ...org.areas,
+              locations: locations
+            }
+          };
+        }
+        return org;
+      });
+      return recalculateAllLevels(updated);
+    });
+  };
+
 
   const handleUpdateNode = (id, field, value) => {
     setOrganizations(orgs => {
@@ -3309,14 +3433,33 @@ export default function OrgManagerApp() {
                         ยอดเยี่ยม! ไม่พบปัญหาในหมวดหมู่นี้
                       </div>
                     ) : group.subGroups && Object.keys(group.subGroups).length > 0 ? (
-                      Object.entries(group.subGroups).map(([locName, nodes]) => (
-                        <div key={locName} className="mb-3">
-                          <div className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-1.5 mb-2 border border-slate-200">
-                            <MapPin size={12} className="text-slate-500" /> พื้นที่: {locName} ({nodes.length})
+                      Object.entries(group.subGroups).map(([locName, nodes]) => {
+                        const isSubCollapsed = collapsedSubGroups.has(locName);
+                        return (
+                        <div key={locName} className="mb-3 border border-slate-200 rounded-lg overflow-hidden">
+                          <div 
+                            className="bg-slate-100 px-3 py-2 text-xs font-bold text-slate-800 border-b border-slate-200 flex items-center justify-between cursor-pointer hover:bg-slate-200 transition-colors"
+                            onClick={() => toggleSubGroup(locName)}
+                          >
+                            <div className="flex items-center gap-1.5 flex-1 min-w-0 pr-2">
+                              {isSubCollapsed ? <ChevronRight size={14} className="text-slate-500 shrink-0" /> : <ChevronDown size={14} className="text-slate-500 shrink-0" />}
+                              <MapPin size={14} className="text-red-500 shrink-0" /> 
+                              <span className="truncate">พื้นที่: {locName} ({nodes.length})</span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setBulkEditGroup({ locName, nodes });
+                              }}
+                              className="shrink-0 px-2.5 py-1 bg-white border border-slate-300 rounded text-[10px] font-bold text-blue-600 hover:bg-blue-50 hover:border-blue-300 transition-colors shadow-sm"
+                            >
+                              แก้ไขทั้งหมด
+                            </button>
                           </div>
-                          <div className="space-y-2 pl-3 border-l-2 border-slate-200 ml-1.5">
-                            {nodes.map(node => (
-                              <div key={node.id} className="p-2.5 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 flex flex-col gap-1.5 transition-all shadow-sm">
+                          {!isSubCollapsed && (
+                            <div className="p-2 space-y-2 bg-slate-50/50">
+                              {nodes.map(node => (
+                                <div key={node.id} className="p-2.5 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 flex flex-col gap-1.5 transition-all shadow-sm">
                                 <div className="flex justify-between items-start gap-2">
                                   <span className="font-bold text-xs text-slate-800 break-words">{node.name || <span className="italic text-slate-500">ไม่ระบุชื่อ</span>}</span>
                                   <button 
@@ -3333,8 +3476,10 @@ export default function OrgManagerApp() {
                               </div>
                             ))}
                           </div>
+                          )}
                         </div>
-                      ))
+                        );
+                      })
                     ) : (
                       <div className="space-y-2">
                         {group.items.map(node => (
@@ -3684,6 +3829,17 @@ export default function OrgManagerApp() {
             </div>
           </div>
         </div>
+      )}
+
+      {bulkEditGroup && (
+        <BulkEditLocationModal
+          isOpen={true}
+          onClose={() => setBulkEditGroup(null)}
+          locationName={bulkEditGroup.locName}
+          orgs={bulkEditGroup.nodes}
+          locationDb={locationDb}
+          handleUpdateBulkLocations={handleUpdateBulkLocations}
+        />
       )}
 
       {showWelcomeModal && (
