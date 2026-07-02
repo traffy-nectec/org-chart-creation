@@ -11,6 +11,7 @@ import { getOrgPath } from './utils/exportUtils';
 import { extractGoogleSheetIds, fetchGoogleSheetAsCSV } from './utils/googleSheetUtils';
 import toast, { Toaster } from 'react-hot-toast';
 import ReactFlowOrgChart from './ReactFlowOrgChart';
+import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 
 // ==========================================
 // CONFIGURATION: Data Cleansing & Alias Dictionary
@@ -2391,22 +2392,24 @@ export default function OrgManagerApp() {
   const [isDraftRestored, setIsDraftRestored] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem('org_builder_draft');
-    if (saved) {
+    const loadDraft = async () => {
       try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 4) {
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setDraftData(parsed);
-          setShowDraftModal(true);
-          return;
+        const saved = await idbGet('org_builder_draft');
+        if (saved) {
+          const parsed = typeof saved === 'string' ? JSON.parse(saved) : saved;
+          if (Array.isArray(parsed) && parsed.length > 4) {
+            setDraftData(parsed);
+            setShowDraftModal(true);
+            return;
+          }
         }
       } catch (err) {
-        console.error("Failed to parse saved draft:", err);
+        console.error("Failed to load saved draft from IndexedDB:", err);
       }
-    }
-    // No large draft found, just start normally
-    setIsDraftRestored(true);
+      // No large draft found, just start normally
+      setIsDraftRestored(true);
+    };
+    loadDraft();
   }, []);
   
   const [locationDb, setLocationDb] = useState([]);
@@ -2464,12 +2467,12 @@ export default function OrgManagerApp() {
   const [collapsedTableNodes, setCollapsedTableNodes] = useState(new Set());
   const [isDraftSaving, setIsDraftSaving] = useState(false);
 
-  const handleSaveDraft = () => {
+  const handleSaveDraft = async () => {
     setIsDraftSaving(true);
     try {
-      localStorage.setItem('org_builder_draft', JSON.stringify(organizations));
+      await idbSet('org_builder_draft', organizations);
     } catch (e) {
-      console.warn("Could not save draft to localStorage: Quota exceeded", e);
+      console.warn("Could not save draft to IndexedDB:", e);
     }
     setTimeout(() => setIsDraftSaving(false), 1500);
   };
@@ -2477,11 +2480,9 @@ export default function OrgManagerApp() {
   // Auto-save draft on organization changes
   useEffect(() => {
     if (isDraftRestored) {
-      try {
-        localStorage.setItem('org_builder_draft', JSON.stringify(organizations));
-      } catch (e) {
-        console.warn("Could not auto-save draft to localStorage: Quota exceeded", e);
-      }
+      idbSet('org_builder_draft', organizations).catch(e => {
+        console.warn("Could not auto-save draft to IndexedDB:", e);
+      });
     }
   }, [organizations, isDraftRestored]);
 
@@ -3773,7 +3774,7 @@ export default function OrgManagerApp() {
             setIsDraftRestored(true);
           }}
           onStartFresh={() => {
-            localStorage.removeItem('org_builder_draft');
+            idbDel('org_builder_draft').catch(console.error);
             setShowDraftModal(false);
             setIsDraftRestored(true);
           }}
