@@ -1,3 +1,4 @@
+/* global Buffer */
 import { test, expect } from '@playwright/test';
 
 test.describe('Import and Export Functionality', () => {
