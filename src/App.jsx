@@ -1648,14 +1648,25 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose
 
   const descendantIds = React.useMemo(() => {
     if (!organizations || !selectedNode) return new Set();
+    
+    // O(N) children map generation to prevent O(N^2) traversal
+    const childrenMap = new Map();
+    organizations.forEach(o => {
+      if (o.parentId) {
+        if (!childrenMap.has(o.parentId)) childrenMap.set(o.parentId, []);
+        childrenMap.get(o.parentId).push(o.id);
+      }
+    });
+
     const descendants = new Set();
     const queue = [selectedNode.id];
     while (queue.length > 0) {
       const currentId = queue.shift();
-      organizations.forEach(o => {
-        if (o.parentId === currentId && !descendants.has(o.id)) {
-          descendants.add(o.id);
-          queue.push(o.id);
+      const children = childrenMap.get(currentId) || [];
+      children.forEach(childId => {
+        if (!descendants.has(childId)) {
+          descendants.add(childId);
+          queue.push(childId);
         }
       });
     }
@@ -3739,12 +3750,23 @@ export default function OrgManagerApp() {
                   let count = 0;
                   const queue = [id];
                   const visited = new Set();
+                  
+                  // O(N) pre-compute to avoid O(N^2) traversal
+                  const childrenMap = new Map();
+                  organizations.forEach(org => {
+                    if (org.parentId) {
+                      if (!childrenMap.has(org.parentId)) childrenMap.set(org.parentId, []);
+                      childrenMap.get(org.parentId).push(org.id);
+                    }
+                  });
+
                   while (queue.length > 0) {
                     const curr = queue.shift();
-                    organizations.forEach(org => {
-                      if (org.parentId === curr && !visited.has(org.id)) {
-                        visited.add(org.id);
-                        queue.push(org.id);
+                    const children = childrenMap.get(curr) || [];
+                    children.forEach(childId => {
+                      if (!visited.has(childId)) {
+                        visited.add(childId);
+                        queue.push(childId);
                         count++;
                       }
                     });
