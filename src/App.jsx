@@ -277,6 +277,7 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
   const [progressStep, setProgressStep] = useState('');
   const [isFinalImporting, setIsFinalImporting] = useState(false);
   const [finalImportProgress, setFinalImportProgress] = useState(0);
+  const [finalImportStepText, setFinalImportStepText] = useState('');
   const [sheetLink, setSheetLink] = useState('');
 
   const availableLevels = useMemo(() => {
@@ -671,10 +672,12 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
   const handleConfirm = async () => {
     setIsFinalImporting(true);
     setFinalImportProgress(10);
+    setFinalImportStepText('กำลังเตรียมข้อมูลหน่วยงาน...');
     await delay(100);
 
     const nodesToImport = validatedNodes.filter(node => !excludedNodes.has(node.name));
     setFinalImportProgress(30);
+    setFinalImportStepText(`กำลังคัดกรองหน่วยงานที่เลือก (${nodesToImport.length.toLocaleString()} โหนด)...`);
     await delay(100);
 
     const idMap = new Map();
@@ -683,48 +686,69 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
     });
 
     setFinalImportProgress(50);
+    setFinalImportStepText('กำลังสร้างรหัสอ้างอิง (ID) ให้กับหน่วยงาน...');
     await delay(100);
 
     const roots = nodesToImport.filter(node => !node.parentName || !idMap.has(node.parentName));
 
-    const finalOrgs = nodesToImport.map(node => {
-      let parentId = node.parentName && idMap.has(node.parentName) ? idMap.get(node.parentName) : null;
-      let warnings = [...(node.warnings || [])];
-      let errors = [...(node.errors || [])];
+    const finalOrgs = [];
+    const chunkSize = 5000;
 
-      // Enforce single root constraint (in case exclusions changed the roots)
-      if (roots.length > 1 && !node.parentName && node.name !== roots[0].name) {
-        parentId = idMap.get(roots[0].name);
-        const warningMsg = `⚠️ ถูกปรับให้อยู่ภายใต้ ${roots[0].name} เนื่องจากระบบกำหนดให้มีหน่วยงานสูงสุดได้เพียง 1 แห่ง`;
-        if (!warnings.includes(warningMsg)) {
-          warnings.push(warningMsg);
+    for (let i = 0; i < nodesToImport.length; i += chunkSize) {
+      const chunk = nodesToImport.slice(i, i + chunkSize);
+      
+      const chunkOrgs = chunk.map(node => {
+        let parentId = node.parentName && idMap.has(node.parentName) ? idMap.get(node.parentName) : null;
+        let warnings = [...(node.warnings || [])];
+        let errors = [...(node.errors || [])];
+
+        // Enforce single root constraint (in case exclusions changed the roots)
+        if (roots.length > 1 && !node.parentName && node.name !== roots[0].name) {
+          parentId = idMap.get(roots[0].name);
+          const warningMsg = `⚠️ ถูกปรับให้อยู่ภายใต้ ${roots[0].name} เนื่องจากระบบกำหนดให้มีหน่วยงานสูงสุดได้เพียง 1 แห่ง`;
+          if (!warnings.includes(warningMsg)) {
+            warnings.push(warningMsg);
+          }
         }
-      }
 
-      return {
-        id: idMap.get(node.name),
-        name: node.name,
-        level: node.level,
-        parentId,
-        logo: null,
-        areas: {
-          locations: node.locations
-        },
-        errors,
-        warnings
-      };
-    });
+        return {
+          id: idMap.get(node.name),
+          name: node.name,
+          level: node.level,
+          parentId,
+          logo: null,
+          areas: {
+            locations: node.locations
+          },
+          errors,
+          warnings
+        };
+      });
+
+      finalOrgs.push(...chunkOrgs);
+
+      // Progress scales from 50% to 80%
+      const currentProgress = Math.floor(50 + ((i + chunk.length) / nodesToImport.length * 30));
+      setFinalImportProgress(currentProgress);
+      setFinalImportStepText(`กำลังประกอบโครงสร้างความสัมพันธ์... (${(i + chunk.length).toLocaleString()} จาก ${nodesToImport.length.toLocaleString()} หน่วยงาน)`);
+      
+      // Yield to browser to paint UI
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
 
     setFinalImportProgress(80);
+    setFinalImportStepText('กำลังประกอบโครงสร้างความสัมพันธ์และวาดแผนผัง...');
     await delay(100);
 
     onImportData(finalOrgs);
 
     setFinalImportProgress(100);
+    setFinalImportStepText('เสร็จสมบูรณ์! กำลังแสดงผล...');
     await delay(400);
 
     setIsFinalImporting(false);
     setFinalImportProgress(0);
+    setFinalImportStepText('');
     resetState();
   };
 
@@ -1241,7 +1265,8 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
               <div className="mb-4 text-[#553923] flex justify-center">
                 <Database size={48} strokeWidth={1.5} className="animate-bounce" />
               </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-6">กำลังนำเข้าข้อมูล...</h3>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">กำลังนำเข้าข้อมูล...</h3>
+              <p className="text-sm text-slate-500 mb-6 font-medium min-h-[20px]">{finalImportStepText}</p>
               <div className="w-full bg-slate-100 rounded-full h-3 mb-3 overflow-hidden shadow-inner">
                 <div 
                   className="bg-[#553923] h-3 rounded-full transition-all duration-300 ease-out" 
