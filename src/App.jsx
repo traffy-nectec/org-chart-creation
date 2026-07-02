@@ -2245,7 +2245,8 @@ export default function OrgManagerApp() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [isIssueSidebarOpen, setIsIssueSidebarOpen] = useState(true);
-  const [expandedIssueCategories, setExpandedIssueCategories] = useState(new Set(['circle', 'missingParent', 'noArea', 'invalidArea', 'duplicate', 'others']));
+  const [collapsedCategories, setCollapsedCategories] = useState(new Set());
+  const [expandedEmptyCategories, setExpandedEmptyCategories] = useState(new Set());
   const [viewMode, setViewMode] = useState('canvas'); // 'canvas' or 'table'
   const [deleteConfirmNode, setDeleteConfirmNode] = useState(null);
   const [moveMode, setMoveMode] = useState('branch'); // 'branch' or 'single'
@@ -2613,16 +2614,22 @@ export default function OrgManagerApp() {
     return Object.values(groups);
   }, [organizations, nodeIssues]);
 
-  const toggleIssueCategory = (categoryId) => {
-    setExpandedIssueCategories(prev => {
-      const next = new Set(prev);
-      if (next.has(categoryId)) {
-        next.delete(categoryId);
-      } else {
-        next.add(categoryId);
-      }
-      return next;
-    });
+  const toggleIssueCategory = (categoryId, isEmpty) => {
+    if (isEmpty) {
+      setExpandedEmptyCategories(prev => {
+        const next = new Set(prev);
+        if (next.has(categoryId)) next.delete(categoryId);
+        else next.add(categoryId);
+        return next;
+      });
+    } else {
+      setCollapsedCategories(prev => {
+        const next = new Set(prev);
+        if (next.has(categoryId)) next.delete(categoryId);
+        else next.add(categoryId);
+        return next;
+      });
+    }
   };
 
 
@@ -3271,6 +3278,7 @@ export default function OrgManagerApp() {
               </div>
               {unifiedIssueGroups.map(group => {
                 const isEmpty = group.items.length === 0;
+                const isExpanded = isEmpty ? expandedEmptyCategories.has(group.id) : !collapsedCategories.has(group.id);
                 const groupBorder = isEmpty ? 'border-emerald-200' : group.border;
                 const groupBg = isEmpty ? 'bg-emerald-50' : group.bg;
                 const groupColor = isEmpty ? 'text-emerald-700' : group.color;
@@ -3279,15 +3287,15 @@ export default function OrgManagerApp() {
                 <div key={group.id} className={`border ${groupBorder} ${groupBg} rounded-xl overflow-hidden shadow-sm`}>
                   <div 
                     className="w-full p-3 flex justify-between items-center text-left bg-white/60 border-b border-black/5 cursor-pointer hover:bg-black/5 transition-colors"
-                    onClick={() => toggleIssueCategory(group.id)}
+                    onClick={() => toggleIssueCategory(group.id, isEmpty)}
                   >
                     <span className={`text-sm font-bold ${groupColor}`}>
                       {group.label} ({group.items.length.toLocaleString()})
                     </span>
-                    {expandedIssueCategories.has(group.id) ? <ChevronUp size={16} className={groupColor} /> : <ChevronDown size={16} className={groupColor} />}
+                    {isExpanded ? <ChevronUp size={16} className={groupColor} /> : <ChevronDown size={16} className={groupColor} />}
                   </div>
                   
-                  {expandedIssueCategories.has(group.id) && (
+                  {isExpanded && (
                     <div className="p-3 space-y-3 bg-white">
                     {isEmpty ? (
                       <div className="text-center p-4 text-xs font-bold text-emerald-600 bg-emerald-50/50 rounded-xl border border-emerald-100 flex flex-col items-center gap-2">
