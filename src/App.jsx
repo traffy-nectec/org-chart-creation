@@ -952,7 +952,8 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
                       ไม่พบหน่วยงานตามตัวกรองที่เลือก
                     </div>
                   ) : (
-                    filteredNodes.map((node, index) => {
+                    <>
+                      {filteredNodes.slice(0, 100).map((node, index) => {
                       const hasErrors = node.errors.length > 0;
                       const hasWarnings = node.warnings.length > 0;
                       const isExcluded = excludedNodes.has(node.name);
@@ -1047,7 +1048,18 @@ const ImportModal = ({ isOpen, onClose, onImportData, onDownloadTemplate, locati
                           )}
                         </div>
                       );
-                    })
+                    })}
+                    {filteredNodes.length > 100 && (
+                      <div className="text-center py-4 mt-2 bg-slate-50 border border-slate-200 rounded-lg shadow-sm">
+                        <p className="text-sm text-slate-700 font-medium">
+                          แสดงตัวอย่างข้อมูล 100 รายการแรก จากทั้งหมด <span className="font-bold text-blue-700">{filteredNodes.length.toLocaleString()}</span> รายการ
+                        </p>
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          ระบบจะนำเข้าข้อมูลทั้งหมดตามปกติเมื่อกดยืนยัน
+                        </p>
+                      </div>
+                    )}
+                    </>
                   )}
                 </div>
               </div>
