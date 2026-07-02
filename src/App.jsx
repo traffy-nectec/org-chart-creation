@@ -2245,6 +2245,7 @@ export default function OrgManagerApp() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [isIssueSidebarOpen, setIsIssueSidebarOpen] = useState(true);
+  const [expandedIssueCategories, setExpandedIssueCategories] = useState(new Set(['circle', 'missingParent', 'noArea', 'duplicate', 'others']));
   const [viewMode, setViewMode] = useState('canvas'); // 'canvas' or 'table'
   const [deleteConfirmNode, setDeleteConfirmNode] = useState(null);
   const [moveMode, setMoveMode] = useState('branch'); // 'branch' or 'single'
@@ -2531,7 +2532,7 @@ export default function OrgManagerApp() {
         if (!existing) {
           issues.set(node.id, {
             type: 'warning',
-            message: node.warnings[0]
+            message: node.warnings.join(' | ')
           });
         }
       }
@@ -2540,7 +2541,7 @@ export default function OrgManagerApp() {
         if (!existing || existing.type !== 'error') {
           issues.set(node.id, {
             type: 'error',
-            message: node.errors[0]
+            message: node.errors.join(' | ')
           });
         }
       }
@@ -2571,9 +2572,9 @@ export default function OrgManagerApp() {
         
         // Extract location name if it exists (e.g. "ไม่พบข้อมูลพื้นที่รับผิดชอบในระบบ จะถูกข้ามไป: เชียงใหม่")
         let locName = 'ไม่ระบุพื้นที่';
-        const match = msg.match(/จะถูกข้ามไป:\s*(.+)/);
-        if (match && match[1]) {
-          locName = match[1].trim();
+        const match = msg.match(/จะถูกข้ามไป(?: \("([^"]+)"\)|:\s*(.+))/);
+        if (match) {
+          locName = (match[1] || match[2] || '').trim();
         }
         
         if (!groups.noArea.subGroups[locName]) {
@@ -2586,6 +2587,18 @@ export default function OrgManagerApp() {
 
     return Object.values(groups).filter(g => g.items.length > 0);
   }, [organizations, nodeIssues]);
+
+  const toggleIssueCategory = (categoryId) => {
+    setExpandedIssueCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) {
+        next.delete(categoryId);
+      } else {
+        next.add(categoryId);
+      }
+      return next;
+    });
+  };
 
 
 
@@ -3229,13 +3242,18 @@ export default function OrgManagerApp() {
               </div>
               {unifiedIssueGroups.map(group => (
                 <div key={group.id} className={`border ${group.border} ${group.bg} rounded-xl overflow-hidden shadow-sm`}>
-                  <div className="w-full p-3 flex justify-between items-center text-left bg-white/60 border-b border-black/5">
+                  <div 
+                    className="w-full p-3 flex justify-between items-center text-left bg-white/60 border-b border-black/5 cursor-pointer hover:bg-black/5 transition-colors"
+                    onClick={() => toggleIssueCategory(group.id)}
+                  >
                     <span className={`text-sm font-bold ${group.color}`}>
                       {group.label} ({group.items.length.toLocaleString()})
                     </span>
+                    {expandedIssueCategories.has(group.id) ? <ChevronUp size={16} className={group.color} /> : <ChevronDown size={16} className={group.color} />}
                   </div>
                   
-                  <div className="p-3 space-y-3 bg-white">
+                  {expandedIssueCategories.has(group.id) && (
+                    <div className="p-3 space-y-3 bg-white">
                     {group.subGroups && Object.keys(group.subGroups).length > 0 ? (
                       Object.entries(group.subGroups).map(([locName, nodes]) => (
                         <div key={locName} className="mb-3">
@@ -3303,6 +3321,7 @@ export default function OrgManagerApp() {
                       </div>
                     )}
                   </div>
+                  )}
                 </div>
               ))}
             </div>
