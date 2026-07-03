@@ -2520,7 +2520,17 @@ export default function OrgManagerApp() {
   const [collapsedTableNodes, setCollapsedTableNodes] = useState(new Set());
 
   // States for Bulk Similarity Check UI
-  const cancelSearchRef = useRef(false);
+  const abortControllerRef = useRef(null);
+  const isCancelledRef = useRef(false);
+  
+  // Cleanup on unmount (especially useful for Vite HMR)
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
   const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportDestination, setExportDestination] = useState('json'); // 'json' or 'api'
@@ -2528,7 +2538,9 @@ export default function OrgManagerApp() {
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
   const [conflicts, setConflicts] = useState([]);
   const [userResolutions, setUserResolutions] = useState({});
-  const [similarityThreshold, setSimilarityThreshold] = useState(0.4);
+  const [activeConflictTab, setActiveConflictTab] = useState('high'); // 'high', 'medium', 'low'
+  const [isPreExportModalOpen, setIsPreExportModalOpen] = useState(false);
+  const [preExportChecks, setPreExportChecks] = useState({});
   const [searchDuration, setSearchDuration] = useState(0);
 
   const handleSaveDraft = async () => {
@@ -3047,7 +3059,13 @@ export default function OrgManagerApp() {
       return;
     }
 
-    cancelSearchRef.current = false;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    isCancelledRef.current = false;
+    abortControllerRef.current = new AbortController();
+    const { signal } = abortControllerRef.current;
+
     setIsCheckingDuplicates(true);
     setIsConflictModalOpen(true);
     setConflicts([]);
@@ -3061,7 +3079,7 @@ export default function OrgManagerApp() {
     
     try {
       for (let i = 0; i < orgs.length; i += chunkSize) {
-        if (cancelSearchRef.current) {
+        if (signal.aborted || isCancelledRef.current) {
           setIsCheckingDuplicates(false);
           setIsConflictModalOpen(false);
           return;
@@ -3075,8 +3093,11 @@ export default function OrgManagerApp() {
           const response = await fetch('/api/similarity', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(namesPayload)
+            body: JSON.stringify(namesPayload),
+            signal: signal
           });
+          
+          if (signal.aborted || isCancelledRef.current) return;
           
           console.log(`[Batch ${i}] Received response. Status: ${response.status}`);
           
@@ -3100,16 +3121,21 @@ export default function OrgManagerApp() {
           });
           
           chunk.forEach(org => {
-             if (resultsByName[org.name] && resultsByName[org.name].length > 0) {
+             const validMatches = (resultsByName[org.name] || []).filter(m => m.score >= 0.5);
+             if (validMatches.length > 0) {
                realConflicts.push({
                  temp_id: org.id,
                  org_name: org.name,
-                 matches: resultsByName[org.name]
+                 matches: validMatches
                });
              }
           });
           setConflicts([...realConflicts]);
         } catch (fetchErr) {
+          if (fetchErr.name === 'AbortError' || isCancelledRef.current) {
+            console.log('Search aborted by user.');
+            return;
+          }
           console.error(`[Batch ${i}] Fetch/Parsing Error:`, fetchErr);
           throw fetchErr; // rethrow to be caught by outer catch
         }
@@ -3117,6 +3143,8 @@ export default function OrgManagerApp() {
         setCheckProgress({ current: Math.min(i + chunkSize, orgs.length), total: orgs.length });
         console.log(`[Batch ${i}] Progress updated.`);
       }
+      
+      if (signal.aborted || isCancelledRef.current) return;
       
       setIsCheckingDuplicates(false);
       // eslint-disable-next-line react-hooks/purity
@@ -3178,7 +3206,21 @@ export default function OrgManagerApp() {
     try {
       // Validate for circular references before calling API
       topologicalSort(organizations); 
-      performBulkSimilaritySearch(organizations, destination);
+      const getIssueCount = (id) => {
+        const group = unifiedIssueGroups.find(g => g.id === id);
+        return group ? group.items.length : 0;
+      };
+      
+      const missingParentCount = getIssueCount('missingParent');
+      const noAreaCount = getIssueCount('noArea');
+      const invalidAreaCount = getIssueCount('invalidArea');
+      
+      if (missingParentCount > 0 || noAreaCount > 0 || invalidAreaCount > 0) {
+        setPreExportChecks({}); // reset checks
+        setIsPreExportModalOpen(true);
+      } else {
+        performBulkSimilaritySearch(organizations, destination);
+      }
     } catch (err) {
       alert(err.message);
     }
@@ -3192,32 +3234,21 @@ export default function OrgManagerApp() {
   };
 
   const handleConfirmResolutions = () => {
-    // Determine which conflicts are actually visible based on the current threshold
-    const filteredConflicts = conflicts.map(c => ({
-      ...c,
-      matches: c.matches.filter(m => m.score >= similarityThreshold)
-    })).filter(c => c.matches.length > 0);
-
     const updatedOrgs = organizations.map(org => {
       const isConflict = conflicts.some(c => c.temp_id === org.id);
-      const isVisibleConflict = filteredConflicts.some(fc => fc.temp_id === org.id);
 
-      // If it's a conflict but falls below threshold, automatically CREATE
-      if (isConflict && !isVisibleConflict) {
-        return {
-          ...org,
-          action: 'CREATE',
-          existing_db_id: null
-        };
-      }
-
-      const res = userResolutions[org.id];
-      if (res) {
-        return {
-          ...org,
-          action: res.action,
-          existing_db_id: res.existing_db_id || null
-        };
+      if (isConflict) {
+        const res = userResolutions[org.id];
+        if (res) {
+          return {
+            ...org,
+            action: res.action,
+            existing_db_id: res.existing_db_id || null
+          };
+        } else {
+          // Fallback if not resolved
+          return { ...org, action: 'CREATE', existing_db_id: null };
+        }
       }
       
       return org;
@@ -4237,11 +4268,109 @@ export default function OrgManagerApp() {
         />
       )}
 
+      {/* Pre-Export Confirmation Modal */}
+      {isPreExportModalOpen && (() => {
+        const getIssueCount = (id) => {
+          const group = unifiedIssueGroups.find(g => g.id === id);
+          return group ? group.items.length : 0;
+        };
+        const missingParentCount = getIssueCount('missingParent');
+        const noAreaCount = getIssueCount('noArea');
+        const invalidAreaCount = getIssueCount('invalidArea');
+        
+        return (
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-[600px] max-w-full p-6 animate-in zoom-in-95">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center shrink-0">
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">ยืนยันข้อมูลก่อนส่งออก</h3>
+                  <p className="text-sm text-slate-500">
+                    ระบบพบว่ายังมีข้อมูลบางส่วนที่ไม่สมบูรณ์ กรุณายืนยันว่าคุณรับทราบผลลัพธ์ที่จะเกิดขึ้น
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 my-6">
+                {missingParentCount > 0 && (
+                  <label className="flex items-start gap-3 p-3 rounded-lg border border-orange-200 bg-orange-50 cursor-pointer hover:bg-orange-100 transition-colors">
+                    <input 
+                      type="checkbox" 
+                      className="mt-1 w-4 h-4 text-orange-600 rounded"
+                      checked={preExportChecks.missingParent || false}
+                      onChange={(e) => setPreExportChecks(prev => ({ ...prev, missingParent: e.target.checked }))}
+                    />
+                    <div className="flex-1 text-sm text-orange-800">
+                      <strong>มี {missingParentCount} หน่วยงานที่ไม่มีต้นสังกัด</strong>
+                      <p className="text-orange-600 mt-1 text-xs">หากส่งออก ระบบจะถือว่าหน่วยงานเหล่านี้เป็น "ต้นสังกัดสูงสุด" ของสายการบังคับบัญชาใหม่ทั้งหมด</p>
+                    </div>
+                  </label>
+                )}
+                {noAreaCount > 0 && (
+                  <label className="flex items-start gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50 cursor-pointer hover:bg-amber-100 transition-colors">
+                    <input 
+                      type="checkbox" 
+                      className="mt-1 w-4 h-4 text-amber-600 rounded"
+                      checked={preExportChecks.noArea || false}
+                      onChange={(e) => setPreExportChecks(prev => ({ ...prev, noArea: e.target.checked }))}
+                    />
+                    <div className="flex-1 text-sm text-amber-800">
+                      <strong>มี {noAreaCount} หน่วยงานที่ไม่มีพื้นที่รับผิดชอบ</strong>
+                      <p className="text-amber-600 mt-1 text-xs">หากส่งออก ข้อมูลในส่วนนี้จะถูกปล่อยว่างไว้ในฐานข้อมูล</p>
+                    </div>
+                  </label>
+                )}
+                {invalidAreaCount > 0 && (
+                  <label className="flex items-start gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50 cursor-pointer hover:bg-amber-100 transition-colors">
+                    <input 
+                      type="checkbox" 
+                      className="mt-1 w-4 h-4 text-amber-600 rounded"
+                      checked={preExportChecks.invalidArea || false}
+                      onChange={(e) => setPreExportChecks(prev => ({ ...prev, invalidArea: e.target.checked }))}
+                    />
+                    <div className="flex-1 text-sm text-amber-800">
+                      <strong>มี {invalidAreaCount} หน่วยงานที่พื้นที่ไม่พบในระบบ</strong>
+                      <p className="text-amber-600 mt-1 text-xs">หากส่งออก ระบบจะข้ามการผูกพื้นที่ในหน่วยงานเหล่านี้ไป</p>
+                    </div>
+                  </label>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  onClick={() => setIsPreExportModalOpen(false)}
+                  className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  ยกเลิก (กลับไปแก้ไข)
+                </button>
+                <button
+                  onClick={() => {
+                    setIsPreExportModalOpen(false);
+                    // eslint-disable-next-line react-hooks/refs
+                    performBulkSimilaritySearch(organizations, exportDestination);
+                  }}
+                  disabled={
+                    (missingParentCount > 0 && !preExportChecks.missingParent) ||
+                    (noAreaCount > 0 && !preExportChecks.noArea) ||
+                    (invalidAreaCount > 0 && !preExportChecks.invalidArea)
+                  }
+                  className="px-6 py-2 text-sm font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  รับทราบ และดำเนินการต่อ
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Progressive Conflict Resolution Modal */}
       {isConflictModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-[800px] max-w-full max-h-[90vh] flex flex-col animate-in zoom-in-95">
-            <div className="px-6 py-4 border-b border-slate-100 flex flex-col gap-4 bg-amber-50 rounded-t-2xl">
+          <div className="bg-white rounded-2xl shadow-xl w-[900px] max-w-full max-h-[90vh] flex flex-col animate-in zoom-in-95">
+            <div className="px-6 py-4 border-b border-slate-100 flex flex-col gap-4 bg-amber-50 rounded-t-2xl shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center">
@@ -4261,7 +4390,10 @@ export default function OrgManagerApp() {
                 {isCheckingDuplicates && (
                   <button
                     onClick={() => {
-                      cancelSearchRef.current = true;
+                      isCancelledRef.current = true;
+                      if (abortControllerRef.current) {
+                        abortControllerRef.current.abort();
+                      }
                       setIsCheckingDuplicates(false);
                       setIsConflictModalOpen(false);
                     }}
@@ -4287,109 +4419,169 @@ export default function OrgManagerApp() {
                 </div>
               )}
 
-              <div className="flex items-center gap-4 bg-white p-3 rounded-lg border border-amber-100 shadow-sm">
-                <div className="flex-1">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm font-semibold text-slate-700">เกณฑ์ความคล้ายขั้นต่ำที่จะแสดง (Threshold)</span>
-                    <span className="text-sm font-bold text-blue-600">{Math.round(similarityThreshold * 100)}%</span>
+              {(() => {
+                const highConflicts = conflicts.filter(c => c.matches.some(m => m.score >= 0.9));
+                const mediumConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.9) && c.matches.some(m => m.score >= 0.7));
+                const lowConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.7));
+                
+                const getResolvedCount = (list) => list.filter(c => userResolutions[c.temp_id]).length;
+
+                return (
+                  <div className="flex bg-white rounded-lg p-1 border border-amber-200 shadow-sm">
+                    <button 
+                      onClick={() => setActiveConflictTab('high')}
+                      className={`flex-1 py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'high' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+                    >
+                      🔴 คล้ายมาก ({getResolvedCount(highConflicts)}/{highConflicts.length})
+                    </button>
+                    <button 
+                      onClick={() => setActiveConflictTab('medium')}
+                      className={`flex-1 py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'medium' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+                    >
+                      🟡 ปานกลาง ({getResolvedCount(mediumConflicts)}/{mediumConflicts.length})
+                    </button>
+                    <button 
+                      onClick={() => setActiveConflictTab('low')}
+                      className={`flex-1 py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'low' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+                    >
+                      🟢 คล้ายน้อย ({getResolvedCount(lowConflicts)}/{lowConflicts.length})
+                    </button>
                   </div>
-                  <input 
-                    type="range" 
-                    min="0.4" max="1.0" step="0.05" 
-                    value={similarityThreshold}
-                    onChange={(e) => setSimilarityThreshold(parseFloat(e.target.value))}
-                    className="w-full accent-blue-600"
-                  />
-                </div>
-                <div className="w-1/3 text-xs text-slate-500 leading-tight">
-                  * หากความคล้ายต่ำกว่าเกณฑ์ ระบบจะ <strong className="text-amber-600">ซ่อน</strong> และถือว่าให้ <strong>สร้างใหม่</strong> อัตโนมัติ
-                </div>
-              </div>
+                );
+              })()}
             </div>
             
             <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
-              <div className="flex flex-col gap-4">
-                {(() => {
-                  const filteredConflicts = conflicts.map(c => ({
-                    ...c,
-                    matches: c.matches.filter(m => m.score >= similarityThreshold)
-                  })).filter(c => c.matches.length > 0);
+              {(() => {
+                const highConflicts = conflicts.filter(c => c.matches.some(m => m.score >= 0.9));
+                const mediumConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.9) && c.matches.some(m => m.score >= 0.7));
+                const lowConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.7));
+                
+                const activeConflicts = activeConflictTab === 'high' ? highConflicts 
+                                      : activeConflictTab === 'medium' ? mediumConflicts 
+                                      : lowConflicts;
 
-                  if (filteredConflicts.length === 0 && !isCheckingDuplicates) {
-                    return (
-                      <div className="text-center py-10">
-                        <div className="text-slate-400 mb-2 text-4xl">🎉</div>
-                        <h4 className="text-lg font-bold text-slate-700">ไม่พบข้อมูลที่คล้ายกัน (ตามเกณฑ์ที่ตั้งไว้)</h4>
-                        <p className="text-sm text-slate-500">คุณสามารถกดยืนยันเพื่อดำเนินการต่อได้เลย</p>
+                if (activeConflicts.length === 0) {
+                  return (
+                    <div className="text-center py-10 flex flex-col items-center justify-center h-full">
+                      <div className="text-slate-300 mb-4"><Check size={48} /></div>
+                      <h4 className="text-lg font-bold text-slate-500">ไม่มีข้อมูลในหมวดหมู่นี้</h4>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm sticky top-0 z-10">
+                      <span className="text-sm font-bold text-slate-600">จัดการข้อมูลทั้งหมดในหน้านี้ (Bulk Actions)</span>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => {
+                            const newRes = { ...userResolutions };
+                            activeConflicts.forEach(c => {
+                              // Pick highest score match for LINK
+                              const bestMatch = c.matches.reduce((max, obj) => obj.score > max.score ? obj : max, c.matches[0]);
+                              newRes[c.temp_id] = { action: 'LINK', existing_db_id: bestMatch.db_id };
+                            });
+                            setUserResolutions(newRes);
+                          }}
+                          className="px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                        >
+                          🔗 ผูกกับเดิมทั้งหมด
+                        </button>
+                        <button 
+                          onClick={() => {
+                            const newRes = { ...userResolutions };
+                            activeConflicts.forEach(c => {
+                              newRes[c.temp_id] = { action: 'CREATE', existing_db_id: null };
+                            });
+                            setUserResolutions(newRes);
+                          }}
+                          className="px-3 py-1.5 text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+                        >
+                          ✨ สร้างใหม่ทั้งหมด
+                        </button>
+                        <button 
+                          onClick={() => {
+                            const newRes = { ...userResolutions };
+                            activeConflicts.forEach(c => {
+                              delete newRes[c.temp_id];
+                            });
+                            setUserResolutions(newRes);
+                          }}
+                          className="px-3 py-1.5 text-xs font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded-lg hover:bg-slate-200 transition-colors"
+                        >
+                          ล้างค่า
+                        </button>
                       </div>
-                    );
-                  }
+                    </div>
 
-                  return filteredConflicts.map((conflict) => (
-                    <div key={conflict.temp_id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-                        <div className="flex-1">
-                          <div className="text-xs font-semibold text-slate-400 mb-1">หน่วยงานที่กำลังสร้าง (ใหม่)</div>
-                          <div className="font-bold text-slate-800 text-base">{conflict.org_name}</div>
-                        </div>
-                        
-                        <div className="flex-1 w-full bg-slate-50 rounded-lg p-3 border border-slate-100">
-                          <div className="text-xs font-semibold text-slate-400 mb-2">หน่วยงานที่คล้ายกันในระบบ (พบ {conflict.matches.length} รายการ)</div>
-                          <div className="flex flex-col gap-2">
-                            {conflict.matches.map(match => (
-                              <label key={match.db_id} className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${userResolutions[conflict.temp_id]?.existing_db_id === match.db_id ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:border-blue-300'}`}>
+                    {activeConflicts.map((conflict) => (
+                      <div key={conflict.temp_id} className={`bg-white border ${userResolutions[conflict.temp_id] ? 'border-green-300 ring-1 ring-green-100' : 'border-slate-200'} rounded-xl p-4 shadow-sm transition-all`}>
+                        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                          <div className="flex-1">
+                            <div className="text-xs font-semibold text-slate-400 mb-1">หน่วยงานที่กำลังสร้าง (ใหม่)</div>
+                            <div className="font-bold text-slate-800 text-base">{conflict.org_name}</div>
+                          </div>
+                          
+                          <div className="flex-1 w-full bg-slate-50 rounded-lg p-3 border border-slate-100">
+                            <div className="text-xs font-semibold text-slate-400 mb-2">หน่วยงานที่คล้ายกันในระบบ (พบ {conflict.matches.length} รายการ)</div>
+                            <div className="flex flex-col gap-2">
+                              {conflict.matches.map(match => (
+                                <label key={match.db_id} className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${userResolutions[conflict.temp_id]?.existing_db_id === match.db_id ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:border-blue-300'}`}>
+                                  <input 
+                                    type="radio" 
+                                    name={`conflict_${conflict.temp_id}`} 
+                                    checked={userResolutions[conflict.temp_id]?.existing_db_id === match.db_id}
+                                    onChange={() => handleResolveConflict(conflict.temp_id, { action: "LINK", existing_db_id: match.db_id })}
+                                    className="text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <div className="flex-1">
+                                    <div className="text-sm font-bold text-slate-700">{match.db_name}</div>
+                                    <div className="text-xs text-slate-500">ความเหมือน: {Math.round(match.score * 100)}% | ID: {match.db_id}</div>
+                                  </div>
+                                </label>
+                              ))}
+                              <label className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${userResolutions[conflict.temp_id]?.action === "CREATE" ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200 hover:border-amber-300'}`}>
                                 <input 
                                   type="radio" 
                                   name={`conflict_${conflict.temp_id}`} 
-                                  checked={userResolutions[conflict.temp_id]?.existing_db_id === match.db_id}
-                                  onChange={() => handleResolveConflict(conflict.temp_id, { action: "LINK", existing_db_id: match.db_id })}
-                                  className="text-blue-600 focus:ring-blue-500"
+                                  checked={userResolutions[conflict.temp_id]?.action === "CREATE"}
+                                  onChange={() => handleResolveConflict(conflict.temp_id, { action: "CREATE", existing_db_id: null })}
+                                  className="text-amber-600 focus:ring-amber-500"
                                 />
-                                <div className="flex-1">
-                                  <div className="text-sm font-bold text-slate-700">{match.db_name}</div>
-                                  <div className="text-xs text-slate-500">ความเหมือน: {Math.round(match.score * 100)}% | ID: {match.db_id}</div>
-                                </div>
+                                <div className="text-sm font-bold text-amber-700">ยืนยันสร้างใหม่ (มองข้ามรายการข้างต้น)</div>
                               </label>
-                            ))}
-                            <label className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${userResolutions[conflict.temp_id]?.action === "CREATE" ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200 hover:border-amber-300'}`}>
-                              <input 
-                                type="radio" 
-                                name={`conflict_${conflict.temp_id}`} 
-                                checked={userResolutions[conflict.temp_id]?.action === "CREATE"}
-                                onChange={() => handleResolveConflict(conflict.temp_id, { action: "CREATE", existing_db_id: null })}
-                                className="text-amber-600 focus:ring-amber-500"
-                              />
-                              <div className="text-sm font-bold text-amber-700">ยืนยันสร้างใหม่ (มองข้ามรายการข้างต้น)</div>
-                            </label>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ));
-                })()}
-                
-                {isCheckingDuplicates && conflicts.length > 0 && (
-                  <div className="text-center text-sm text-slate-400 py-4 animate-pulse">
-                    กำลังทะยอยค้นหาเพิ่มเติม...
+                    ))}
                   </div>
-                )}
-              </div>
+                );
+              })()}
+              
+              {isCheckingDuplicates && conflicts.length > 0 && (
+                <div className="text-center text-sm text-slate-400 py-4 animate-pulse">
+                  กำลังทะยอยค้นหาเพิ่มเติม...
+                </div>
+              )}
             </div>
             
-            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-white rounded-b-2xl">
-              <div className="text-sm text-slate-500">
-                {(() => {
-                  const filteredConflicts = conflicts.map(c => ({
-                    ...c,
-                    matches: c.matches.filter(m => m.score >= similarityThreshold)
-                  })).filter(c => c.matches.length > 0);
-                  
-                  return `ประมวลผลแล้ว ${Object.keys(userResolutions).filter(k => filteredConflicts.some(fc => fc.temp_id === k)).length} / ${filteredConflicts.length} รายการ`;
-                })()}
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-white rounded-b-2xl shrink-0">
+              <div className="text-sm text-slate-500 font-medium">
+                {`จัดการแล้ว ${Object.keys(userResolutions).length} / ${conflicts.length} รายการ`}
               </div>
               <div className="flex gap-3">
                 <button 
-                  onClick={() => setIsConflictModalOpen(false)}
+                  onClick={() => {
+                    isCancelledRef.current = true;
+                    if (abortControllerRef.current) {
+                      abortControllerRef.current.abort();
+                    }
+                    setIsCheckingDuplicates(false);
+                    setIsConflictModalOpen(false);
+                  }}
                   className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                 >
                   ยกเลิก
@@ -4398,13 +4590,7 @@ export default function OrgManagerApp() {
                   onClick={handleConfirmResolutions}
                   disabled={
                     isCheckingDuplicates || isExporting || 
-                    (() => {
-                      const filteredConflicts = conflicts.map(c => ({
-                        ...c,
-                        matches: c.matches.filter(m => m.score >= similarityThreshold)
-                      })).filter(c => c.matches.length > 0);
-                      return Object.keys(userResolutions).filter(k => filteredConflicts.some(fc => fc.temp_id === k)).length !== filteredConflicts.length;
-                    })()
+                    Object.keys(userResolutions).length !== conflicts.length
                   }
                   className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
