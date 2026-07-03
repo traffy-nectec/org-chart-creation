@@ -16,6 +16,11 @@
 4. **Import/Export Pipeline:**
    - ส่งออกและนำเข้าข้อมูลได้ในรูปแบบ `.json` และ `.xlsx` สำหรับนำไปใช้งานต่อ.
    - **Google Sheets Link Import:** รองรับการนำเข้าข้อมูลโดยตรงจากลิงก์ Google Sheets ที่ตั้งค่าสิทธิ์เป็นสาธารณะ (Anyone with the link can view) โดยระบบจะสกัดข้อมูลมาประมวลผลให้อัตโนมัติ.
+5. **Massive-Scale Export Pipeline (Topological Sort):**
+   - การส่งออกไฟล์ JSON สำหรับ Backend มีการรัน **Kahn's Algorithm (Topological Sort)** ก่อนเสมอ เพื่อดักจับปัญหาผังวงกลม (Circular Reference) และการันตีว่าหน่วยงาน "ต้นสังกัด" จะถูกจัดเรียงให้อยู่ก่อนหน้า "ลูกน้อง" เสมอ ป้องกันข้อผิดพลาดในการ Insert ข้อมูลลง Database
+6. **Bulk Similarity Search & Conflict Resolution UI:**
+   - มีระบบจำลองการยิง API ตรวจสอบรายชื่อซ้ำซ้อนกับฐานข้อมูล (ผ่านระบบ Chunking ทีละ 1,000 รายการ) พร้อม Progress Bar ป้องกันหน้าจอค้าง
+   - หน้าจอ **Conflict Resolution Modal** ให้ผู้ใช้ตัดสินใจชี้ชะตา (LINK หรือ CREATE) สำหรับหน่วยงานที่ชื่อคล้ายกัน ก่อนที่จะรวมผลลัพธ์ลงใน JSON Payload ขั้นสุดท้าย
 
 ### 🎨 การปรับปรุง UI/UX ล่าสุด (Latest UI/UX Improvements)
 - **Left Sidebar Notification Panel:** ย้ายการแจ้งเตือนปัญหา (Issues/Alerts) จากกล่องลอยตัว (Floating Panel) ไปเป็น Sidebar ด้านซ้ายที่สามารถเปิด/ปิดได้ เพื่อเพิ่มพื้นที่ในการแสดงผลบน Canvas และดูรายการทั้งหมดได้สะดวก
@@ -64,31 +69,27 @@
 
 ```mermaid
 flowchart TD
-  A["User อัปโหลดไฟล์ Excel"] --> B["Frontend Clean ข้อมูลเบื้องต้น"]
-  B --> C["Frontend วาดผัง ReactFlow"]
-  C --> D["User แก้ไขความผิดพลาดของพื้นที่ & ต้นสังกัด"]
-  D --> E{"Frontend ค้นหาหน่วยงานในฐานข้อมูลจริง"}
+  A["User สร้าง/แก้ไขผังใน UI"] --> B["กดปุ่ม 'ส่งออกให้ Backend'"]
+  B --> C{"Topological Sort (Check Circular Ref)"}
   
-  E -->|"เจอชื่อคล้าย 70-99%"| G["ขึ้น UI แจ้งเตือน: มีแล้วในระบบ"]
-  E -->|"เจอชื่อตรง 100%"| F["ผูก ID เดิมอัตโนมัติ"]
-  E -->|"ไม่เจอเลย"| H["ตั้งค่าเป็น CREATE"]
+  C -->|"พบข้อผิดพลาด"| D["ล็อกการส่งออก แจ้งเตือนผู้ใช้"]
+  C -->|"ผ่าน (เรียงลำดับ พ่อ->ลูก เสร็จสิ้น)"| E["แบ่งข้อมูล (Chunking) ยิง API เช็คชื่อซ้ำ"]
   
-  G -->|"User ยืนยันใช้ชื่อเดิม"| F
-  G -->|"User ยืนยันสร้างใหม่"| H
+  E --> F["แสดง Progress Bar Modal (กำลังตรวจสอบ...)"]
+  F --> G{"พบรายชื่อซ้ำซ้อนไหม?"}
   
-  F --> I{"ระบบตรวจสอบ Pre-export Validation"}
-  H --> I
+  G -->|"เจอชื่อคล้าย (Score > threshold)"| H["ขึ้น UI แจ้งเตือน (Conflict Resolution Modal)"]
+  G -->|"ไม่เจอเลย"| I["ตั้งค่า Action เป็น CREATE ให้ทั้งหมด"]
   
-  I -->|"ติด Error"| J["ล็อกปุ่ม! บังคับผู้ใช้กลับไปแก้"]
-  I -->|"ติด Warning"| K["ขึ้น Prompt ถามย้ำให้กดยืนยัน"]
-  K -->|"ผู้ใช้ยืนยันข้าม"| L["รวมข้อมูล & สั่ง Export JSON"]
-  I -->|"ผ่านหมด (Clean)"| L
+  H -->|"User เลือกผูกกับของเดิม"| J["กำหนด action = LINK, ใส่ existing_db_id"]
+  H -->|"User ยืนยันสร้างใหม่"| K["กำหนด action = CREATE"]
   
-  L --> M["ส่ง Payload ไปที่ Backend"]
-  M --> N["Backend วนลูปอ่านข้อมูลทีละชั้น"]
+  J --> L["สร้าง Final JSON Payload"]
+  K --> L
+  I --> L
   
-  N -->|"Action: CREATE"| O["Insert หน่วยงานใหม่ลง DB"]
-  N -->|"Action: LINK"| P["Insert เฉพาะเส้นความสัมพันธ์ลง DB"]
+  L --> M["ดาวน์โหลด backend_payload.json"]
+  M --> N["ส่งไฟล์ไปประมวลผลต่อที่ Backend (Go/Python)"]
 ```
 
 ### 2. Sequence Diagram (การคุยกันระหว่างระบบและฐานข้อมูล)

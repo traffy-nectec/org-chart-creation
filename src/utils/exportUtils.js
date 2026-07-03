@@ -30,3 +30,103 @@ export const getOrgPath = (orgId, organizations) => {
 
   return path.join('.');
 };
+
+/**
+ * Topologically sorts an array of organizations so that parents always appear before their children.
+ * Uses Kahn's algorithm. Throws an error if a cycle is detected.
+ * 
+ * @param {Array} organizations 
+ * @returns {Array} Sorted array of organizations
+ */
+export const topologicalSort = (organizations) => {
+  const adjList = new Map();
+  const inDegree = new Map();
+  const orgMap = new Map();
+
+  // Initialize data structures
+  organizations.forEach(org => {
+    adjList.set(org.id, []);
+    inDegree.set(org.id, 0);
+    orgMap.set(org.id, org);
+  });
+
+  // Build graph
+  organizations.forEach(org => {
+    if (org.parentId) {
+      if (adjList.has(org.parentId)) {
+        adjList.get(org.parentId).push(org.id);
+        inDegree.set(org.id, inDegree.get(org.id) + 1);
+      } else {
+        // Parent doesn't exist in the list, treat this node as a root (inDegree 0)
+        console.warn(`Parent ID ${org.parentId} not found for org ${org.id}. Treating as root.`);
+      }
+    }
+  });
+
+  const queue = [];
+  inDegree.forEach((degree, id) => {
+    if (degree === 0) queue.push(id);
+  });
+
+  const sortedIds = [];
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+    sortedIds.push(currentId);
+
+    adjList.get(currentId).forEach(childId => {
+      inDegree.set(childId, inDegree.get(childId) - 1);
+      if (inDegree.get(childId) === 0) {
+        queue.push(childId);
+      }
+    });
+  }
+
+  if (sortedIds.length !== organizations.length) {
+    throw new Error('พบการโยงสายแบบวงกลม (Circular Reference) ในผังองค์กร กรุณาแก้ไขก่อนทำการ Export');
+  }
+
+  return sortedIds.map(id => orgMap.get(id));
+};
+
+/**
+ * Generates the standardized JSON payload for the Backend import pipeline.
+ * 
+ * @param {Array} organizations 
+ * @returns {Object} JSON Payload
+ */
+export const generateBackendPayload = (organizations) => {
+  const sortedOrgs = topologicalSort(organizations);
+  
+  const nodes = sortedOrgs.map(org => {
+    // Determine action. Default is CREATE, but can be set to LINK if user resolved conflicts
+    return {
+      temp_id: org.id,
+      action: org.action || "CREATE", 
+      existing_db_id: org.existing_db_id || null,
+      name: org.name,
+      parent_temp_id: org.parentId || null,
+      details: {
+        address: org.attributes?.address || "",
+        tel: org.attributes?.tel || "",
+        province: org.attributes?.province || ""
+        // Note: latitude, longitude, type_fondue_group are expected to be handled/defaulted by Backend
+      },
+      locations: org.locations?.map(loc => ({
+        province: loc.province || "",
+        district: loc.amphoe || "",
+        subdistrict: loc.tambon || "",
+        zipcode: loc.zipcode || "",
+        code: loc.code || "" // DOPA 6-digit code
+      })) || []
+    };
+  });
+
+  return {
+    metadata: {
+      version: "1.0",
+      exported_at: new Date().toISOString(),
+      total_nodes: nodes.length
+    },
+    nodes
+  };
+};

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { ThailandAddressTypeahead, useAddressTypeaheadContext } from "react-thailand-address-typeahead";
 import * as XLSX from 'xlsx';
-import { getOrgPath } from './utils/exportUtils';
+import { getOrgPath, generateBackendPayload, topologicalSort } from './utils/exportUtils';
 import { extractGoogleSheetIds, fetchGoogleSheetAsCSV } from './utils/googleSheetUtils';
 import toast, { Toaster } from 'react-hot-toast';
 import ReactFlowOrgChart from './ReactFlowOrgChart';
@@ -2501,6 +2501,13 @@ export default function OrgManagerApp() {
   const [collapsedTableNodes, setCollapsedTableNodes] = useState(new Set());
   const [isDraftSaving, setIsDraftSaving] = useState(false);
 
+  // States for Bulk Similarity Check UI
+  const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
+  const [checkProgress, setCheckProgress] = useState({ current: 0, total: 0 });
+  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
+  const [conflicts, setConflicts] = useState([]);
+  const [userResolutions, setUserResolutions] = useState({});
+
   const handleSaveDraft = async () => {
     setIsDraftSaving(true);
     try {
@@ -3006,6 +3013,101 @@ export default function OrgManagerApp() {
     }
   };
 
+  const mockBulkSimilaritySearch = async (orgs) => {
+    setIsCheckingDuplicates(true);
+    setCheckProgress({ current: 0, total: orgs.length });
+    
+    const mockConflicts = [];
+    const chunkSize = 1000;
+    
+    // Simulate chunk processing
+    for (let i = 0; i < orgs.length; i += chunkSize) {
+      const chunk = orgs.slice(i, i + chunkSize);
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Randomly inject some mock conflicts for demonstration
+      chunk.forEach((org, idx) => {
+        // Just inject a few to demonstrate UI
+        if (Math.random() > 0.95 && mockConflicts.length < 3) {
+          mockConflicts.push({
+            temp_id: org.id,
+            org_name: org.name,
+            matches: [
+              { db_id: 1000 + idx, db_name: `${org.name} (ในระบบ)`, score: 0.85 },
+              { db_id: 2000 + idx, db_name: `${org.name}เก่า`, score: 0.72 }
+            ]
+          });
+        }
+      });
+      
+      setCheckProgress({ current: Math.min(i + chunkSize, orgs.length), total: orgs.length });
+    }
+    
+    setIsCheckingDuplicates(false);
+    
+    if (mockConflicts.length > 0) {
+      setConflicts(mockConflicts);
+      setUserResolutions({});
+      setIsConflictModalOpen(true);
+    } else {
+      executeFinalExport(orgs);
+    }
+  };
+
+  const executeFinalExport = (currentOrgs = organizations) => {
+    try {
+      const payload = generateBackendPayload(currentOrgs);
+      
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `backend_payload_${new Date().getTime()}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handlePrepareExport = () => {
+    try {
+      // Validate for circular references before calling API
+      topologicalSort(organizations); 
+      mockBulkSimilaritySearch(organizations);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleResolveConflict = (temp_id, resolution) => {
+    setUserResolutions(prev => ({
+      ...prev,
+      [temp_id]: resolution
+    }));
+  };
+
+  const handleConfirmResolutions = () => {
+    const updatedOrgs = organizations.map(org => {
+      const res = userResolutions[org.id];
+      if (res) {
+        return {
+          ...org,
+          action: res.action,
+          existing_db_id: res.existing_db_id || null
+        };
+      }
+      return org;
+    });
+
+    setIsConflictModalOpen(false);
+    executeFinalExport(updatedOrgs);
+  };
+
   const handleExportCSV = () => {
     const headers = ['org_name', 'parent_name', 'level', 'coverage_scope', 'province', 'amphoe', 'tambon', 'postal_code', 'area_code', 'path'];
     const rows = [];
@@ -3496,6 +3598,12 @@ export default function OrgManagerApp() {
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors border-b border-slate-100 text-left"
                 >
                   <Download size={14} className="text-amber-600" /> ส่งออกเป็น CSV
+                </button>
+                <button
+                  onClick={() => { handlePrepareExport(); setIsDataMenuOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors border-b border-slate-100 text-left"
+                >
+                  <Download size={14} className="text-indigo-600" /> ส่งออกให้ Backend (JSON)
                 </button>
                 <button
                   onClick={() => { handleCleanAllData(); setIsDataMenuOpen(false); }}
@@ -3993,6 +4101,116 @@ export default function OrgManagerApp() {
           locationDb={locationDb}
           handleUpdateBulkLocations={handleUpdateBulkLocations}
         />
+      )}
+
+      {/* Progress Modal */}
+      {isCheckingDuplicates && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-xl w-[400px] p-6 text-center animate-in zoom-in-95">
+            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+            <h3 className="text-lg font-bold text-slate-800 mb-2">กำลังตรวจสอบรายชื่อซ้ำซ้อน</h3>
+            <p className="text-sm text-slate-500 mb-6">ระบบกำลังตรวจสอบความถูกต้องกับฐานข้อมูลหลัก...</p>
+            
+            <div className="w-full bg-slate-100 rounded-full h-3 mb-2 overflow-hidden">
+              <div 
+                className="bg-blue-500 h-3 rounded-full transition-all duration-300" 
+                style={{ width: `${checkProgress.total ? (checkProgress.current / checkProgress.total) * 100 : 0}%` }}
+              ></div>
+            </div>
+            <div className="text-xs font-semibold text-slate-500">
+              {checkProgress.current} / {checkProgress.total} หน่วยงาน
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Conflict Resolution Modal */}
+      {isConflictModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-[800px] max-w-full max-h-[90vh] flex flex-col animate-in zoom-in-95">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-amber-50 rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center">
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-amber-800">พบชื่อหน่วยงานคล้ายคลึงกับในระบบ</h3>
+                  <p className="text-sm text-amber-600">กรุณาเลือกว่าจะผูกกับของเดิม (LINK) หรือสร้างใหม่ (CREATE)</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+              <div className="flex flex-col gap-4">
+                {conflicts.map((conflict) => (
+                  <div key={conflict.temp_id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                    <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                      <div className="flex-1">
+                        <div className="text-xs font-semibold text-slate-400 mb-1">หน่วยงานที่กำลังสร้าง (ใหม่)</div>
+                        <div className="font-bold text-slate-800 text-base">{conflict.org_name}</div>
+                      </div>
+                      
+                      <div className="flex-1 w-full bg-slate-50 rounded-lg p-3 border border-slate-100">
+                        <div className="text-xs font-semibold text-slate-400 mb-2">หน่วยงานที่คล้ายกันในระบบ (พบ {conflict.matches.length} รายการ)</div>
+                        <div className="flex flex-col gap-2">
+                          {conflict.matches.map(match => (
+                            <label key={match.db_id} className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${userResolutions[conflict.temp_id]?.existing_db_id === match.db_id ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:border-blue-300'}`}>
+                              <input 
+                                type="radio" 
+                                name={`conflict_${conflict.temp_id}`} 
+                                checked={userResolutions[conflict.temp_id]?.existing_db_id === match.db_id}
+                                onChange={() => handleResolveConflict(conflict.temp_id, { action: "LINK", existing_db_id: match.db_id })}
+                                className="text-blue-600 focus:ring-blue-500"
+                              />
+                              <div className="flex-1">
+                                <div className="text-sm font-bold text-slate-700">{match.db_name}</div>
+                                <div className="text-xs text-slate-500">ความเหมือน: {Math.round(match.score * 100)}% | ID: {match.db_id}</div>
+                              </div>
+                            </label>
+                          ))}
+                          <label className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${userResolutions[conflict.temp_id]?.action === "CREATE" ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200 hover:border-amber-300'}`}>
+                            <input 
+                              type="radio" 
+                              name={`conflict_${conflict.temp_id}`} 
+                              checked={userResolutions[conflict.temp_id]?.action === "CREATE"}
+                              onChange={() => handleResolveConflict(conflict.temp_id, { action: "CREATE", existing_db_id: null })}
+                              className="text-amber-600 focus:ring-amber-500"
+                            />
+                            <div className="text-sm font-bold text-amber-700">ยืนยันสร้างใหม่ (มองข้ามรายการข้างต้น)</div>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-white rounded-b-2xl">
+              <div className="text-sm text-slate-500">
+                ประมวลผลแล้ว {Object.keys(userResolutions).length} / {conflicts.length} รายการ
+              </div>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setIsConflictModalOpen(false)}
+                  className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  ยกเลิก
+                </button>
+                <button 
+                  onClick={handleConfirmResolutions}
+                  disabled={Object.keys(userResolutions).length !== conflicts.length}
+                  className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <Check size={16} />
+                  ยืนยันและส่งออกข้อมูล
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {showWelcomeModal && (
