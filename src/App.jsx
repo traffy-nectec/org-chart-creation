@@ -2499,7 +2499,6 @@ export default function OrgManagerApp() {
   const [moveMode, setMoveMode] = useState('branch'); // 'branch' or 'single'
   const [isDataMenuOpen, setIsDataMenuOpen] = useState(false);
   const [collapsedTableNodes, setCollapsedTableNodes] = useState(new Set());
-  const [isDraftSaving, setIsDraftSaving] = useState(false);
 
   // States for Bulk Similarity Check UI
   const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
@@ -2509,13 +2508,13 @@ export default function OrgManagerApp() {
   const [userResolutions, setUserResolutions] = useState({});
 
   const handleSaveDraft = async () => {
-    setIsDraftSaving(true);
     try {
       await idbSet('org_builder_draft', organizations);
+      toast.success('บันทึกแบบร่างสำเร็จ');
     } catch (e) {
       console.warn("Could not save draft to IndexedDB:", e);
+      toast.error('ไม่สามารถบันทึกแบบร่างได้');
     }
-    setTimeout(() => setIsDraftSaving(false), 1500);
   };
 
   // Auto-save draft on organization changes
@@ -3600,10 +3599,10 @@ export default function OrgManagerApp() {
                   <Download size={14} className="text-amber-600" /> ส่งออกเป็น CSV
                 </button>
                 <button
-                  onClick={() => { handlePrepareExport(); setIsDataMenuOpen(false); }}
+                  onClick={() => { handleSaveDraft(); setIsDataMenuOpen(false); }}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors border-b border-slate-100 text-left"
                 >
-                  <Download size={14} className="text-indigo-600" /> ส่งออกให้ Backend (JSON)
+                  <CheckCircle size={14} className="text-blue-600" /> บันทึกแบบร่าง (Save Draft)
                 </button>
                 <button
                   onClick={() => { handleCleanAllData(); setIsDataMenuOpen(false); }}
@@ -3627,17 +3626,18 @@ export default function OrgManagerApp() {
           <div className="w-px h-8 bg-slate-200 mx-1 self-center"></div>
 
           <button
-            onClick={handleSaveDraft}
-            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold shadow-lg transition-all duration-300 cursor-pointer ${isDraftSaving
-                ? 'bg-green-600 hover:bg-green-700 text-white shadow-green-200'
-                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200'
+            onClick={handlePrepareExport}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold shadow-lg transition-all duration-300 cursor-pointer ${isCheckingDuplicates
+                ? 'bg-indigo-400 text-white cursor-wait'
+                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'
               }`}
-            aria-label="บันทึกแบบร่าง"
+            aria-label="ส่งออกข้อมูลให้ Backend"
+            disabled={isCheckingDuplicates}
           >
-            {isDraftSaving ? (
-              <><Check size={16} strokeWidth={3} /> Draft Saved!</>
+            {isCheckingDuplicates ? (
+              <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Checking...</>
             ) : (
-              <><CheckCircle size={16} /> Save Draft</>
+              <><Download size={16} /> ส่งออกให้ Backend (JSON)</>
             )}
           </button>
         </div>
