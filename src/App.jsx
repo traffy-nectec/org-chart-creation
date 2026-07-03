@@ -254,7 +254,24 @@ const getLevel = (nodeName, parentMap) => {
 };
 
 const DraftRestoreModal = ({ isOpen, draftCount, onResume, onStartFresh }) => {
+  const [loading, setLoading] = useState(null);
+
   if (!isOpen) return null;
+
+  const handleStartFresh = () => {
+    setLoading('fresh');
+    setTimeout(() => {
+      onStartFresh();
+    }, 50);
+  };
+
+  const handleResume = () => {
+    setLoading('resume');
+    setTimeout(() => {
+      onResume();
+    }, 50);
+  };
+
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 text-center animate-in zoom-in-95">
@@ -268,16 +285,18 @@ const DraftRestoreModal = ({ isOpen, draftCount, onResume, onStartFresh }) => {
         </p>
         <div className="flex gap-3 justify-center">
           <button
-            onClick={onStartFresh}
-            className="px-6 py-2.5 rounded-xl text-red-600 font-bold border border-red-200 bg-red-50 hover:bg-red-100 transition-colors"
+            onClick={handleStartFresh}
+            disabled={loading !== null}
+            className="px-6 py-2.5 rounded-xl text-red-600 font-bold border border-red-200 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center gap-2"
           >
-            ลบทิ้ง เริ่มใหม่ทั้งหมด
+            {loading === 'fresh' ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div> กำลังลบ...</> : "ลบทิ้ง เริ่มใหม่ทั้งหมด"}
           </button>
           <button
-            onClick={onResume}
-            className="px-6 py-2.5 rounded-xl text-white font-bold bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200 transition-colors"
+            onClick={handleResume}
+            disabled={loading !== null}
+            className="px-6 py-2.5 rounded-xl text-white font-bold bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200 transition-colors disabled:opacity-50 flex items-center gap-2"
           >
-            ทำต่อจากข้อมูลเดิม
+            {loading === 'resume' ? <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> กำลังเตรียมข้อมูล...</> : "ทำต่อจากข้อมูลเดิม"}
           </button>
         </div>
       </div>
@@ -2501,6 +2520,7 @@ export default function OrgManagerApp() {
   const [collapsedTableNodes, setCollapsedTableNodes] = useState(new Set());
 
   // States for Bulk Similarity Check UI
+  const cancelSearchRef = useRef(false);
   const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportDestination, setExportDestination] = useState('json'); // 'json' or 'api'
@@ -2508,6 +2528,8 @@ export default function OrgManagerApp() {
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
   const [conflicts, setConflicts] = useState([]);
   const [userResolutions, setUserResolutions] = useState({});
+  const [similarityThreshold, setSimilarityThreshold] = useState(0.4);
+  const [searchDuration, setSearchDuration] = useState(0);
 
   const handleSaveDraft = async () => {
     try {
@@ -3025,66 +3047,88 @@ export default function OrgManagerApp() {
       return;
     }
 
+    cancelSearchRef.current = false;
     setIsCheckingDuplicates(true);
+    setIsConflictModalOpen(true);
+    setConflicts([]);
+    setUserResolutions({});
     setCheckProgress({ current: 0, total: orgs.length });
     
     const realConflicts = [];
-    const chunkSize = 100; // ลดขนาดลงเพื่อให้ UI ขยับเร็วขึ้น
+    const chunkSize = 200; // ลดขนาด Chunk ลงมาเพื่อป้องกัน Database ค้าง (Memory Spill) จากข้อมูลคำซ้ำเยอะๆ (เช่น คำว่า "โรงเรียน")
+    // eslint-disable-next-line react-hooks/purity
+    const startTime = Date.now();
     
     try {
       for (let i = 0; i < orgs.length; i += chunkSize) {
-        const chunk = orgs.slice(i, i + chunkSize);
-        
-        const namesPayload = { names: chunk.map(o => o.name) };
-        
-        const response = await fetch('http://localhost:8080/api/similarity', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(namesPayload)
-        });
-        
-        if (!response.ok) {
-           throw new Error(`API Error (${response.status})`);
+        if (cancelSearchRef.current) {
+          setIsCheckingDuplicates(false);
+          setIsConflictModalOpen(false);
+          return;
         }
         
-        const results = await response.json() || [];
+        const chunk = orgs.slice(i, i + chunkSize);
+        const namesPayload = { names: chunk.map(o => o.name) };
+        console.log(`[Batch ${i}] Sending payload with ${namesPayload.names.length} names...`, namesPayload.names.slice(0, 5));
         
-        const resultsByName = {};
-        results.forEach(res => {
-          if (!resultsByName[res.name]) {
-             resultsByName[res.name] = [];
-          }
-          resultsByName[res.name].push({
-            db_id: res.db_id,
-            db_name: res.match,
-            score: res.score
+        try {
+          const response = await fetch('/api/similarity', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(namesPayload)
           });
-        });
-        
-        chunk.forEach(org => {
-           if (resultsByName[org.name] && resultsByName[org.name].length > 0) {
-             realConflicts.push({
-               temp_id: org.id,
-               org_name: org.name,
-               matches: resultsByName[org.name]
-             });
-           }
-        });
+          
+          console.log(`[Batch ${i}] Received response. Status: ${response.status}`);
+          
+          if (!response.ok) {
+             throw new Error(`API Error (${response.status})`);
+          }
+          
+          const results = await response.json() || [];
+          console.log(`[Batch ${i}] Parsed ${results.length} similarity results.`);
+          
+          const resultsByName = {};
+          results.forEach(res => {
+            if (!resultsByName[res.name]) {
+               resultsByName[res.name] = [];
+            }
+            resultsByName[res.name].push({
+              db_id: res.db_id,
+              db_name: res.match,
+              score: res.score
+            });
+          });
+          
+          chunk.forEach(org => {
+             if (resultsByName[org.name] && resultsByName[org.name].length > 0) {
+               realConflicts.push({
+                 temp_id: org.id,
+                 org_name: org.name,
+                 matches: resultsByName[org.name]
+               });
+             }
+          });
+          setConflicts([...realConflicts]);
+        } catch (fetchErr) {
+          console.error(`[Batch ${i}] Fetch/Parsing Error:`, fetchErr);
+          throw fetchErr; // rethrow to be caught by outer catch
+        }
         
         setCheckProgress({ current: Math.min(i + chunkSize, orgs.length), total: orgs.length });
+        console.log(`[Batch ${i}] Progress updated.`);
       }
       
       setIsCheckingDuplicates(false);
+      // eslint-disable-next-line react-hooks/purity
+      setSearchDuration(((Date.now() - startTime) / 1000).toFixed(2));
       
-      if (realConflicts.length > 0) {
-        setConflicts(realConflicts);
-        setUserResolutions({});
-        setIsConflictModalOpen(true);
-      } else {
+      if (realConflicts.length === 0) {
+        setIsConflictModalOpen(false);
         executeFinalExport(orgs, destination);
       }
     } catch (err) {
       setIsCheckingDuplicates(false);
+      setIsConflictModalOpen(false);
       alert(`การตรวจสอบความซ้ำซ้อนล้มเหลว: ${err.message}\nระบบจะดำเนินการนำเข้าข้อมูลโดยไม่ผ่านการตรวจสอบ`);
       executeFinalExport(orgs, destination);
     }
@@ -3096,7 +3140,7 @@ export default function OrgManagerApp() {
       const payload = generateBackendPayload(currentOrgs);
       
       if (destination === 'api') {
-        const response = await fetch('http://localhost:8080/api/import', {
+        const response = await fetch('/api/import', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -3148,7 +3192,25 @@ export default function OrgManagerApp() {
   };
 
   const handleConfirmResolutions = () => {
+    // Determine which conflicts are actually visible based on the current threshold
+    const filteredConflicts = conflicts.map(c => ({
+      ...c,
+      matches: c.matches.filter(m => m.score >= similarityThreshold)
+    })).filter(c => c.matches.length > 0);
+
     const updatedOrgs = organizations.map(org => {
+      const isConflict = conflicts.some(c => c.temp_id === org.id);
+      const isVisibleConflict = filteredConflicts.some(fc => fc.temp_id === org.id);
+
+      // If it's a conflict but falls below threshold, automatically CREATE
+      if (isConflict && !isVisibleConflict) {
+        return {
+          ...org,
+          action: 'CREATE',
+          existing_db_id: null
+        };
+      }
+
       const res = userResolutions[org.id];
       if (res) {
         return {
@@ -3157,6 +3219,7 @@ export default function OrgManagerApp() {
           existing_db_id: res.existing_db_id || null
         };
       }
+      
       return org;
     });
 
@@ -3684,14 +3747,14 @@ export default function OrgManagerApp() {
 
           <button
             onClick={() => handlePrepareExport('json')}
-            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold shadow-sm transition-all duration-300 cursor-pointer ${isCheckingDuplicates && exportDestination === 'json'
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold shadow-sm transition-all duration-300 ${((isExporting || isCheckingDuplicates) && exportDestination === 'json')
                 ? 'bg-slate-200 text-slate-500 cursor-wait'
-                : 'bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-indigo-100'
+                : 'bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-indigo-100 cursor-pointer'
               }`}
-            disabled={isCheckingDuplicates}
+            disabled={isExporting || isCheckingDuplicates}
           >
-            {isCheckingDuplicates && exportDestination === 'json' ? (
-              <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-500"></div> Checking...</>
+            {(isExporting || isCheckingDuplicates) && exportDestination === 'json' ? (
+              <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-500"></div> {isCheckingDuplicates ? 'กำลังตรวจสอบ...' : 'กำลังสร้างไฟล์...'}</>
             ) : (
               <><Download size={16} /> โหลด JSON</>
             )}
@@ -3699,14 +3762,14 @@ export default function OrgManagerApp() {
           
           <button
             onClick={() => handlePrepareExport('api')}
-            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold shadow-lg transition-all duration-300 cursor-pointer ${isExporting && exportDestination === 'api'
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold shadow-lg transition-all duration-300 ${((isExporting || isCheckingDuplicates) && exportDestination === 'api')
                 ? 'bg-indigo-400 text-white cursor-wait'
-                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'
+                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 cursor-pointer'
               }`}
-            disabled={isExporting}
+            disabled={isExporting || isCheckingDuplicates}
           >
-            {isExporting && exportDestination === 'api' ? (
-              <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> กำลังส่งข้อมูล...</>
+            {(isExporting || isCheckingDuplicates) && exportDestination === 'api' ? (
+              <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> {isCheckingDuplicates ? 'กำลังตรวจสอบ...' : 'กำลังส่งข้อมูล...'}</>
             ) : (
               <><Upload size={16} /> ส่งเข้าฐานข้อมูล (API)</>
             )}
@@ -4174,94 +4237,155 @@ export default function OrgManagerApp() {
         />
       )}
 
-      {/* Progress Modal */}
-      {isCheckingDuplicates && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center">
-          <div className="bg-white rounded-2xl shadow-xl w-[400px] p-6 text-center animate-in zoom-in-95">
-            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
-            <h3 className="text-lg font-bold text-slate-800 mb-2">กำลังตรวจสอบรายชื่อซ้ำซ้อน</h3>
-            <p className="text-sm text-slate-500 mb-6">ระบบกำลังตรวจสอบความถูกต้องกับฐานข้อมูลหลัก...</p>
-            
-            <div className="w-full bg-slate-100 rounded-full h-3 mb-2 overflow-hidden">
-              <div 
-                className="bg-blue-500 h-3 rounded-full transition-all duration-300" 
-                style={{ width: `${checkProgress.total ? (checkProgress.current / checkProgress.total) * 100 : 0}%` }}
-              ></div>
-            </div>
-            <div className="text-xs font-semibold text-slate-500">
-              {checkProgress.current} / {checkProgress.total} หน่วยงาน
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Conflict Resolution Modal */}
+      {/* Progressive Conflict Resolution Modal */}
       {isConflictModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-[800px] max-w-full max-h-[90vh] flex flex-col animate-in zoom-in-95">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-amber-50 rounded-t-2xl">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center">
-                  <AlertTriangle size={20} />
+            <div className="px-6 py-4 border-b border-slate-100 flex flex-col gap-4 bg-amber-50 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center">
+                    <AlertTriangle size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-amber-800">
+                      {isCheckingDuplicates ? 'กำลังค้นหาและเปรียบเทียบข้อมูล...' : 'ค้นหาเสร็จสิ้น'}
+                    </h3>
+                    <p className="text-sm text-amber-600">
+                      {isCheckingDuplicates 
+                        ? 'ระบบกำลังทะยอยค้นหา คุณสามารถเริ่มพิจารณาและจัดการข้อมูลไปพร้อมกันได้'
+                        : `ใช้เวลาทั้งหมด ${searchDuration} วินาที | กรุณาเลือกจัดการข้อมูลที่พบความคล้ายคลึง`}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-amber-800">พบชื่อหน่วยงานคล้ายคลึงกับในระบบ</h3>
-                  <p className="text-sm text-amber-600">กรุณาเลือกว่าจะผูกกับของเดิม (LINK) หรือสร้างใหม่ (CREATE)</p>
+                {isCheckingDuplicates && (
+                  <button
+                    onClick={() => {
+                      cancelSearchRef.current = true;
+                      setIsCheckingDuplicates(false);
+                      setIsConflictModalOpen(false);
+                    }}
+                    className="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors font-semibold text-sm"
+                  >
+                    ยกเลิกการค้นหา
+                  </button>
+                )}
+              </div>
+              
+              {isCheckingDuplicates && (
+                <div className="w-full">
+                  <div className="flex justify-between text-xs font-semibold text-amber-700 mb-1">
+                    <span>ความคืบหน้า</span>
+                    <span>{checkProgress.current} / {checkProgress.total} หน่วยงาน</span>
+                  </div>
+                  <div className="w-full bg-amber-200/50 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className="bg-amber-500 h-2 rounded-full transition-all duration-300" 
+                      style={{ width: `${checkProgress.total ? (checkProgress.current / checkProgress.total) * 100 : 0}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-4 bg-white p-3 rounded-lg border border-amber-100 shadow-sm">
+                <div className="flex-1">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm font-semibold text-slate-700">เกณฑ์ความคล้ายขั้นต่ำที่จะแสดง (Threshold)</span>
+                    <span className="text-sm font-bold text-blue-600">{Math.round(similarityThreshold * 100)}%</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="0.4" max="1.0" step="0.05" 
+                    value={similarityThreshold}
+                    onChange={(e) => setSimilarityThreshold(parseFloat(e.target.value))}
+                    className="w-full accent-blue-600"
+                  />
+                </div>
+                <div className="w-1/3 text-xs text-slate-500 leading-tight">
+                  * หากความคล้ายต่ำกว่าเกณฑ์ ระบบจะ <strong className="text-amber-600">ซ่อน</strong> และถือว่าให้ <strong>สร้างใหม่</strong> อัตโนมัติ
                 </div>
               </div>
             </div>
             
             <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
               <div className="flex flex-col gap-4">
-                {conflicts.map((conflict) => (
-                  <div key={conflict.temp_id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                    <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-                      <div className="flex-1">
-                        <div className="text-xs font-semibold text-slate-400 mb-1">หน่วยงานที่กำลังสร้าง (ใหม่)</div>
-                        <div className="font-bold text-slate-800 text-base">{conflict.org_name}</div>
+                {(() => {
+                  const filteredConflicts = conflicts.map(c => ({
+                    ...c,
+                    matches: c.matches.filter(m => m.score >= similarityThreshold)
+                  })).filter(c => c.matches.length > 0);
+
+                  if (filteredConflicts.length === 0 && !isCheckingDuplicates) {
+                    return (
+                      <div className="text-center py-10">
+                        <div className="text-slate-400 mb-2 text-4xl">🎉</div>
+                        <h4 className="text-lg font-bold text-slate-700">ไม่พบข้อมูลที่คล้ายกัน (ตามเกณฑ์ที่ตั้งไว้)</h4>
+                        <p className="text-sm text-slate-500">คุณสามารถกดยืนยันเพื่อดำเนินการต่อได้เลย</p>
                       </div>
-                      
-                      <div className="flex-1 w-full bg-slate-50 rounded-lg p-3 border border-slate-100">
-                        <div className="text-xs font-semibold text-slate-400 mb-2">หน่วยงานที่คล้ายกันในระบบ (พบ {conflict.matches.length} รายการ)</div>
-                        <div className="flex flex-col gap-2">
-                          {conflict.matches.map(match => (
-                            <label key={match.db_id} className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${userResolutions[conflict.temp_id]?.existing_db_id === match.db_id ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:border-blue-300'}`}>
+                    );
+                  }
+
+                  return filteredConflicts.map((conflict) => (
+                    <div key={conflict.temp_id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                        <div className="flex-1">
+                          <div className="text-xs font-semibold text-slate-400 mb-1">หน่วยงานที่กำลังสร้าง (ใหม่)</div>
+                          <div className="font-bold text-slate-800 text-base">{conflict.org_name}</div>
+                        </div>
+                        
+                        <div className="flex-1 w-full bg-slate-50 rounded-lg p-3 border border-slate-100">
+                          <div className="text-xs font-semibold text-slate-400 mb-2">หน่วยงานที่คล้ายกันในระบบ (พบ {conflict.matches.length} รายการ)</div>
+                          <div className="flex flex-col gap-2">
+                            {conflict.matches.map(match => (
+                              <label key={match.db_id} className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${userResolutions[conflict.temp_id]?.existing_db_id === match.db_id ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:border-blue-300'}`}>
+                                <input 
+                                  type="radio" 
+                                  name={`conflict_${conflict.temp_id}`} 
+                                  checked={userResolutions[conflict.temp_id]?.existing_db_id === match.db_id}
+                                  onChange={() => handleResolveConflict(conflict.temp_id, { action: "LINK", existing_db_id: match.db_id })}
+                                  className="text-blue-600 focus:ring-blue-500"
+                                />
+                                <div className="flex-1">
+                                  <div className="text-sm font-bold text-slate-700">{match.db_name}</div>
+                                  <div className="text-xs text-slate-500">ความเหมือน: {Math.round(match.score * 100)}% | ID: {match.db_id}</div>
+                                </div>
+                              </label>
+                            ))}
+                            <label className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${userResolutions[conflict.temp_id]?.action === "CREATE" ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200 hover:border-amber-300'}`}>
                               <input 
                                 type="radio" 
                                 name={`conflict_${conflict.temp_id}`} 
-                                checked={userResolutions[conflict.temp_id]?.existing_db_id === match.db_id}
-                                onChange={() => handleResolveConflict(conflict.temp_id, { action: "LINK", existing_db_id: match.db_id })}
-                                className="text-blue-600 focus:ring-blue-500"
+                                checked={userResolutions[conflict.temp_id]?.action === "CREATE"}
+                                onChange={() => handleResolveConflict(conflict.temp_id, { action: "CREATE", existing_db_id: null })}
+                                className="text-amber-600 focus:ring-amber-500"
                               />
-                              <div className="flex-1">
-                                <div className="text-sm font-bold text-slate-700">{match.db_name}</div>
-                                <div className="text-xs text-slate-500">ความเหมือน: {Math.round(match.score * 100)}% | ID: {match.db_id}</div>
-                              </div>
+                              <div className="text-sm font-bold text-amber-700">ยืนยันสร้างใหม่ (มองข้ามรายการข้างต้น)</div>
                             </label>
-                          ))}
-                          <label className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${userResolutions[conflict.temp_id]?.action === "CREATE" ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200 hover:border-amber-300'}`}>
-                            <input 
-                              type="radio" 
-                              name={`conflict_${conflict.temp_id}`} 
-                              checked={userResolutions[conflict.temp_id]?.action === "CREATE"}
-                              onChange={() => handleResolveConflict(conflict.temp_id, { action: "CREATE", existing_db_id: null })}
-                              className="text-amber-600 focus:ring-amber-500"
-                            />
-                            <div className="text-sm font-bold text-amber-700">ยืนยันสร้างใหม่ (มองข้ามรายการข้างต้น)</div>
-                          </label>
+                          </div>
                         </div>
                       </div>
                     </div>
+                  ));
+                })()}
+                
+                {isCheckingDuplicates && conflicts.length > 0 && (
+                  <div className="text-center text-sm text-slate-400 py-4 animate-pulse">
+                    กำลังทะยอยค้นหาเพิ่มเติม...
                   </div>
-                ))}
+                )}
               </div>
             </div>
             
             <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-white rounded-b-2xl">
               <div className="text-sm text-slate-500">
-                ประมวลผลแล้ว {Object.keys(userResolutions).length} / {conflicts.length} รายการ
+                {(() => {
+                  const filteredConflicts = conflicts.map(c => ({
+                    ...c,
+                    matches: c.matches.filter(m => m.score >= similarityThreshold)
+                  })).filter(c => c.matches.length > 0);
+                  
+                  return `ประมวลผลแล้ว ${Object.keys(userResolutions).filter(k => filteredConflicts.some(fc => fc.temp_id === k)).length} / ${filteredConflicts.length} รายการ`;
+                })()}
               </div>
               <div className="flex gap-3">
                 <button 
@@ -4272,11 +4396,23 @@ export default function OrgManagerApp() {
                 </button>
                 <button 
                   onClick={handleConfirmResolutions}
-                  disabled={Object.keys(userResolutions).length !== conflicts.length}
-                  className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  disabled={
+                    isCheckingDuplicates || isExporting || 
+                    (() => {
+                      const filteredConflicts = conflicts.map(c => ({
+                        ...c,
+                        matches: c.matches.filter(m => m.score >= similarityThreshold)
+                      })).filter(c => c.matches.length > 0);
+                      return Object.keys(userResolutions).filter(k => filteredConflicts.some(fc => fc.temp_id === k)).length !== filteredConflicts.length;
+                    })()
+                  }
+                  className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  <Check size={16} />
-                  ยืนยันและส่งออกข้อมูล
+                  {isExporting ? (
+                    <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> กำลังส่งออกข้อมูล...</>
+                  ) : (
+                    <><Check size={16} /> ยืนยันและส่งออกข้อมูล</>
+                  )}
                 </button>
               </div>
             </div>
