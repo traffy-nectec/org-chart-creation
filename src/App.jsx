@@ -1210,11 +1210,25 @@ const CustomAddressInput = ({ placeholder, className }) => {
     }
 
     // 4. Combine all suggestions (province options first, then districts, then subdistricts)
-    const allSuggestions = [
+    const allSuggestions = [];
+
+    // Inject "Nationwide" if search text matches
+    const searchLower = text.trim().toLowerCase();
+    if ('ส่วนกลาง'.includes(searchLower) || 'ทั่วประเทศ'.includes(searchLower) || 'ไม่มีพื้นที่ดูแลเฉพาะ'.includes(searchLower) || 'nationwide'.includes(searchLower)) {
+      allSuggestions.push({
+        s: '',
+        d: '',
+        p: 'NATIONWIDE_SCOPE',
+        po: '',
+        isNationwide: true
+      });
+    }
+
+    allSuggestions.push(
       ...provinceSuggestions,
       ...districtSuggestions,
       ...uniqueSubdistricts
-    ];
+    );
 
     setSuggestions(allSuggestions.slice(0, 30));
     setHighlightedItemIndex(-1);
@@ -1276,9 +1290,12 @@ const CustomAddressInput = ({ placeholder, className }) => {
             let label;
             let badge = null;
 
-            if (item.isWholeProvince) {
+            if (item.isNationwide) {
+              label = `🌍 ส่วนกลาง / ไม่มีพื้นที่ดูแลเฉพาะ (Non-spatial)`;
+              badge = <span className="bg-amber-100 text-amber-700 text-[9px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap">ส่วนกลาง</span>;
+            } else if (item.isWholeProvince) {
               label = `ทั้งจังหวัด ${item.p}`;
-              badge = <span className="bg-purple-100 text-purple-700 text-[9px] px-1.5 py-0.5 rounded font-bold">ทั้งจังหวัด</span>;
+              badge = <span className="bg-purple-100 text-purple-700 text-[9px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap">ทั้งจังหวัด</span>;
             } else if (item.isWholeDistrict) {
               const prefix = item.p === "กรุงเทพมหานคร" ? "เขต" : "อำเภอ";
               label = `ทั้ง${prefix}${item.d} (จ. ${item.p})`;
@@ -1409,6 +1426,12 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose
   const nodeIssue = nodeIssues?.get(selectedNode.id);
 
   const handleAddressSelect = (nextVal) => {
+    if (nextVal.province === 'NATIONWIDE_SCOPE') {
+      handleUpdateNode(selectedNode.id, 'areas', { ...(selectedNode.areas || {}), scope: 'NATIONWIDE', locations: [] });
+      setAddressInput({ subdistrict: '', district: '', province: '', postalCode: '' });
+      return;
+    }
+
     if (nextVal.province) {
       const newLoc = {
         province: nextVal.province || '',
@@ -1659,26 +1682,15 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose
 
         {/* ขอบเขตพื้นที่รับผิดชอบ */}
         <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-4">
-          <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2"><MapPin size={16} className="text-blue-700" /> ขอบเขตพื้นที่รับผิดชอบ</h4>
-
-          <div className="flex gap-4 mb-2">
-            <label className="flex items-center gap-2 cursor-pointer text-xs">
-              <input type="radio" name="scope" value="LOCAL" checked={selectedNode.areas?.scope !== 'NATIONWIDE'} onChange={() => handleUpdateNode(selectedNode.id, 'areas', { ...(selectedNode.areas || {}), scope: 'LOCAL' })} className="text-blue-600 focus:ring-blue-500 w-3.5 h-3.5" />
-              <span className="font-bold text-slate-700">เฉพาะพื้นที่ (Local)</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer text-xs">
-              <input type="radio" name="scope" value="NATIONWIDE" checked={selectedNode.areas?.scope === 'NATIONWIDE'} onChange={() => handleUpdateNode(selectedNode.id, 'areas', { ...(selectedNode.areas || {}), scope: 'NATIONWIDE', locations: [] })} className="text-blue-600 focus:ring-blue-500 w-3.5 h-3.5" />
-              <span className="font-bold text-slate-700">ส่วนกลาง / ทั่วประเทศ</span>
-            </label>
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2"><MapPin size={16} className="text-blue-700" /> ขอบเขตพื้นที่รับผิดชอบ</h4>
+            {selectedNode.areas?.scope === 'NATIONWIDE' && (
+              <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold border border-amber-200">ส่วนกลาง / ทั่วประเทศ</span>
+            )}
           </div>
 
-          {selectedNode.areas?.scope === 'NATIONWIDE' ? (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs font-bold text-blue-800 text-center shadow-sm animate-in fade-in zoom-in-95">
-              🌍 หน่วยงานนี้มีขอบเขตรับผิดชอบครอบคลุมทั่วประเทศ (ข้อมูลจะไม่ถูกผูกติดกับแผนที่จังหวัดใดๆ)
-            </div>
-          ) : (
-            <div className="space-y-3 animate-in fade-in">
-              <ThailandAddressTypeahead
+          <div className="space-y-3 animate-in fade-in">
+            <ThailandAddressTypeahead
                 value={addressInput}
                 onValueChange={handleAddressSelect}
               >
@@ -1693,7 +1705,6 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose
                 </div>
               </ThailandAddressTypeahead>
             </div>
-          )}
 
           {selectedNode.areas?.scope !== 'NATIONWIDE' && selectedLocations.length > 0 && (
             <div className="space-y-2 mt-4 animate-in fade-in slide-in-from-top-2 pt-3 border-t border-slate-200/60">
