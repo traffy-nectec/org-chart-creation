@@ -56,104 +56,88 @@
 
 ---
 
-## 🏛 System Architecture: Two-Tier Validation Workflow
+## 🏛 System Architecture: End-to-End Pipeline & Contextual UX
 
-### 1. Flow Chart (แผนผังกระบวนการ)
-การไหลของข้อมูลตั้งแต่หน้าบ้าน จนถึงแอดมินยืนยัน
+สถาปัตยกรรมระบบได้รับการออกแบบมาเพื่อรองรับโครงสร้างแบบ **กราฟ / หลายต้นสังกัด (Multi-parent Graph)** ผ่านแนวคิด **Contextual UX** ที่ให้ผู้ใช้งานทำงานบนโครงสร้างแบบต้นไม้ (Tree) ทีละบริบท เพื่อความเรียบง่ายในการใช้งาน แต่ส่วนหลังบ้านจะแปลงคำสั่งเป็นการผูกข้อมูล (LINK) แบบกราฟโดยอัตโนมัติ
+
+### 1. Flow Chart (ภาพรวมการทำงานของระบบ)
 
 ```mermaid
 flowchart TD
-    %% User Actions
-    A["External User"] -->|1. จัดการข้อมูลผังหน่วยงาน| B("Org Builder UI")
-    B -->|2. กดปุ่ม Validate / Submit| C{"Backend: Pre-processing"}
-    
-    %% Backend Processing
-    C -->|1. ลบช่องว่าง/จุด/อักขระ| C1["แปลงคำย่อ (Alias Dictionary)"]
-    C1 -->|2. แปลงชื่อตำบล/อำเภอ| C2["Map เป็น Location ID"]
-    C2 -->|3. ค้นหาข้อมูล| D["Backend: Similarity Check"]
-    D -->|เปรียบเทียบกับ Production DB| E{"พบชื่อซ้ำหรือคล้ายเกิน X% ?"}
-    
-    %% User Feedback Loop
-    E -->|ใช่ พบความคล้าย| F["UI: แจ้งเตือน User ว่ามีหน่วยงานคล้ายกัน"]
-    F -->|User กลับไปแก้ไขชื่อ| B
-    F -->|User ยืนยันว่าตั้งใจให้ชื่อนี้| G["ส่งข้อมูลเข้า Staging"]
-    
-    %% Clean Path
-    E -->|ไม่พบความคล้าย| G["ส่งข้อมูลเข้า Staging"]
-    
-    %% Staging & Admin
-    G --> H["Staging Table / คิวรอตรวจสอบ"]
-    H -->|สถานะ: Pending| I["Admin Review Dashboard"]
-    I -->|แอดมินตรวจสอบข้อมูล| J{"การตัดสินใจของ Admin"}
-    
-    J -->|Approve| K["Production DB"]
-    J -->|Reject| L["ระบบแจ้งเตือนกลับไปยัง External User"]
-    
-    %% Styling
-    classDef external fill:#e1f5fe,stroke:#03a9f4,stroke-width:2px;
-    classDef backend fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px;
-    classDef database fill:#fff3e0,stroke:#ff9800,stroke-width:2px;
-    classDef admin fill:#e8f5e9,stroke:#4caf50,stroke-width:2px;
-
-    class A,B,F external;
-    class C,C1,C2,D,E,G,L backend;
-    class H,K database;
-    class I,J admin;
+  A["User อัปโหลดไฟล์ Excel"] --> B["Frontend Clean ข้อมูลเบื้องต้น"]
+  B --> C["Frontend วาดผัง ReactFlow"]
+  C --> D["User แก้ไขความผิดพลาดของพื้นที่ & ต้นสังกัด"]
+  D --> E{"Frontend ค้นหาหน่วยงานในฐานข้อมูลจริง"}
+  
+  E -->|"เจอชื่อคล้าย 70-99%"| G["ขึ้น UI แจ้งเตือน: มีแล้วในระบบ"]
+  E -->|"เจอชื่อตรง 100%"| F["ผูก ID เดิมอัตโนมัติ"]
+  E -->|"ไม่เจอเลย"| H["ตั้งค่าเป็น CREATE"]
+  
+  G -->|"User ยืนยันใช้ชื่อเดิม"| F
+  G -->|"User ยืนยันสร้างใหม่"| H
+  
+  F --> I{"ระบบตรวจสอบ Pre-export Validation"}
+  H --> I
+  
+  I -->|"ติด Error"| J["ล็อกปุ่ม! บังคับผู้ใช้กลับไปแก้"]
+  I -->|"ติด Warning"| K["ขึ้น Prompt ถามย้ำให้กดยืนยัน"]
+  K -->|"ผู้ใช้ยืนยันข้าม"| L["รวมข้อมูล & สั่ง Export JSON"]
+  I -->|"ผ่านหมด (Clean)"| L
+  
+  L --> M["ส่ง Payload ไปที่ Backend"]
+  M --> N["Backend วนลูปอ่านข้อมูลทีละชั้น"]
+  
+  N -->|"Action: CREATE"| O["Insert หน่วยงานใหม่ลง DB"]
+  N -->|"Action: LINK"| P["Insert เฉพาะเส้นความสัมพันธ์ลง DB"]
 ```
 
-### 2. Sequence Diagram (ลำดับการประมวลผล)
-ลำดับการรับส่งข้อมูลระหว่าง API
+### 2. Sequence Diagram (การคุยกันระหว่างระบบและฐานข้อมูล)
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    actor ExternalUser as External User
-    participant Frontend as Frontend (Org Builder)
+    participant User as ผู้ใช้งาน
+    participant Frontend as Frontend (Vite)
     participant Backend as Backend API
-    participant DB as Production DB
-    actor Admin as Internal Admin
+    participant DB as ฐานข้อมูลจริง
 
-    Note over ExternalUser,Frontend: Phase 1: สร้างและตรวจสอบเบื้องต้น
-    ExternalUser->>Frontend: จัดทำผังหน่วยงาน
-    ExternalUser->>Frontend: คลิก "Validate & Submit"
-    Frontend->>Backend: POST /api/orgs/validate (Raw Data)
+    User->>Frontend: อัปโหลดข้อมูล / ปรับแต่งผังใน UI
+    Frontend->>Frontend: รัน Clean Format & Typo Dict
+    User->>Frontend: กดปุ่ม "ตรวจสอบกับฐานข้อมูล"
+    Frontend->>Backend: ขอดาวน์โหลดรายชื่อหน่วยงานทั้งหมด
+    Backend-->>Frontend: ส่งกลับเป็น JSON Dump (เพื่อลดภาระเซิร์ฟเวอร์)
+    Frontend->>Frontend: รันอัลกอริทึม Fuzzy Search ด้วย CPU ลูกค้า
     
-    activate Backend
-    Backend->>Backend: 1. ลบช่องว่าง/จุด/อักขระพิเศษ และแก้ 'เเ'
-    Backend->>Backend: 2. Dictionary Normalization (แปลงคำย่อ)
-    Backend->>Backend: 3. Map พื้นที่เป็น Location ID (6 หลัก)
-    Backend->>DB: Query ข้อมูลหน่วยงานที่มีอยู่ (กรองด้วย Location ID)
-    DB-->>Backend: Return ข้อมูล
-    Backend->>Backend: คำนวณความคล้าย (Fuzzy Matching)
-    Backend-->>Frontend: Return ผลลัพธ์และ % ความคล้าย
-    deactivate Backend
-    
-    alt พบชื่อที่ความคล้ายเกินกำหนด (เช่น >80%)
-        Frontend-->>ExternalUser: โชว์ Popup แจ้งเตือน "หน่วยงานคล้ายกับในระบบ"
-        ExternalUser->>Frontend: กด "ยืนยันจะใช้ชื่อนี้" หรือทำการแก้ไข
-        ExternalUser->>Frontend: คลิก "Final Submit"
-        Frontend->>Backend: POST /api/orgs/staging (Confirmed Data)
-    else ไม่พบชื่อที่คล้ายกัน
-        Frontend->>Backend: POST /api/orgs/staging (Clean Data)
+    alt พบชื่อที่คล้ายกันมาก (Fuzzy Match)
+        Frontend->>User: ป๊อปอัปแจ้ง "พบหน่วยงานชื่อนี้ในระบบ จะผูกเลยไหม?"
+        User-->>Frontend: กดยืนยัน (Action: LINK + เก็บ ID เดิม)
     end
     
-    activate Backend
-    Backend->>DB: Save ข้อมูลลง Staging Table
-    Backend-->>Frontend: Success Response (200 OK)
-    deactivate Backend
-    Frontend-->>ExternalUser: แจ้งเตือน "ส่งข้อมูลสำเร็จ รอแอดมินอนุมัติ"
-
-    Note over Admin,DB: Phase 2: แอดมินตรวจสอบและนำเข้าจริง
-    Admin->>Backend: GET /api/orgs/staging (ดึงรายการที่รออนุมัติ)
-    Backend-->>Admin: แสดงข้อมูลที่ผ่านการ Cleansing + Confirmation จาก User
-    Admin->>Admin: รีวิวตรวจสอบความถูกต้อง
-    Admin->>Backend: POST /api/orgs/approve/{id}
-    activate Backend
-    Backend->>DB: ย้ายข้อมูลจาก Staging -> Production Table
-    DB-->>Backend: Success
-    Backend-->>Admin: แจ้งเตือน "นำเข้าสำเร็จ"
-    deactivate Backend
+    User->>Frontend: กดปุ่ม "บันทึกเข้าระบบ" (Export)
+    Frontend->>Frontend: รันตัวตรวจสอบ Error / Warning ก่อนส่ง (Pre-export Check)
+    alt พบ Error หรือ Warning 
+        Frontend-->>User: เด้งเตือนให้แก้ไขก่อน หรือกดยืนยันเพื่อเพิกเฉย Warning
+    end
+    
+    Frontend->>Backend: POST /api/import (ส่งข้อมูลเป็น Array พ่อ-ลูก)
+    
+    loop วนลูปตามลำดับชั้น (Topological Sort)
+        alt ถ้าเป็นคำสั่ง CREATE
+            Backend->>DB: INSERT หน่วยงานใหม่
+            DB-->>Backend: คืนค่า UUID กลับมา
+            Backend->>DB: INSERT เส้นความสัมพันธ์ (รหัสพ่อ + รหัสลูก)
+        else ถ้าเป็นคำสั่ง LINK
+            Backend->>DB: INSERT เฉพาะเส้นความสัมพันธ์ (รหัสพ่อ + รหัสลูกเก่า)
+        end
+    end
+    
+    Backend-->>Frontend: ประมวลผลสำเร็จ (200 OK)
+    Frontend-->>User: แสดผลเสร็จสิ้นการทำงาน!
 ```
+
+### 3. Database Schema (รองรับ Multi-parent)
+เพื่อการขยายตัวในอนาคต ระบบใช้ฐานข้อมูลแบบ Edge Table เพื่อเก็บเส้นทางแยกระหว่างความสัมพันธ์ของหน่วยงาน (Graph)
+- **Table `organizations`:** เก็บข้อมูลพื้นฐาน (`id`, `name`, `metadata`)
+- **Table `organization_edges`:** เก็บความสัมพันธ์ (`parent_id`, `child_id`, `root_context_id`) โดย `root_context_id` ใช้แยกบริบทของผัง (เช่น ผัง กทม. หรือ ผังกระทรวงศึกษาฯ) เพื่อให้ผู้ใช้งานสามารถดึงโครงสร้างผังแบบ Tree ออกมาแสดงผลทีละบริบทได้โดยไม่พันกัน
 
 ## 🧪 การทดสอบ (Testing)
 
