@@ -789,21 +789,46 @@ const ImportModal = ({ isOpen, onClose, onImportData, onCancelImport, onDownload
         <div className="flex flex-col bg-white flex-1 overflow-hidden p-6 gap-6">
           {!parsedFile ? (
             isProcessing ? (
-              <div className="flex-1 flex flex-col justify-center items-center bg-slate-50/50 rounded-2xl border border-slate-100 p-8 text-center animate-in fade-in duration-300">
-                <div className="relative w-16 h-16 mb-6">
+              <div className="flex-1 flex flex-col justify-center items-center bg-slate-50/50 rounded-2xl border border-slate-100 p-8 text-center animate-in fade-in duration-300 overflow-y-auto">
+                <div className="relative w-16 h-16 mb-6 shrink-0 mt-4">
                   <div className="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
                   <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
                   <div className="absolute inset-0 flex items-center justify-center">
                     <Layers className="text-blue-600 animate-pulse w-6 h-6" />
                   </div>
                 </div>
-                <h3 className="text-lg font-bold text-slate-800 mb-2">กำลังเตรียมความพร้อมของข้อมูล...</h3>
-                <p className="text-sm text-blue-700 font-bold bg-blue-50 px-4 py-2 rounded-xl inline-flex shadow-sm border border-blue-100 animate-pulse">
-                  {progressStep}
-                </p>
-                <p className="mt-4 text-xs text-slate-500 font-semibold max-w-[200px] leading-relaxed">
-                  ระบบกำลังผูกความสัมพันธ์อัตโนมัติ (อาจใช้เวลาสักครู่)
-                </p>
+                <h3 className="text-lg font-bold text-slate-800 mb-6 shrink-0">ระบบกำลังประมวลผลข้อมูล...</h3>
+                
+                <div className="w-full max-w-sm space-y-3 pb-4">
+                  {[
+                    { id: 'read', label: 'กำลังอ่านและดึงข้อมูล', match: ['เชื่อมต่อ', 'อ่านไฟล์'] },
+                    { id: 'parse', label: 'กำลังแปลงโครงสร้างข้อมูล', match: ['แปลงโครงสร้าง'] },
+                    { id: 'clean', label: 'ตรวจสอบความถูกต้องของข้อมูล', match: ['ทำความสะอาด'] },
+                    { id: 'build', label: 'ประกอบโครงสร้างความสัมพันธ์', match: ['เตรียมพร้อมโครงสร้าง', 'ประกอบโครงสร้าง'] },
+                    { id: 'render', label: 'เตรียมการแสดงผล', match: ['เตรียมการแสดงผล'] }
+                  ].map((step, idx, arr) => {
+                    const currentStepIndex = arr.findIndex(s => s.match.some(m => progressStep.includes(m)));
+                    const activeIdx = currentStepIndex === -1 ? 0 : currentStepIndex; // fallback to 0
+                    const isCompleted = activeIdx > idx;
+                    const isCurrent = activeIdx === idx;
+
+                    return (
+                      <div key={step.id} className={`flex items-center gap-4 p-3 rounded-xl transition-all duration-300 ${isCurrent ? 'bg-blue-50 border border-blue-100 shadow-sm scale-[1.02]' : isCompleted ? 'bg-white border border-slate-100' : 'opacity-50 grayscale bg-transparent'}`}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${isCompleted ? 'bg-green-100 text-green-600' : isCurrent ? 'bg-blue-600 text-white shadow-md shadow-blue-200' : 'bg-slate-100 text-slate-400'}`}>
+                          {isCompleted ? <Check size={16} strokeWidth={3} /> : <span className="text-xs font-bold">{idx + 1}</span>}
+                        </div>
+                        <div className="flex-1 text-left min-w-0">
+                          <p className={`text-sm font-bold transition-colors truncate ${isCompleted ? 'text-green-700' : isCurrent ? 'text-blue-700' : 'text-slate-500'}`}>
+                            {step.label}
+                          </p>
+                          {isCurrent && progressStep && !progressStep.includes(step.label) && (
+                            <p className="text-[11px] text-blue-600/80 font-medium mt-0.5 animate-in slide-in-from-top-1 truncate" title={progressStep}>{progressStep}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             ) : (
               <div className="flex-1 flex flex-col overflow-y-auto">
@@ -2190,12 +2215,21 @@ const WelcomeModal = ({ isOpen, onClose }) => {
   );
 };
 const BulkEditLocationModal = ({ isOpen, onClose, locationName, orgs, locationDb, handleUpdateBulkLocations }) => {
-  const [addressInput, setAddressInput] = useState('');
+  const [addressInput, setAddressInput] = useState({ subdistrict: '', district: '', province: '', postalCode: '' });
   const [selectedLocations, setSelectedLocations] = useState([]);
 
 
 
   const handleAddressSelect = (nextVal) => {
+    if (nextVal.province === 'NATIONWIDE_SCOPE') {
+      // For bulk edit, setting nationwide means clearing locations and setting a special flag?
+      // Actually, we don't have a scope field directly in BulkEditLocationModal yet, but we can set a pseudo-location to handle it later.
+      const newLoc = { province: 'NATIONWIDE_SCOPE' };
+      setSelectedLocations([...selectedLocations.filter(l => l.province !== 'NATIONWIDE_SCOPE'), newLoc]);
+      setAddressInput({ subdistrict: '', district: '', province: '', postalCode: '' });
+      return;
+    }
+
     if (nextVal.province) {
       const newLoc = {
         province: nextVal.province || '',
@@ -2214,7 +2248,7 @@ const BulkEditLocationModal = ({ isOpen, onClose, locationName, orgs, locationDb
         newLoc.code = getLocationCode(newLoc, locationDb);
         setSelectedLocations([...selectedLocations, newLoc]);
       }
-      setAddressInput('');
+      setAddressInput({ subdistrict: '', district: '', province: '', postalCode: '' });
     }
   };
 
@@ -2782,6 +2816,10 @@ export default function OrgManagerApp() {
     setSelectedNodeId(newNode.id);
   };
   const handleUpdateBulkLocations = (nodeIds, locations) => {
+    const isNationwide = locations.some(loc => loc.province === 'NATIONWIDE_SCOPE');
+    const finalLocations = isNationwide ? [] : locations;
+    const finalScope = isNationwide ? 'NATIONWIDE' : 'LOCAL';
+
     setOrganizations(orgs => {
       const updated = orgs.map(org => {
         if (nodeIds.includes(org.id)) {
@@ -2789,7 +2827,8 @@ export default function OrgManagerApp() {
             ...org,
             areas: {
               ...org.areas,
-              locations: locations
+              scope: finalScope,
+              locations: finalLocations
             }
           };
         }
