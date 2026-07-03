@@ -25,6 +25,16 @@ const FULL_TO_ABBREV_DICT = {
   'สถานีตำรวจนครบาล': 'สน.',
 };
 
+// Dictionary for suggesting correct locations when users make common spelling mistakes in Excel
+const LOCATION_TYPO_DICT = {
+  'อรุณอัมรินทร์': { province: 'กรุงเทพมหานคร', district: 'บางกอกน้อย', subdistrict: 'อรุณอมรินทร์', postalCode: '10700' },
+  'อรุณอมรินทร์': { province: 'กรุงเทพมหานคร', district: 'บางกอกน้อย', subdistrict: 'อรุณอมรินทร์', postalCode: '10700' },
+  'ไผ่จำศิล': { province: 'อ่างทอง', district: 'วิเศษชัยชาญ', subdistrict: 'ไผ่จำศีล', postalCode: '14110' },
+  'ห้วยขะยุง': { province: 'อุบลราชธานี', district: 'วารินชำราบ', subdistrict: 'ห้วยขะยูง', postalCode: '34310' },
+  'ห้วยยะยูง': { province: 'อุบลราชธานี', district: 'วารินชำราบ', subdistrict: 'ห้วยขะยูง', postalCode: '34310' },
+  'บ้านจันทร์': { province: 'อุดรธานี', district: 'บ้านดุง', subdistrict: 'บ้านจันทน์', postalCode: '41190' },
+};
+
 const ABBREV_TO_FULL_DICT = {
   'อ.': 'อำเภอ',
   'ทน.': 'เทศบาลนคร',
@@ -1714,6 +1724,42 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose
             )}
           </div>
 
+          {(() => {
+            if (selectedNode.areas?.scope === 'NATIONWIDE' || selectedLocations.length > 0) return null;
+            let matchKey = null;
+            if (selectedNode.rawRows && selectedNode.rawRows.length > 0) {
+              const raw = selectedNode.rawRows[0];
+              matchKey = Object.keys(LOCATION_TYPO_DICT).find(k => 
+                (raw.tambon && String(raw.tambon).includes(k)) || 
+                (raw.amphoe && String(raw.amphoe).includes(k)) || 
+                (raw.province && String(raw.province).includes(k))
+              );
+            }
+            if (!matchKey) return null;
+            const suggestion = LOCATION_TYPO_DICT[matchKey];
+            return (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col gap-3 animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-start gap-2.5">
+                  <div className="p-1.5 bg-amber-100 text-amber-700 rounded-lg shrink-0 mt-0.5">
+                    <AlertTriangle size={14} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-amber-800">💡 แนะนำคำที่ถูกต้อง</h4>
+                    <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
+                      คุณหมายถึง <span className="font-bold text-amber-900">ต.{suggestion.subdistrict} อ.{suggestion.district} จ.{suggestion.province}</span> ใช่หรือไม่?
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => handleAddressSelect(suggestion)}
+                  className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm"
+                >
+                  ใช่, เลือกพื้นที่นี้
+                </button>
+              </div>
+            );
+          })()}
+
           <div className="space-y-3 animate-in fade-in">
             <ThailandAddressTypeahead
                 value={addressInput}
@@ -2280,6 +2326,34 @@ const BulkEditLocationModal = ({ isOpen, onClose, locationName, orgs, locationDb
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"><X size={20} /></button>
         </div>
         <div className="p-5 flex flex-col gap-4 bg-white">
+          
+          {(() => {
+            const matchKey = Object.keys(LOCATION_TYPO_DICT).find(k => locationName && locationName.includes(k));
+            if (!matchKey) return null;
+            const suggestion = LOCATION_TYPO_DICT[matchKey];
+            return (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-100 text-amber-700 rounded-full shrink-0">
+                    <AlertTriangle size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-amber-800">💡 แนะนำคำที่ถูกต้อง</h4>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      คุณหมายถึง <span className="font-bold text-amber-900">ต.{suggestion.subdistrict} อ.{suggestion.district} จ.{suggestion.province}</span> ใช่หรือไม่?
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => handleAddressSelect(suggestion)}
+                  className="w-full sm:w-auto shrink-0 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
+                >
+                  ใช่, เลือกพื้นที่นี้
+                </button>
+              </div>
+            );
+          })()}
+
           <div className="space-y-3">
             <ThailandAddressTypeahead value={addressInput} onValueChange={handleAddressSelect}>
               <div className="space-y-2 relative">
