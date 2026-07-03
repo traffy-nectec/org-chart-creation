@@ -18,9 +18,9 @@
    - **Google Sheets Link Import:** รองรับการนำเข้าข้อมูลโดยตรงจากลิงก์ Google Sheets ที่ตั้งค่าสิทธิ์เป็นสาธารณะ (Anyone with the link can view) โดยระบบจะสกัดข้อมูลมาประมวลผลให้อัตโนมัติ.
 5. **Massive-Scale Export Pipeline (Topological Sort):**
    - การส่งออกไฟล์ JSON สำหรับ Backend มีการรัน **Kahn's Algorithm (Topological Sort)** ก่อนเสมอ เพื่อดักจับปัญหาผังวงกลม (Circular Reference) และการันตีว่าหน่วยงาน "ต้นสังกัด" จะถูกจัดเรียงให้อยู่ก่อนหน้า "ลูกน้อง" เสมอ ป้องกันข้อผิดพลาดในการ Insert ข้อมูลลง Database
-6. **Bulk Similarity Search & Conflict Resolution UI:**
-   - มีระบบจำลองการยิง API ตรวจสอบรายชื่อซ้ำซ้อนกับฐานข้อมูล (ผ่านระบบ Chunking ทีละ 1,000 รายการ) พร้อม Progress Bar ป้องกันหน้าจอค้าง
-   - หน้าจอ **Conflict Resolution Modal** ให้ผู้ใช้ตัดสินใจชี้ชะตา (LINK หรือ CREATE) สำหรับหน่วยงานที่ชื่อคล้ายกัน ก่อนที่จะรวมผลลัพธ์ลงใน JSON Payload ขั้นสุดท้าย
+6. **Real-time Bulk Similarity Search & Conflict Resolution:**
+   - ระบบเชื่อมต่อ API ตรวจสอบรายชื่อซ้ำซ้อนกับฐานข้อมูลจริง (Backend) พร้อมระบบทยอยส่งข้อมูล (Chunking ทีละ 100 รายการ) เพื่อแสดง Progress Bar และป้องกันหน้าจอค้าง
+   - หน้าจอ **Conflict Resolution Modal** ให้ผู้ใช้ตัดสินใจชี้ชะตา (ผูกกับข้อมูลเดิม LINK หรือ สร้างใหม่ CREATE) สำหรับหน่วยงานที่ชื่อคล้ายกัน ก่อนที่จะรวมผลลัพธ์ลงใน JSON Payload ขั้นสุดท้าย
 
 ### 🎨 การปรับปรุง UI/UX ล่าสุด (Latest UI/UX Improvements)
 - **Left Sidebar Notification Panel:** ย้ายการแจ้งเตือนปัญหา (Issues/Alerts) จากกล่องลอยตัว (Floating Panel) ไปเป็น Sidebar ด้านซ้ายที่สามารถเปิด/ปิดได้ เพื่อเพิ่มพื้นที่ในการแสดงผลบน Canvas และดูรายการทั้งหมดได้สะดวก

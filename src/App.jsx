@@ -2502,6 +2502,8 @@ export default function OrgManagerApp() {
 
   // States for Bulk Similarity Check UI
   const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportDestination, setExportDestination] = useState('json'); // 'json' or 'api'
   const [checkProgress, setCheckProgress] = useState({ current: 0, total: 0 });
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
   const [conflicts, setConflicts] = useState([]);
@@ -3016,72 +3018,123 @@ export default function OrgManagerApp() {
     }
   };
 
-  const mockBulkSimilaritySearch = async (orgs) => {
+  const performBulkSimilaritySearch = async (orgs, destination) => {
+    // If not API destination, bypass
+    if (destination !== 'api') {
+      executeFinalExport(orgs, destination);
+      return;
+    }
+
     setIsCheckingDuplicates(true);
     setCheckProgress({ current: 0, total: orgs.length });
     
-    const mockConflicts = [];
-    const chunkSize = 1000;
+    const realConflicts = [];
+    const chunkSize = 100; // ลดขนาดลงเพื่อให้ UI ขยับเร็วขึ้น
     
-    // Simulate chunk processing
-    for (let i = 0; i < orgs.length; i += chunkSize) {
-      const chunk = orgs.slice(i, i + chunkSize);
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      // Randomly inject some mock conflicts for demonstration
-      chunk.forEach((org, idx) => {
-        // Just inject a few to demonstrate UI
-        if (Math.random() > 0.95 && mockConflicts.length < 3) {
-          mockConflicts.push({
-            temp_id: org.id,
-            org_name: org.name,
-            matches: [
-              { db_id: 1000 + idx, db_name: `${org.name} (ในระบบ)`, score: 0.85 },
-              { db_id: 2000 + idx, db_name: `${org.name}เก่า`, score: 0.72 }
-            ]
-          });
+    try {
+      for (let i = 0; i < orgs.length; i += chunkSize) {
+        const chunk = orgs.slice(i, i + chunkSize);
+        
+        const namesPayload = { names: chunk.map(o => o.name) };
+        
+        const response = await fetch('http://localhost:8080/api/similarity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(namesPayload)
+        });
+        
+        if (!response.ok) {
+           throw new Error(`API Error (${response.status})`);
         }
-      });
+        
+        const results = await response.json() || [];
+        
+        const resultsByName = {};
+        results.forEach(res => {
+          if (!resultsByName[res.name]) {
+             resultsByName[res.name] = [];
+          }
+          resultsByName[res.name].push({
+            db_id: res.db_id,
+            db_name: res.match,
+            score: res.score
+          });
+        });
+        
+        chunk.forEach(org => {
+           if (resultsByName[org.name] && resultsByName[org.name].length > 0) {
+             realConflicts.push({
+               temp_id: org.id,
+               org_name: org.name,
+               matches: resultsByName[org.name]
+             });
+           }
+        });
+        
+        setCheckProgress({ current: Math.min(i + chunkSize, orgs.length), total: orgs.length });
+      }
       
-      setCheckProgress({ current: Math.min(i + chunkSize, orgs.length), total: orgs.length });
-    }
-    
-    setIsCheckingDuplicates(false);
-    
-    if (mockConflicts.length > 0) {
-      setConflicts(mockConflicts);
-      setUserResolutions({});
-      setIsConflictModalOpen(true);
-    } else {
-      executeFinalExport(orgs);
+      setIsCheckingDuplicates(false);
+      
+      if (realConflicts.length > 0) {
+        setConflicts(realConflicts);
+        setUserResolutions({});
+        setIsConflictModalOpen(true);
+      } else {
+        executeFinalExport(orgs, destination);
+      }
+    } catch (err) {
+      setIsCheckingDuplicates(false);
+      alert(`การตรวจสอบความซ้ำซ้อนล้มเหลว: ${err.message}\nระบบจะดำเนินการนำเข้าข้อมูลโดยไม่ผ่านการตรวจสอบ`);
+      executeFinalExport(orgs, destination);
     }
   };
 
-  const executeFinalExport = (currentOrgs = organizations) => {
+  const executeFinalExport = async (currentOrgs = organizations, destination = exportDestination) => {
+    setIsExporting(true);
     try {
       const payload = generateBackendPayload(currentOrgs);
       
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `backend_payload_${new Date().getTime()}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      if (destination === 'api') {
+        const response = await fetch('http://localhost:8080/api/import', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`API Error (${response.status}): ${errorText}`);
+        }
+        
+        const result = await response.json();
+        alert(`ส่งข้อมูลสำเร็จ! นำเข้า ${result.nodes_processed || payload.nodes.length} หน่วยงาน`);
+      } else {
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `backend_payload_${new Date().getTime()}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
     } catch (err) {
-      alert(err.message);
+      alert(`เกิดข้อผิดพลาดในการส่งออกข้อมูล: ${err.message}`);
+    } finally {
+      setIsExporting(false);
     }
   };
 
-  const handlePrepareExport = () => {
+  const handlePrepareExport = (destination = 'json') => {
+    setExportDestination(destination);
     try {
       // Validate for circular references before calling API
       topologicalSort(organizations); 
-      mockBulkSimilaritySearch(organizations);
+      performBulkSimilaritySearch(organizations, destination);
     } catch (err) {
       alert(err.message);
     }
@@ -3630,18 +3683,32 @@ export default function OrgManagerApp() {
           <div className="w-px h-8 bg-slate-200 mx-1 self-center"></div>
 
           <button
-            onClick={handlePrepareExport}
-            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold shadow-lg transition-all duration-300 cursor-pointer ${isCheckingDuplicates
+            onClick={() => handlePrepareExport('json')}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold shadow-sm transition-all duration-300 cursor-pointer ${isCheckingDuplicates && exportDestination === 'json'
+                ? 'bg-slate-200 text-slate-500 cursor-wait'
+                : 'bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-indigo-100'
+              }`}
+            disabled={isCheckingDuplicates}
+          >
+            {isCheckingDuplicates && exportDestination === 'json' ? (
+              <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-500"></div> Checking...</>
+            ) : (
+              <><Download size={16} /> โหลด JSON</>
+            )}
+          </button>
+          
+          <button
+            onClick={() => handlePrepareExport('api')}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold shadow-lg transition-all duration-300 cursor-pointer ${isExporting && exportDestination === 'api'
                 ? 'bg-indigo-400 text-white cursor-wait'
                 : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'
               }`}
-            aria-label="ส่งออกข้อมูลให้ Backend"
-            disabled={isCheckingDuplicates}
+            disabled={isExporting}
           >
-            {isCheckingDuplicates ? (
-              <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Checking...</>
+            {isExporting && exportDestination === 'api' ? (
+              <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> กำลังส่งข้อมูล...</>
             ) : (
-              <><Download size={16} /> ส่งออกให้ Backend (JSON)</>
+              <><Upload size={16} /> ส่งเข้าฐานข้อมูล (API)</>
             )}
           </button>
         </div>
