@@ -27,12 +27,23 @@ const FULL_TO_ABBREV_DICT = {
 
 // Dictionary for suggesting correct locations when users make common spelling mistakes in Excel
 const LOCATION_TYPO_DICT = {
+  // Existing
   'อรุณอัมรินทร์': { province: 'กรุงเทพมหานคร', district: 'บางกอกน้อย', subdistrict: 'อรุณอมรินทร์', postalCode: '10700' },
   'อรุณอมรินทร์': { province: 'กรุงเทพมหานคร', district: 'บางกอกน้อย', subdistrict: 'อรุณอมรินทร์', postalCode: '10700' },
   'ไผ่จำศิล': { province: 'อ่างทอง', district: 'วิเศษชัยชาญ', subdistrict: 'ไผ่จำศีล', postalCode: '14110' },
   'ห้วยขะยุง': { province: 'อุบลราชธานี', district: 'วารินชำราบ', subdistrict: 'ห้วยขะยูง', postalCode: '34310' },
   'ห้วยยะยูง': { province: 'อุบลราชธานี', district: 'วารินชำราบ', subdistrict: 'ห้วยขะยูง', postalCode: '34310' },
   'บ้านจันทร์': { province: 'อุดรธานี', district: 'บ้านดุง', subdistrict: 'บ้านจันทน์', postalCode: '41190' },
+  // New from MOE.xlsx analysis
+  'โพธิไพศาล': { province: 'สกลนคร', district: 'กุสุมาลย์', subdistrict: 'โพธิ์ไพศาล', postalCode: '47210' },
+  'อุใดเจริญ': { province: 'สตูล', district: 'ควนกาหลง', subdistrict: 'อุไดเจริญ', postalCode: '91130' },
+  'บ่อสวก': { province: 'น่าน', district: 'เมืองน่าน', subdistrict: 'สวก', postalCode: '55000' },
+  'ปอพาน': { province: 'ร้อยเอ็ด', district: 'เมืองร้อยเอ็ด', subdistrict: 'ปอภาร', postalCode: '45000' },
+  'ปอภาร (ปอพาน)': { province: 'ร้อยเอ็ด', district: 'เมืองร้อยเอ็ด', subdistrict: 'ปอภาร', postalCode: '45000' },
+  'ทุ่งปี๊': { province: 'เชียงใหม่', district: 'แม่วาง', subdistrict: 'ทุ่งปี้', postalCode: '50360' },
+  'วังหงส์': { province: 'แพร่', district: 'เมืองแพร่', subdistrict: 'วังหงษ์', postalCode: '54000' },
+  'บางบอนใต้': { province: 'กรุงเทพมหานคร', district: 'บางบอน', subdistrict: 'บางบอน', postalCode: '10150' },
+  'บางบอนเหนือ': { province: 'กรุงเทพมหานคร', district: 'บางบอน', subdistrict: 'บางบอน', postalCode: '10150' },
 };
 
 const ABBREV_TO_FULL_DICT = {
