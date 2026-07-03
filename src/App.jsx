@@ -2831,7 +2831,7 @@ export default function OrgManagerApp() {
       circle: { id: 'circle', label: 'ความสัมพันธ์เป็นวงกลม', items: [], color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' },
       missingParent: { id: 'missingParent', label: 'ไม่พบต้นสังกัด', items: [], color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200' },
       multipleRoots: { id: 'multipleRoots', label: 'ถูกปรับยอด (มีหัวหน้าสูงสุดได้ 1 แห่ง)', items: [], color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
-      noArea: { id: 'noArea', label: 'ไม่มีพื้นที่รับผิดชอบ (เป็นหน่วยงานลอย)', items: [], color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
+      noArea: { id: 'noArea', label: 'ไม่มีพื้นที่รับผิดชอบ (เป็นหน่วยงานลอย)', items: [], subGroups: {}, color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
       invalidArea: { id: 'invalidArea', label: 'พื้นที่ไม่พบในระบบ', items: [], subGroups: {}, color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
       duplicate: { id: 'duplicate', label: 'ชื่อหน่วยงานซ้ำกัน', items: [], color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
       others: { id: 'others', label: 'ขัดแย้งอื่นๆ', items: [], color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-200' },
@@ -2862,6 +2862,10 @@ export default function OrgManagerApp() {
       }
       else if (msg.includes('ไม่มีพื้นที่รับผิดชอบ')) {
         groups.noArea.items.push(org);
+        if (!groups.noArea.subGroups['ไม่มีพื้นที่รับผิดชอบ (ทั้งหมด)']) {
+          groups.noArea.subGroups['ไม่มีพื้นที่รับผิดชอบ (ทั้งหมด)'] = [];
+        }
+        groups.noArea.subGroups['ไม่มีพื้นที่รับผิดชอบ (ทั้งหมด)'].push(org);
       }
       else groups.others.items.push(org);
     });
