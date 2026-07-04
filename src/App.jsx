@@ -3,7 +3,7 @@ import {
   Plus, Trash2, MapPin, CheckCircle,
   Layers, Network, ChevronDown, ChevronRight, ChevronUp, ChevronLeft,
   ChevronsDown, Upload, FileSpreadsheet, X, Download, Table,
-  AlertTriangle, Check, Database, Search, HelpCircle
+  AlertTriangle, Check, Database, Search, HelpCircle, Loader2
 } from 'lucide-react';
 import { ThailandAddressTypeahead, useAddressTypeaheadContext } from "react-thailand-address-typeahead";
 import * as XLSX from 'xlsx';
@@ -2438,17 +2438,41 @@ export default function OrgManagerApp() {
 
 
   const [draftData, setDraftData] = useState(null);
+  const [draftResolutions, setDraftResolutions] = useState(null);
+  const [draftConflicts, setDraftConflicts] = useState(null);
+  const [draftJobId, setDraftJobId] = useState(null);
   const [showDraftModal, setShowDraftModal] = useState(false);
   const [isDraftRestored, setIsDraftRestored] = useState(false);
+
+  // New States for Job Polling
+  const [importJobId, setImportJobId] = useState(null);
+  const [importProgress, setImportProgress] = useState(null);
+  const [showProgressModal, setShowProgressModal] = useState(false);
 
   useEffect(() => {
     const loadDraft = async () => {
       try {
-        const saved = await idbGet('org_builder_draft');
-        if (saved) {
-          const parsed = typeof saved === 'string' ? JSON.parse(saved) : saved;
+        const [savedOrgs, savedRes, savedConf, savedJob] = await Promise.all([
+          idbGet('org_builder_draft'),
+          idbGet('org_builder_resolutions'),
+          idbGet('org_builder_conflicts'),
+          idbGet('org_builder_job_id')
+        ]);
+        
+        if (savedJob) {
+          // If there's an active job, we must restore and show progress
+          setImportJobId(savedJob);
+          setShowProgressModal(true);
+        }
+
+        if (savedOrgs) {
+          const parsed = typeof savedOrgs === 'string' ? JSON.parse(savedOrgs) : savedOrgs;
           if (Array.isArray(parsed) && parsed.length > 4) {
             setDraftData(parsed);
+            if (savedRes) setDraftResolutions(typeof savedRes === 'string' ? JSON.parse(savedRes) : savedRes);
+            if (savedConf) setDraftConflicts(typeof savedConf === 'string' ? JSON.parse(savedConf) : savedConf);
+            if (savedJob) setDraftJobId(savedJob);
+            
             setShowDraftModal(true);
             return;
           }
@@ -2559,8 +2583,11 @@ export default function OrgManagerApp() {
       idbSet('org_builder_draft', organizations).catch(e => {
         console.warn("Could not auto-save draft to IndexedDB:", e);
       });
+      idbSet('org_builder_resolutions', userResolutions).catch(console.warn);
+      idbSet('org_builder_conflicts', conflicts).catch(console.warn);
+      idbSet('org_builder_job_id', importJobId).catch(console.warn);
     }
-  }, [organizations, isDraftRestored]);
+  }, [organizations, userResolutions, conflicts, importJobId, isDraftRestored]);
 
   const breadcrumbPath = useMemo(() => {
     if (!focusNodeId) return [];
@@ -3069,7 +3096,7 @@ export default function OrgManagerApp() {
     setIsCheckingDuplicates(true);
     setIsConflictModalOpen(true);
     setConflicts([]);
-    setUserResolutions({});
+    // setUserResolutions({}); // Removed to prevent clearing previous resolutions when checking again
     setCheckProgress({ current: 0, total: orgs.length });
     
     const realConflicts = [];
@@ -3176,13 +3203,14 @@ export default function OrgManagerApp() {
           body: JSON.stringify(payload)
         });
         
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`API Error (${response.status}): ${errorText}`);
+        if (response.status === 202) {
+          const result = await response.json();
+          setImportJobId(result.job_id);
+          setShowProgressModal(true);
+        } else {
+          const result = await response.json();
+          alert(`ส่งข้อมูลสำเร็จ! นำเข้า ${result.nodes_processed || payload.nodes.length} หน่วยงาน`);
         }
-        
-        const result = await response.json();
-        alert(`ส่งข้อมูลสำเร็จ! นำเข้า ${result.nodes_processed || payload.nodes.length} หน่วยงาน`);
       } else {
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -3199,6 +3227,65 @@ export default function OrgManagerApp() {
     } finally {
       setIsExporting(false);
     }
+  };
+
+  // Polling Job Status
+  useEffect(() => {
+    let intervalId;
+
+    const checkJobStatus = async () => {
+      if (!importJobId) return;
+
+      try {
+        const response = await fetch(`/api/import/status/${importJobId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setImportProgress(data);
+
+          if (data.status === 'completed' || data.status === 'error') {
+            clearInterval(intervalId);
+            
+            // Clean up Draft on success
+            if (data.status === 'completed') {
+              Promise.all([
+                idbDel('org_builder_draft'),
+                idbDel('org_builder_resolutions'),
+                idbDel('org_builder_conflicts'),
+                idbDel('org_builder_job_id')
+              ]).catch(console.warn);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to check job status", err);
+      }
+    };
+
+    if (importJobId && showProgressModal) {
+      // Check immediately once
+      checkJobStatus();
+      // Then poll every 2 seconds
+      intervalId = setInterval(checkJobStatus, 2000);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [importJobId, showProgressModal]);
+
+  const handleCloseProgressModal = () => {
+    setShowProgressModal(false);
+    setImportJobId(null);
+    setImportProgress(null);
+  };
+
+  const handleStartFreshAfterSuccess = () => {
+    handleCloseProgressModal();
+    setOrganizations(DEFAULT_ORGS);
+    setDraftData(null);
+    setIsDraftRestored(false);
+    setConflicts([]);
+    setUserResolutions({});
   };
 
   const handlePrepareExport = (destination = 'json') => {
@@ -4619,15 +4706,106 @@ export default function OrgManagerApp() {
           draftCount={draftData ? draftData.length : 0}
           onResume={() => {
             setOrganizations(draftData);
+            if (draftResolutions) setUserResolutions(draftResolutions);
+            if (draftConflicts) setConflicts(draftConflicts);
+            if (draftJobId) setImportJobId(draftJobId);
+            
             setShowDraftModal(false);
             setIsDraftRestored(true);
+            
+            if (draftJobId) {
+              setShowProgressModal(true);
+            }
           }}
           onStartFresh={() => {
-            idbDel('org_builder_draft').catch(console.error);
+            Promise.all([
+              idbDel('org_builder_draft'),
+              idbDel('org_builder_resolutions'),
+              idbDel('org_builder_conflicts'),
+              idbDel('org_builder_job_id')
+            ]).catch(console.error);
             setShowDraftModal(false);
             setIsDraftRestored(true);
           }}
         />
+      )}
+
+      {showProgressModal && importJobId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-md w-full mx-4 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-blue-100">
+              {importProgress?.status === 'processing' && (
+                <div 
+                  className="h-full bg-blue-600 transition-all duration-300"
+                  style={{ width: `${importProgress.total_items > 0 ? (importProgress.processed_items / importProgress.total_items) * 100 : 0}%` }}
+                />
+              )}
+              {importProgress?.status === 'completed' && <div className="h-full bg-green-500 w-full" />}
+              {importProgress?.status === 'error' && <div className="h-full bg-red-500 w-full" />}
+            </div>
+            
+            <div className="mt-4">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                {importProgress?.status === 'completed' ? (
+                  <><Check className="text-green-500" /> นำเข้าข้อมูลสำเร็จ</>
+                ) : importProgress?.status === 'error' ? (
+                  <><AlertTriangle className="text-red-500" /> เกิดข้อผิดพลาด</>
+                ) : (
+                  <><Loader2 className="animate-spin text-blue-500" /> กำลังนำเข้าข้อมูล...</>
+                )}
+              </h2>
+              
+              <div className="mt-4 space-y-3">
+                <div className="flex justify-between text-sm text-slate-600">
+                  <span>Job ID:</span>
+                  <span className="font-mono text-xs">{importJobId.substring(0,8)}...</span>
+                </div>
+                
+                {importProgress && importProgress.status !== 'error' && (
+                  <div className="flex justify-between items-end">
+                    <div className="text-sm font-semibold text-slate-700">
+                      ความคืบหน้า
+                    </div>
+                    <div className="text-2xl font-black text-blue-600 font-mono">
+                      {importProgress.processed_items} <span className="text-sm text-slate-400 font-normal">/ {importProgress.total_items}</span>
+                    </div>
+                  </div>
+                )}
+
+                {importProgress?.error_message && (
+                  <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200 mt-4">
+                    {importProgress.error_message}
+                  </div>
+                )}
+              </div>
+              
+              <div className="mt-8 flex justify-end gap-3">
+                {importProgress?.status === 'completed' ? (
+                  <button 
+                    onClick={handleStartFreshAfterSuccess}
+                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md cursor-pointer transition-colors w-full"
+                  >
+                    เริ่มการทำงานใหม่ (Clear)
+                  </button>
+                ) : importProgress?.status === 'error' ? (
+                  <button 
+                    onClick={handleCloseProgressModal}
+                    className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-sm font-bold cursor-pointer transition-colors"
+                  >
+                    ปิดหน้าต่าง
+                  </button>
+                ) : (
+                  <button 
+                    disabled
+                    className="px-4 py-2 bg-slate-100 text-slate-400 rounded-lg text-sm font-bold cursor-not-allowed"
+                  >
+                    กำลังประมวลผล...
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
