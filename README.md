@@ -98,70 +98,107 @@
 
 ```mermaid
 flowchart TD
-  A["User สร้าง/แก้ไขผังใน UI"] --> B["กดปุ่ม 'ส่งออกให้ Backend'"]
-  B --> C{"Topological Sort (Check Circular Ref)"}
-  
-  C -->|"พบข้อผิดพลาด"| D["ล็อกการส่งออก แจ้งเตือนผู้ใช้"]
-  C -->|"ผ่าน (เรียงลำดับ พ่อ->ลูก เสร็จสิ้น)"| E["แบ่งข้อมูล (Chunking) ยิง API เช็คชื่อซ้ำ"]
-  
-  E --> F["แสดง Progress Bar Modal (กำลังตรวจสอบ...)"]
-  F --> G{"พบรายชื่อซ้ำซ้อนไหม?"}
-  
-  G -->|"เจอชื่อคล้าย (Score > threshold)"| H["ขึ้น UI แจ้งเตือน (Conflict Resolution Modal)"]
-  G -->|"ไม่เจอเลย"| I["ตั้งค่า Action เป็น CREATE ให้ทั้งหมด"]
-  
-  H -->|"User เลือกผูกกับของเดิม"| J["กำหนด action = LINK, ใส่ existing_db_id"]
-  H -->|"User ยืนยันสร้างใหม่"| K["กำหนด action = CREATE"]
-  
-  J --> L["สร้าง Final JSON Payload"]
-  K --> L
-  I --> L
-  
-  L --> M["ดาวน์โหลด backend_payload.json"]
-  M --> N["ส่งไฟล์ไปประมวลผลต่อที่ Backend (Go/Python)"]
+    classDef completed fill:#d4edda,stroke:#28a745,stroke-width:2px;
+    classDef pending fill:#fff3cd,stroke:#ffc107,stroke-width:2px,stroke-dasharray: 5 5;
+    classDef waiting fill:#f8d7da,stroke:#dc3545,stroke-width:2px;
+
+    subgraph Frontend [Frontend (React + Vite)]
+        A("User สร้าง/แก้ไขผังใน UI"):::completed
+        B("Topological Sort (Check Circular Ref)"):::completed
+        C("แจ้งเตือนข้อผิดพลาด (ถ้ามี)"):::completed
+        D("แบ่งข้อมูลยิง API (Chunking)"):::completed
+        E("UI จัดการชื่อซ้ำ (Conflict Resolution)"):::completed
+        F("Progress Polling UI (รอประมวลผล)"):::completed
+    end
+
+    subgraph Backend [Backend (Golang API)]
+        G("POST /api/similarity (ตรวจสอบชื่อซ้ำ)"):::completed
+        H("POST /api/import (รับข้อมูลเข้าระบบ)"):::completed
+        I("GET /api/import/status (เช็คสถานะ)"):::completed
+        J("Background Worker Pipeline"):::completed
+        M("Save to Staging Table (ระบบตะกร้าพัก)"):::pending
+    end
+
+    subgraph Database [PostgreSQL]
+        K[("pg_trgm Similarity Search")]:::completed
+        L[("import_jobs Table")]:::completed
+        N[("voice_fonduegroup")]:::waiting
+        O[("voice_hierarchy_org")]:::waiting
+    end
+
+    A -->|"กดส่งออก Backend"| B
+    B -->|"พบข้อผิดพลาด"| C
+    B -->|"ผ่าน (เรียงลำดับเสร็จสิ้น)"| D
+    
+    D -->|"Array of Names"| G
+    G -->|"Search Query"| K
+    K -->|"Match Results"| G
+    G -->|"Similarity Scores & IDs"| E
+    
+    E -->|"User จัดการเสร็จ (Final Payload)"| H
+    H -->|"สร้าง Job ใหม่"| L
+    H -->|"Return Job ID"| F
+    F -->|"Poll Status (ทุก 2 วิ)"| I
+    I -->|"Query Progress"| L
+    
+    H -.->|"Spawn Background Task"| J
+    J -->|"Insert หน่วยงาน (รอ DB เปิดสิทธิ์)"| N
+    J -->|"Insert โครงสร้าง Path (รอ DB เปิดสิทธิ์)"| O
+    
+    %% Future Roadmap
+    J -.->|"Future: นำเข้า Staging"| M
 ```
 
-### 2. Sequence Diagram (การคุยกันระหว่างระบบและฐานข้อมูล)
+**คำอธิบายสถานะ (Status Legend):**
+- 🟩 **กรอบสีเขียว (Completed):** ส่วนที่พัฒนาเสร็จสมบูรณ์ 100% แล้ว
+- 🟥 **กรอบสีแดง (Waiting):** ส่วนที่พัฒนาเสร็จแล้ว แต่กำลังรอให้เซิร์ฟเวอร์เปิดสิทธิ์ Database แบบ Read-Write ให้
+- 🟨 **กรอบสีเหลืองเส้นปะ (Pending / Roadmap):** แผนงานในอนาคต (Phase ถัดไป)
+
+### 2. Sequence Diagram (การทำงาน E2E จาก Client ถึง Database)
 
 ```mermaid
 sequenceDiagram
-    participant User as ผู้ใช้งาน
-    participant Frontend as Frontend (Vite)
-    participant Backend as Backend API
-    participant DB as ฐานข้อมูลจริง
+    participant C as Client (Frontend)
+    participant A as Backend API
+    participant W as Async Worker
+    participant DB as PostgreSQL
 
-    User->>Frontend: อัปโหลดข้อมูล / ปรับแต่งผังใน UI
-    Frontend->>Frontend: รัน Clean Format & Typo Dict
-    User->>Frontend: กดปุ่ม "ตรวจสอบกับฐานข้อมูล"
-    Frontend->>Backend: ขอดาวน์โหลดรายชื่อหน่วยงานทั้งหมด
-    Backend-->>Frontend: ส่งกลับเป็น JSON Dump (เพื่อลดภาระเซิร์ฟเวอร์)
-    Frontend->>Frontend: รันอัลกอริทึม Fuzzy Search ด้วย CPU ลูกค้า
-    
-    alt พบชื่อที่คล้ายกันมาก (Fuzzy Match)
-        Frontend->>User: ป๊อปอัปแจ้ง "พบหน่วยงานชื่อนี้ในระบบ จะผูกเลยไหม?"
-        User-->>Frontend: กดยืนยัน (Action: LINK + เก็บ ID เดิม)
+    rect rgb(212, 237, 218)
+    Note over C, DB: เฟส 1: การจัดการข้อมูลและการค้นหา (เสร็จแล้ว 100%)
+    C->>C: นำเข้าข้อมูล & Topological Sort
+    C->>A: POST /api/similarity (เช็คชื่อซ้ำทีละ 200 แถว)
+    A->>DB: Query `pg_trgm` similarity
+    DB-->>A: ส่งกลับรายชื่อที่คล้าย
+    A-->>C: แสดง Modal ให้ User รีวิว
+    C->>C: User ตัดสินใจ (LINK หรือ CREATE)
     end
     
-    User->>Frontend: กดปุ่ม "บันทึกเข้าระบบ" (Export)
-    Frontend->>Frontend: รันตัวตรวจสอบ Error / Warning ก่อนส่ง (Pre-export Check)
-    alt พบ Error หรือ Warning 
-        Frontend-->>User: เด้งเตือนให้แก้ไขก่อน หรือกดยืนยันเพื่อเพิกเฉย Warning
+    rect rgb(212, 237, 218)
+    Note over C, DB: เฟส 2: การนำเข้าข้อมูล (Background Process - เสร็จแล้ว)
+    C->>A: POST /api/import (ส่ง Final JSON)
+    A->>DB: INSERT into `import_jobs`
+    A-->>C: HTTP 202 Accepted (ส่ง Job ID กลับ)
+    C->>A: GET /api/import/status/{job_id} (Polling)
+    A-->>C: { status: "processing", processed: 0 }
     end
     
-    Frontend->>Backend: POST /api/import (ส่งข้อมูลเป็น Array พ่อ-ลูก)
-    
-    loop วนลูปตามลำดับชั้น (Topological Sort)
-        alt ถ้าเป็นคำสั่ง CREATE
-            Backend->>DB: INSERT หน่วยงานใหม่
-            DB-->>Backend: คืนค่า UUID กลับมา
-            Backend->>DB: INSERT เส้นความสัมพันธ์ (รหัสพ่อ + รหัสลูก)
-        else ถ้าเป็นคำสั่ง LINK
-            Backend->>DB: INSERT เฉพาะเส้นความสัมพันธ์ (รหัสพ่อ + รหัสลูกเก่า)
-        end
+    rect rgb(248, 215, 218)
+    Note over A, DB: เฟส 3: การบันทึกผลจริง (รอสิทธิ์ Database)
+    A-)W: Spawn Worker Task
+    loop วนลูป Bulk Insert ทีละ 1000 รายการ
+        W->>DB: INSERT ลง `voice_fonduegroup`
+        W->>DB: Update `voice_hierarchy_org` (Materialized Path)
+        W->>DB: Update `import_jobs` progress
+    end
+    W->>DB: อัปเดตสถานะเป็น "completed"
     end
     
-    Backend-->>Frontend: ประมวลผลสำเร็จ (200 OK)
-    Frontend-->>User: แสดผลเสร็จสิ้นการทำงาน!
+    rect rgb(212, 237, 218)
+    Note over C, DB: เฟส 4: แสดงผลลัพธ์ (เสร็จแล้ว 100%)
+    C->>A: GET /api/import/status/{job_id} (Polling)
+    A-->>C: { status: "completed", processed: 1000 }
+    C->>C: ขึ้นหน้าจอ Success (เสร็จสมบูรณ์)
+    end
 ```
 
 ### 3. Database Schema (รองรับ Multi-parent)
