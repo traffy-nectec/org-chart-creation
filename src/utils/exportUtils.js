@@ -88,6 +88,19 @@ export const topologicalSort = (organizations) => {
   return sortedIds.map(id => orgMap.get(id));
 };
 
+import rawAddressDB from '../assets/raw_database.json';
+
+// Build a fast lookup dictionary for Address -> DOPA Code (6-digit)
+// raw_database.json format: { province: "...", amphoe: "...", district: "...", district_code: 100101 }
+const addressCodeLookup = new Map();
+rawAddressDB.forEach(item => {
+  // Key format: "จังหวัด_อำเภอ_ตำบล"
+  // Note: raw_database uses 'district' for tambon, and 'amphoe' for amphoe
+  const key = `${item.province}_${item.amphoe}_${item.district}`;
+  // Store as 6-digit string
+  addressCodeLookup.set(key, String(item.district_code).padStart(6, '0'));
+});
+
 /**
  * Generates the standardized JSON payload for the Backend import pipeline.
  * 
@@ -111,13 +124,23 @@ export const generateBackendPayload = (organizations) => {
         province: org.attributes?.province || ""
         // Note: latitude, longitude, type_fondue_group are expected to be handled/defaulted by Backend
       },
-      locations: org.locations?.map(loc => ({
-        province: loc.province || "",
-        district: loc.amphoe || "",
-        subdistrict: loc.tambon || "",
-        zipcode: loc.zipcode || "",
-        code: loc.code || "" // DOPA 6-digit code
-      })) || []
+      locations: org.locations?.map(loc => {
+        const prov = loc.province || "";
+        const dist = loc.amphoe || ""; // react-thailand-address uses amphoe for district
+        const sub = loc.tambon || ""; // react-thailand-address uses tambon for subdistrict
+        
+        // Find 6-digit DOPA code
+        const lookupKey = `${prov}_${dist}_${sub}`;
+        const code = addressCodeLookup.get(lookupKey) || "";
+
+        return {
+          province: prov,
+          district: dist,
+          subdistrict: sub,
+          zipcode: loc.zipcode || "",
+          code: code // Extracted DOPA 6-digit code
+        };
+      }) || []
     };
   });
 
