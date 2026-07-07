@@ -67057,5 +67057,176 @@
     "district_code": 961303,
     "amphoe_code": 9613,
     "province_code": 76
+  },
+  {
+    "district": "ดอนเมือง",
+    "amphoe": "ดอนเมือง",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10210,
+    "district_code": 103602,
+    "amphoe_code": 1036,
+    "province_code": 1
+  },
+  {
+    "district": "สนามบิน",
+    "amphoe": "ดอนเมือง",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10210,
+    "district_code": 103603,
+    "amphoe_code": 1036,
+    "province_code": 1
+  },
+  {
+    "district": "นวลจันทร์",
+    "amphoe": "บึงกุ่ม",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10240,
+    "district_code": 102704,
+    "amphoe_code": 1027,
+    "province_code": 1
+  },
+  {
+    "district": "นวมินทร์",
+    "amphoe": "บึงกุ่ม",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10240,
+    "district_code": 102705,
+    "amphoe_code": 1027,
+    "province_code": 1
+  },
+  {
+    "district": "บางนาเหนือ",
+    "amphoe": "บางนา",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10260,
+    "district_code": 104701,
+    "amphoe_code": 1047,
+    "province_code": 1
+  },
+  {
+    "district": "บางนาใต้",
+    "amphoe": "บางนา",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10260,
+    "district_code": 104702,
+    "amphoe_code": 1047,
+    "province_code": 1
+  },
+  {
+    "district": "พัฒนาการ",
+    "amphoe": "สวนหลวง",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10250,
+    "district_code": 103402,
+    "amphoe_code": 1034,
+    "province_code": 1
+  },
+  {
+    "district": "อ่อนนุช",
+    "amphoe": "สวนหลวง",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10250,
+    "district_code": 103403,
+    "amphoe_code": 1034,
+    "province_code": 1
+  },
+  {
+    "district": "บางบอนเหนือ",
+    "amphoe": "บางบอน",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10150,
+    "district_code": 105002,
+    "amphoe_code": 1050,
+    "province_code": 1
+  },
+  {
+    "district": "บางบอนใต้",
+    "amphoe": "บางบอน",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10150,
+    "district_code": 105003,
+    "amphoe_code": 1050,
+    "province_code": 1
+  },
+  {
+    "district": "คลองบางพราน",
+    "amphoe": "บางบอน",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10150,
+    "district_code": 105004,
+    "amphoe_code": 1050,
+    "province_code": 1
+  },
+  {
+    "district": "คลองบางบอน",
+    "amphoe": "บางบอน",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10150,
+    "district_code": 105005,
+    "amphoe_code": 1050,
+    "province_code": 1
+  },
+  {
+    "district": "ราษฎร์พัฒนา",
+    "amphoe": "สะพานสูง",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10240,
+    "district_code": 104402,
+    "amphoe_code": 1044,
+    "province_code": 1
+  },
+  {
+    "district": "ทับช้าง",
+    "amphoe": "สะพานสูง",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10240,
+    "district_code": 104403,
+    "amphoe_code": 1044,
+    "province_code": 1
+  },
+  {
+    "district": "สะพานสอง",
+    "amphoe": "วังทองหลาง",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10310,
+    "district_code": 104502,
+    "amphoe_code": 1045,
+    "province_code": 1
+  },
+  {
+    "district": "คลองเจ้าคุณสิงห์",
+    "amphoe": "วังทองหลาง",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10310,
+    "district_code": 104503,
+    "amphoe_code": 1045,
+    "province_code": 1
+  },
+  {
+    "district": "พลับพลา",
+    "amphoe": "วังทองหลาง",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10310,
+    "district_code": 104504,
+    "amphoe_code": 1045,
+    "province_code": 1
+  },
+  {
+    "district": "รามอินทรา",
+    "amphoe": "คันนายาว",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10230,
+    "district_code": 104302,
+    "amphoe_code": 1043,
+    "province_code": 1
+  },
+  {
+    "district": "วงศ์สว่าง",
+    "amphoe": "บางซื่อ",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": 10800,
+    "district_code": 102902,
+    "amphoe_code": 1029,
+    "province_code": 1
   }
 ]
