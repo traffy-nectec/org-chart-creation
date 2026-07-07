@@ -616,7 +616,7 @@ const ImportModal = ({ isOpen, onClose, onImportData, onCancelImport, onDownload
                 }
               }
 
-              const locObj = {
+              let locObj = {
                 province,
                 amphoe,
                 tambon,
@@ -626,11 +626,32 @@ const ImportModal = ({ isOpen, onClose, onImportData, onCancelImport, onDownload
 
               if (!isValidLoc) {
                 const locStr = [rawProvItem, rawAmphoe, rawTambon].filter(Boolean).join(' ');
-                const warningMsg = `⚠️ ไม่พบข้อมูลพื้นที่รับผิดชอบในระบบ จะถูกข้ามไป ("${locStr}")`;
-                if (!orgInfo.warnings.includes(warningMsg)) {
-                  orgInfo.warnings.push(warningMsg);
+
+                // Fallback: search DOPA DB for any subdistrict that perfectly matches the concatenated string
+                const fuzzyMatch = locationDb?.find(r => 
+                  r.district && r.amphoe && r.province && 
+                  locStr.includes(r.district) && 
+                  locStr.includes(r.amphoe) && 
+                  locStr.includes(r.province)
+                );
+
+                if (fuzzyMatch) {
+                  isValidLoc = true;
+                  locObj.province = fuzzyMatch.province;
+                  locObj.amphoe = fuzzyMatch.amphoe;
+                  locObj.tambon = fuzzyMatch.district;
+                  locObj.code = fuzzyMatch.district_code ? String(fuzzyMatch.district_code) : (fuzzyMatch.amphoe_code ? String(fuzzyMatch.amphoe_code) : String(fuzzyMatch.province_code));
                 }
-              } else {
+
+                if (!isValidLoc) {
+                  const warningMsg = `⚠️ ไม่พบข้อมูลพื้นที่รับผิดชอบในระบบ จะถูกข้ามไป ("${locStr}")`;
+                  if (!orgInfo.warnings.includes(warningMsg)) {
+                    orgInfo.warnings.push(warningMsg);
+                  }
+                }
+              }
+              
+              if (isValidLoc) {
                 orgInfo.locations.push(locObj);
               }
             }
