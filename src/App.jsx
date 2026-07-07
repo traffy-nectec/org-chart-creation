@@ -29,7 +29,6 @@ const FULL_TO_ABBREV_DICT = {
 const LOCATION_TYPO_DICT = {
   // Existing
   'อรุณอัมรินทร์': { province: 'กรุงเทพมหานคร', district: 'บางกอกน้อย', subdistrict: 'อรุณอมรินทร์', postalCode: '10700' },
-  'อรุณอมรินทร์': { province: 'กรุงเทพมหานคร', district: 'บางกอกน้อย', subdistrict: 'อรุณอมรินทร์', postalCode: '10700' },
   'ไผ่จำศิล': { province: 'อ่างทอง', district: 'วิเศษชัยชาญ', subdistrict: 'ไผ่จำศีล', postalCode: '14110' },
   'ห้วยขะยุง': { province: 'อุบลราชธานี', district: 'วารินชำราบ', subdistrict: 'ห้วยขะยูง', postalCode: '34310' },
   'ห้วยยะยูง': { province: 'อุบลราชธานี', district: 'วารินชำราบ', subdistrict: 'ห้วยขะยูง', postalCode: '34310' },
@@ -42,10 +41,7 @@ const LOCATION_TYPO_DICT = {
   'ปอภาร (ปอพาน)': { province: 'ร้อยเอ็ด', district: 'เมืองร้อยเอ็ด', subdistrict: 'ปอภาร', postalCode: '45000' },
   'ทุ่งปี๊': { province: 'เชียงใหม่', district: 'แม่วาง', subdistrict: 'ทุ่งปี้', postalCode: '50360' },
   'วังหงส์': { province: 'แพร่', district: 'เมืองแพร่', subdistrict: 'วังหงษ์', postalCode: '54000' },
-  'บางบอนใต้': { province: 'กรุงเทพมหานคร', district: 'บางบอน', subdistrict: 'บางบอน', postalCode: '10150' },
-  'บางบอนเหนือ': { province: 'กรุงเทพมหานคร', district: 'บางบอน', subdistrict: 'บางบอน', postalCode: '10150' },
 };
-
 const ABBREV_TO_FULL_DICT = {
   'อ.': 'อำเภอ',
   'ทน.': 'เทศบาลนคร',
