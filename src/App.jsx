@@ -1183,6 +1183,34 @@ const formatAreaLabel = (areas) => {
 
 
 
+const formatSingleLocation = (loc) => {
+  if (loc.province && !loc.amphoe && !loc.tambon) {
+    return `ทั้งจังหวัด ${loc.province}`;
+  }
+  if (loc.province && loc.amphoe && !loc.tambon) {
+    const prefix = loc.province === "กรุงเทพมหานคร" ? "เขต" : "อำเภอ";
+    return `ทั้ง${prefix}${loc.amphoe} (จ. ${loc.province})`;
+  }
+
+  const parts = [];
+  if (loc.tambon) {
+    const prefix = loc.province === "กรุงเทพมหานคร" ? "แขวง" : "ต.";
+    parts.push(`${prefix}${loc.tambon}`);
+  }
+  if (loc.amphoe) {
+    const prefix = loc.province === "กรุงเทพมหานคร" ? "เขต" : "อ.";
+    parts.push(`${prefix}${loc.amphoe}`);
+  }
+  if (loc.province) {
+    const prefix = loc.province === "กรุงเทพมหานคร" ? "" : "จ.";
+    parts.push(`${prefix}${loc.province}`);
+  }
+  if (loc.postalCode) {
+    parts.push(loc.postalCode);
+  }
+  return parts.join(' ');
+};
+
 // Custom address search input component searching all fields: tambon (s), amphoe (d), province (p), and postalCode (po)
 const CustomAddressInput = ({ placeholder, className }) => {
   const {
@@ -1539,30 +1567,6 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose
     });
   };
 
-  const formatSingleLocation = (loc) => {
-    if (loc.province && !loc.amphoe && !loc.tambon) {
-      return `ทั้งจังหวัด ${loc.province}`;
-    }
-    if (loc.province && loc.amphoe && !loc.tambon) {
-      const prefix = loc.province === "กรุงเทพมหานคร" ? "เขต" : "อำเภอ";
-      return `ทั้ง${prefix}${loc.amphoe} (จ. ${loc.province})`;
-    }
-
-    const parts = [];
-    if (loc.tambon) {
-      const prefix = loc.province === "กรุงเทพมหานคร" ? "แขวง" : "ต.";
-      parts.push(`${prefix}${loc.tambon}`);
-    }
-    if (loc.amphoe) {
-      const prefix = loc.province === "กรุงเทพมหานคร" ? "เขต" : "อ.";
-      parts.push(`${prefix}${loc.amphoe}`);
-    }
-    if (loc.province) {
-      const prefix = loc.province === "กรุงเทพมหานคร" ? "" : "จ.";
-      parts.push(`${prefix}${loc.province}`);
-    }
-    return parts.join(' ');
-  };
 
   const handleConfirmParentChange = () => {
     if (pendingParentId === undefined) return;
@@ -2370,7 +2374,7 @@ const BulkEditLocationModal = ({ isOpen, onClose, locationName, orgs, locationDb
                   <div>
                     <h4 className="text-sm font-bold text-amber-800">💡 แนะนำคำที่ถูกต้อง</h4>
                     <p className="text-xs text-amber-700 mt-0.5">
-                      คุณหมายถึง <span className="font-bold text-amber-900">ต.{suggestion.subdistrict} อ.{suggestion.district} จ.{suggestion.province}</span> ใช่หรือไม่?
+                      คุณหมายถึง <span className="font-bold text-amber-900">{formatSingleLocation({ tambon: suggestion.subdistrict, amphoe: suggestion.district, province: suggestion.province })}</span> ใช่หรือไม่?
                     </p>
                   </div>
                 </div>
@@ -2404,7 +2408,7 @@ const BulkEditLocationModal = ({ isOpen, onClose, locationName, orgs, locationDb
                 {selectedLocations.map((loc, idx) => (
                   <div key={idx} className="flex justify-between items-center bg-blue-50 border border-blue-100 rounded-xl p-2.5 text-xs font-semibold text-blue-700">
                     <div className="flex flex-col min-w-0 flex-1">
-                      <span className="truncate">{loc.tambon ? `ต.${loc.tambon} ` : ''}{loc.amphoe ? `อ.${loc.amphoe} ` : ''}จ.${loc.province} {loc.postalCode}</span>
+                      <span className="truncate">{formatSingleLocation(loc)}</span>
                       {loc.code && <span className="text-[10px] text-blue-600/70 font-mono mt-0.5">รหัส: {loc.code}</span>}
                     </div>
                     <button onClick={() => handleRemoveLocation(idx)} className="p-1.5 hover:bg-blue-100 hover:text-red-700 rounded-lg cursor-pointer"><X size={14} /></button>
