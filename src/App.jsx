@@ -2379,9 +2379,30 @@ const BulkEditLocationModal = ({ isOpen, onClose, locationName, orgs, locationDb
         <div className="p-5 flex flex-col gap-4 bg-white">
           
           {(() => {
+            let suggestion = null;
             const matchKey = Object.keys(LOCATION_TYPO_DICT).find(k => locationName && locationName.includes(k));
-            if (!matchKey) return null;
-            const suggestion = LOCATION_TYPO_DICT[matchKey];
+            
+            if (matchKey) {
+              suggestion = LOCATION_TYPO_DICT[matchKey];
+            } else if (locationDb && locationName) {
+              // Dynamic suggestion: find a subdistrict that exactly appears in the error string
+              const partialMatch = locationDb.find(r => 
+                r.district && r.province &&
+                r.district.length >= 3 &&
+                locationName.includes(r.district) &&
+                locationName.includes(r.province)
+              );
+              if (partialMatch) {
+                suggestion = {
+                  subdistrict: partialMatch.district,
+                  district: partialMatch.amphoe,
+                  province: partialMatch.province,
+                  zipcode: partialMatch.zipcode
+                };
+              }
+            }
+
+            if (!suggestion) return null;
             return (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
                 <div className="flex items-center gap-3">
