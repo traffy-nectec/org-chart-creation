@@ -2464,6 +2464,8 @@ const BulkEditLocationModal = ({ isOpen, onClose, locationName, orgs, locationDb
 };
 
 export default function OrgManagerApp() {
+  const [tablePage, setTablePage] = useState(1);
+  const [issueLimit, setIssueLimit] = useState(50);
   // Fetch aliases on component mount
   useEffect(() => {
     if (!isAliasesLoaded) {
@@ -3658,7 +3660,7 @@ export default function OrgManagerApp() {
                   </td>
                 </tr>
               ) : (
-                filteredOrgs.map(org => {
+                filteredOrgs.slice((tablePage - 1) * 100, tablePage * 100).map(org => {
                   const isSelected = selectedNodeId === org.id;
                   const areaCount = getAreaCount(org.areas);
                   const issue = nodeIssues?.get(org.id);
@@ -3791,6 +3793,32 @@ export default function OrgManagerApp() {
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination Controls */}
+        {filteredOrgs.length > 100 && (
+          <div className="flex justify-between items-center py-3 px-4 bg-white border-t border-slate-200 shrink-0">
+            <span className="text-sm text-slate-600 font-medium">
+              แสดงหน้าที่ {tablePage} จาก {Math.ceil(filteredOrgs.length / 100)}
+            </span>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setTablePage(p => Math.max(1, p - 1))}
+                disabled={tablePage === 1}
+                className="px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed rounded text-sm font-bold shadow-sm cursor-pointer"
+              >
+                ก่อนหน้า
+              </button>
+              <button 
+                onClick={() => setTablePage(p => Math.min(Math.ceil(filteredOrgs.length / 100), p + 1))}
+                disabled={tablePage >= Math.ceil(filteredOrgs.length / 100)}
+                className="px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed rounded text-sm font-bold shadow-sm cursor-pointer"
+              >
+                ถัดไป
+              </button>
+            </div>
+          </div>
+        )}
+        
       </div>
     );
   };
@@ -4027,15 +4055,18 @@ export default function OrgManagerApp() {
                                 </div>
                                 {!isSubCollapsed && (
                                   <div className="p-2 space-y-2 bg-slate-50/50">
-                                    {nodes.map(node => (
+                                    {nodes.slice(0, issueLimit).map(node => (
                                       <div key={node.id} className="p-2.5 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 flex flex-col gap-1.5 transition-all shadow-sm">
                                         <div className="flex justify-between items-start gap-2">
                                           <span className="font-bold text-xs text-slate-800 break-words">{node.name || <span className="italic text-slate-500">ไม่ระบุชื่อ</span>}</span>
                                           <button
                                             onClick={() => {
+                                              console.log('Edit clicked for', node.id);
+                                              console.time('EditClickStateUpdates');
                                               setSelectedNodeId(node.id);
                                               setFocusNodeId(node.parentId || node.id);
                                               setSearchedNodeId(node.id);
+                                              console.timeEnd('EditClickStateUpdates');
                                             }}
                                             className="px-2 py-1 bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 rounded-md text-[10px] font-bold shadow-sm cursor-pointer shrink-0"
                                           >
@@ -4044,6 +4075,14 @@ export default function OrgManagerApp() {
                                         </div>
                                       </div>
                                     ))}
+                                    {nodes.length > issueLimit && (
+                                      <button
+                                        onClick={() => setIssueLimit(prev => prev + 50)}
+                                        className="w-full py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-[11px] font-bold shadow-sm cursor-pointer"
+                                      >
+                                        โหลดเพิ่มเติม ({nodes.length - issueLimit} รายการ)
+                                      </button>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -4051,7 +4090,7 @@ export default function OrgManagerApp() {
                           })
                         ) : (
                           <div className="space-y-2">
-                            {group.items.map(node => (
+                            {group.items.slice(0, issueLimit).map(node => (
                               <div
                                 key={node.id}
                                 className={`p-3 rounded-lg border ${group.id === 'circle' || group.id === 'missingParent' ? 'border-red-200 bg-red-50 hover:bg-red-100' : 'border-amber-200 bg-amber-50 hover:bg-amber-100'} transition-all flex flex-col gap-2 shadow-sm`}
@@ -4061,9 +4100,12 @@ export default function OrgManagerApp() {
                                   <div className="flex gap-1.5 shrink-0">
                                     <button
                                       onClick={() => {
+                                        console.log('Edit clicked for (group)', node.id);
+                                        console.time('EditClickStateUpdates');
                                         setSelectedNodeId(node.id);
                                         setFocusNodeId(node.parentId || node.id);
                                         setSearchedNodeId(node.id);
+                                        console.timeEnd('EditClickStateUpdates');
                                       }}
                                       className={`px-2 py-1 bg-white border ${group.id === 'circle' || group.id === 'missingParent' ? 'border-red-300 text-red-600 hover:bg-red-50' : 'border-amber-300 text-amber-700 hover:bg-amber-50'} rounded-md text-[10px] font-bold shadow-sm cursor-pointer`}
                                     >
@@ -4086,6 +4128,14 @@ export default function OrgManagerApp() {
                                 </div>
                               </div>
                             ))}
+                            {group.items.length > issueLimit && (
+                              <button
+                                onClick={() => setIssueLimit(prev => prev + 50)}
+                                className="w-full py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-[11px] font-bold shadow-sm cursor-pointer"
+                              >
+                                โหลดเพิ่มเติม ({group.items.length - issueLimit} รายการ)
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
