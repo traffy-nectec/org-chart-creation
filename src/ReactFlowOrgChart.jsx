@@ -28,6 +28,15 @@ const getAreaCount = (areas) => {
 // --- Custom Node ---
 const OrgNodeFlow = ({ data }) => {
   const { node, isSelected, hasError, hasWarning, issue, isDrillable, setFocusNodeId, handleAddNode, isParent, childCount, setSelectedNodeId } = data;
+  if (node?.isDummy) {
+    return (
+      <div className="w-[240px] h-[210px] flex items-center justify-center p-3 rounded-2xl border-2 border-slate-200 border-dashed bg-slate-50">
+        <div className="text-slate-500 font-bold text-sm text-center px-4">
+          {node.name}
+        </div>
+      </div>
+    );
+  }
   const lvl = node.level || 1;
   let levelColorClass = "bg-slate-100 text-slate-700 border-slate-200";
   if (lvl === 1) levelColorClass = "bg-purple-100 text-purple-800 border-purple-200";
@@ -290,7 +299,10 @@ const FlowInner = ({ orgTree, focusNodeId, setFocusNodeId, selectedNodeId, setSe
       });
 
       if (depth === 0 && childCount > 0) {
-        node.children.forEach(child => {
+        const MAX_CHILDREN = 200;
+        const displayChildren = node.children.slice(0, MAX_CHILDREN);
+        
+        displayChildren.forEach(child => {
           flatEdges.push({
             id: `e-${node.id}-${child.id}`,
             source: node.id,
@@ -301,6 +313,37 @@ const FlowInner = ({ orgTree, focusNodeId, setFocusNodeId, selectedNodeId, setSe
           });
           traverse(child, depth + 1);
         });
+
+        if (childCount > MAX_CHILDREN) {
+          const remainingCount = childCount - MAX_CHILDREN;
+          const dummyId = `dummy-${node.id}`;
+          flatNodes.push({
+            id: dummyId,
+            type: 'orgNode',
+            data: {
+              node: { id: dummyId, name: `... และอีก ${remainingCount.toLocaleString()} หน่วยงานย่อย`, isDummy: true },
+              isSelected: false,
+              hasError: false,
+              hasWarning: false,
+              issue: null,
+              treeLayout: 'vertical',
+              childCount: 0,
+              isParent: false,
+              isDrillable: false,
+              setFocusNodeId,
+              handleAddNode,
+              setSelectedNodeId
+            }
+          });
+          flatEdges.push({
+            id: `e-${node.id}-${dummyId}`,
+            source: node.id,
+            target: dummyId,
+            type: 'smoothstep',
+            animated: false,
+            style: { stroke: '#cbd5e1', strokeWidth: 1.5, opacity: 0.5, strokeDasharray: '5,5' },
+          });
+        }
       }
     };
 
@@ -348,7 +391,18 @@ const FlowInner = ({ orgTree, focusNodeId, setFocusNodeId, selectedNodeId, setSe
     prevFocusNodeIdRef.current = focusNodeId;
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orgTree, focusNodeId, treeLayout, selectedNodeId, nodeIssues]);
+  }, [orgTree, focusNodeId, treeLayout, nodeIssues]); // REMOVED selectedNodeId from here
+
+  // Separate useEffect to update node selection state WITHOUT re-running layout algorithm
+  useEffect(() => {
+    setNodes(nds => nds.map(node => {
+      const isSelected = selectedNodeId === node.id;
+      if (node.data.isSelected !== isSelected) {
+        return { ...node, data: { ...node.data, isSelected } };
+      }
+      return node;
+    }));
+  }, [selectedNodeId, setNodes]);
 
   const onDownload = () => {
     if (nodes.length === 0) return;
