@@ -16,14 +16,10 @@ import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 // ==========================================
 // CONFIGURATION: Data Cleansing & Alias Dictionary
 // ==========================================
-// Dictionary for converting abbreviations to official terms.
-// Easily extendable - just add key-value pairs here.
-const FULL_TO_ABBREV_DICT = {
-  'องค์การบริหารส่วนตำบล': 'อบต.',
-  'องค์การบริหารส่วนจังหวัด': 'อบจ.',
-  'สถานีตำรวจภูธร': 'สภ.',
-  'สถานีตำรวจนครบาล': 'สน.',
-};
+// Global dictionary populated from backend on mount
+let orgNameAliases = [];
+let isAliasesLoaded = false;
+
 
 // Dictionary for suggesting correct locations when users make common spelling mistakes in Excel
 const LOCATION_TYPO_DICT = {
@@ -98,18 +94,20 @@ const sanitizeString = (str, options = { showToast: false }) => {
   // 4. Normalize spacing
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
-  // 5. Abbreviate full names
-  const fullToAbbrevEntries = Object.entries(FULL_TO_ABBREV_DICT).sort((a, b) => b[0].length - a[0].length);
-  for (const [fullWord, abbrev] of fullToAbbrevEntries) {
-    if (cleaned.includes(fullWord)) {
-      cleaned = cleaned.replaceAll(fullWord, abbrev);
+  // 5. Abbreviate full names and perform replacements from database
+  for (const alias of orgNameAliases) {
+    if (cleaned.includes(alias.search_text)) {
+      cleaned = cleaned.replaceAll(alias.search_text, alias.replace_text);
       if (options.showToast) {
-        toast.success(`เปลี่ยนคำว่า "${fullWord}" เป็น "${abbrev}"`, {
+        toast.success(`เปลี่ยนคำว่า "${alias.search_text}" เป็น "${alias.replace_text}"`, {
           duration: 3000,
         });
       }
     }
   }
+
+  // Handle ( ) spaces cleanup explicitly since we moved away from PHP while loops
+  cleaned = cleaned.replace(/\(\s+/g, '(').replace(/\s+\)/g, ')').replace(/\(\)/g, '');
 
   // 6. Expand abbreviations
   const abbrevToFullEntries = Object.entries(ABBREV_TO_FULL_DICT).sort((a, b) => b[0].length - a[0].length);
@@ -2466,6 +2464,22 @@ const BulkEditLocationModal = ({ isOpen, onClose, locationName, orgs, locationDb
 };
 
 export default function OrgManagerApp() {
+  // Fetch aliases on component mount
+  useEffect(() => {
+    if (!isAliasesLoaded) {
+      fetch('http://localhost:8080/api/aliases')
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            // Sort by search_text length descending to match longest phrases first
+            orgNameAliases = data.sort((a, b) => b.search_text.length - a.search_text.length);
+            isAliasesLoaded = true;
+          }
+        })
+        .catch(err => console.error("Failed to load organization aliases:", err));
+    }
+  }, []);
+
   const DEFAULT_ORGS = [
     {
       id: 'root-1', name: 'กรุงเทพมหานคร', level: 1, parentId: null, logo: null,
