@@ -2470,7 +2470,8 @@ export default function OrgManagerApp() {
   // Fetch aliases on component mount
   useEffect(() => {
     if (!isAliasesLoaded) {
-      fetch('http://localhost:8080/api/aliases')
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      fetch(`${apiUrl}/api/aliases`)
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) {
@@ -3176,7 +3177,8 @@ export default function OrgManagerApp() {
         console.log(`[Batch ${i}] Sending payload with ${namesPayload.names.length} names...`, namesPayload.names.slice(0, 5));
         
         try {
-          const response = await fetch('/api/similarity', {
+          const apiUrl = import.meta.env.VITE_API_URL || '';
+          const response = await fetch(`${apiUrl}/api/similarity`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(namesPayload),
@@ -3254,7 +3256,8 @@ export default function OrgManagerApp() {
       const payload = generateBackendPayload(currentOrgs);
       
       if (destination === 'api') {
-        const response = await fetch('/api/import', {
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        const response = await fetch(`${apiUrl}/api/import`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -3296,7 +3299,8 @@ export default function OrgManagerApp() {
       if (!importJobId) return;
 
       try {
-        const response = await fetch(`/api/import/status/${importJobId}`);
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        const response = await fetch(`${apiUrl}/api/import/status/${importJobId}`);
         if (response.ok) {
           const data = await response.json();
           setImportProgress(data);
