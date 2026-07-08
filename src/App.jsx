@@ -3548,12 +3548,11 @@ export default function OrgManagerApp() {
     };
 
     // Flatten orgTree to preserve hierarchical order
-    const flattenTree = (nodes) => {
-      let result = [];
+    const flattenTree = (nodes, result = []) => {
       nodes.forEach(node => {
         result.push(node);
         if (node.children && node.children.length > 0) {
-          result = result.concat(flattenTree(node.children));
+          flattenTree(node.children, result);
         }
       });
       return result;
@@ -3566,11 +3565,14 @@ export default function OrgManagerApp() {
     const missingOrgs = organizations.filter(o => !sortedIds.has(o.id));
     const finalOrgs = [...sortedOrgs, ...missingOrgs];
 
+    const orgMap = new Map();
+    organizations.forEach(o => orgMap.set(o.id, o));
+
     const isNodeVisible = (org) => {
       let curr = org.parentId;
       while (curr) {
         if (collapsedTableNodes.has(curr)) return false;
-        const p = organizations.find(o => o.id === curr);
+        const p = orgMap.get(curr);
         curr = p ? p.parentId : null;
       }
       return true;
@@ -3948,21 +3950,6 @@ export default function OrgManagerApp() {
 
           <div className="w-px h-8 bg-slate-200 mx-1 self-center"></div>
 
-          <button
-            onClick={() => handlePrepareExport('json')}
-            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold shadow-sm transition-all duration-300 ${((isExporting || isCheckingDuplicates) && exportDestination === 'json')
-                ? 'bg-slate-200 text-slate-500 cursor-wait'
-                : 'bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-indigo-100 cursor-pointer'
-              }`}
-            disabled={isExporting || isCheckingDuplicates}
-          >
-            {(isExporting || isCheckingDuplicates) && exportDestination === 'json' ? (
-              <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-500"></div> {isCheckingDuplicates ? 'กำลังตรวจสอบ...' : 'กำลังสร้างไฟล์...'}</>
-            ) : (
-              <><Download size={16} /> โหลด JSON</>
-            )}
-          </button>
-          
           <button
             onClick={() => handlePrepareExport('api')}
             className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold shadow-lg transition-all duration-300 ${((isExporting || isCheckingDuplicates) && exportDestination === 'api')
