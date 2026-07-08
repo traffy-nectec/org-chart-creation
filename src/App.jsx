@@ -1488,7 +1488,8 @@ const ConfigPanel = ({ selectedNode, handleUpdateNode, handleDeleteNode, onClose
 
   const potentialRoots = React.useMemo(() => {
     if (!organizations) return [];
-    return organizations.filter(org => !org.parentId || !organizations.some(n => n.id === org.parentId));
+    const idSet = new Set(organizations.map(o => o.id));
+    return organizations.filter(org => !org.parentId || !idSet.has(org.parentId));
   }, [organizations]);
 
   const primaryRootId = potentialRoots.length > 0 ? potentialRoots[0].id : null;
