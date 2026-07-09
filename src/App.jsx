@@ -4628,7 +4628,7 @@ export default function OrgManagerApp() {
       {/* Progressive Conflict Resolution Modal */}
       {isConflictModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-[900px] max-w-full max-h-[90vh] flex flex-col animate-in zoom-in-95">
+          <div className="bg-white rounded-2xl shadow-xl w-[1100px] max-w-full max-h-[90vh] flex flex-col animate-in zoom-in-95">
             <div className="px-6 py-4 border-b border-slate-100 flex flex-col gap-4 bg-amber-50 rounded-t-2xl shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
