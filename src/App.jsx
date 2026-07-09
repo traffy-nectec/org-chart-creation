@@ -4609,7 +4609,8 @@ export default function OrgManagerApp() {
               {(() => {
                 const highConflicts = conflicts.filter(c => c.matches.some(m => m.score >= 0.9));
                 const mediumConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.9) && c.matches.some(m => m.score >= 0.7));
-                const lowConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.7));
+                const lowConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.7) && c.matches.some(m => m.score >= 0.5));
+                const veryLowConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.5));
                 
                 const getResolvedCount = (list) => list.filter(c => userResolutions[c.temp_id]).length;
 
@@ -4637,7 +4638,13 @@ export default function OrgManagerApp() {
                       onClick={() => setActiveConflictTab('low')}
                       className={`flex-none min-w-fit py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'low' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                     >
-                      🟢 คล้ายน้อย (&lt;70%) ({getResolvedCount(lowConflicts)}/{lowConflicts.length})
+                      🟢 คล้ายน้อย (50-69%) ({getResolvedCount(lowConflicts)}/{lowConflicts.length})
+                    </button>
+                    <button 
+                      onClick={() => setActiveConflictTab('very_low')}
+                      className={`flex-none min-w-fit py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'very_low' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+                    >
+                      ⚪️ คล้ายน้อยมาก (0-49%) ({getResolvedCount(veryLowConflicts)}/{veryLowConflicts.length})
                     </button>
                   </div>
                 );
@@ -4648,12 +4655,14 @@ export default function OrgManagerApp() {
               {(() => {
                 const highConflicts = conflicts.filter(c => c.matches.some(m => m.score >= 0.9));
                 const mediumConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.9) && c.matches.some(m => m.score >= 0.7));
-                const lowConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.7));
+                const lowConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.7) && c.matches.some(m => m.score >= 0.5));
+                const veryLowConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.5));
                 
                 const activeConflicts = activeConflictTab === 'all' ? conflicts
                                       : activeConflictTab === 'high' ? highConflicts 
                                       : activeConflictTab === 'medium' ? mediumConflicts 
-                                      : lowConflicts;
+                                      : activeConflictTab === 'low' ? lowConflicts 
+                                      : veryLowConflicts;
 
                 if (activeConflicts.length === 0) {
                   return (
