@@ -2622,7 +2622,7 @@ export default function OrgManagerApp() {
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
   const [conflicts, setConflicts] = useState([]);
   const [userResolutions, setUserResolutions] = useState({});
-  const [activeConflictTab, setActiveConflictTab] = useState('high'); // 'high', 'medium', 'low'
+  const [activeConflictTab, setActiveConflictTab] = useState('all'); // 'all', 'high', 'medium', 'low'
   const [isPreExportModalOpen, setIsPreExportModalOpen] = useState(false);
   const [preExportChecks, setPreExportChecks] = useState({});
   const [searchDuration, setSearchDuration] = useState(0);
@@ -4614,24 +4614,30 @@ export default function OrgManagerApp() {
                 const getResolvedCount = (list) => list.filter(c => userResolutions[c.temp_id]).length;
 
                 return (
-                  <div className="flex bg-white rounded-lg p-1 border border-amber-200 shadow-sm">
+                  <div className="flex bg-white rounded-lg p-1 border border-amber-200 shadow-sm overflow-x-auto">
+                    <button 
+                      onClick={() => setActiveConflictTab('all')}
+                      className={`flex-none min-w-fit py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'all' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+                    >
+                      📋 ทั้งหมด ({getResolvedCount(conflicts)}/{conflicts.length})
+                    </button>
                     <button 
                       onClick={() => setActiveConflictTab('high')}
-                      className={`flex-1 py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'high' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+                      className={`flex-none min-w-fit py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'high' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                     >
-                      🔴 คล้ายมาก ({getResolvedCount(highConflicts)}/{highConflicts.length})
+                      🔴 คล้ายมาก (90-100%) ({getResolvedCount(highConflicts)}/{highConflicts.length})
                     </button>
                     <button 
                       onClick={() => setActiveConflictTab('medium')}
-                      className={`flex-1 py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'medium' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+                      className={`flex-none min-w-fit py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'medium' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                     >
-                      🟡 ปานกลาง ({getResolvedCount(mediumConflicts)}/{mediumConflicts.length})
+                      🟡 ปานกลาง (70-89%) ({getResolvedCount(mediumConflicts)}/{mediumConflicts.length})
                     </button>
                     <button 
                       onClick={() => setActiveConflictTab('low')}
-                      className={`flex-1 py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'low' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+                      className={`flex-none min-w-fit py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'low' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                     >
-                      🟢 คล้ายน้อย ({getResolvedCount(lowConflicts)}/{lowConflicts.length})
+                      🟢 คล้ายน้อย (&lt;70%) ({getResolvedCount(lowConflicts)}/{lowConflicts.length})
                     </button>
                   </div>
                 );
@@ -4644,7 +4650,8 @@ export default function OrgManagerApp() {
                 const mediumConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.9) && c.matches.some(m => m.score >= 0.7));
                 const lowConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.7));
                 
-                const activeConflicts = activeConflictTab === 'high' ? highConflicts 
+                const activeConflicts = activeConflictTab === 'all' ? conflicts
+                                      : activeConflictTab === 'high' ? highConflicts 
                                       : activeConflictTab === 'medium' ? mediumConflicts 
                                       : lowConflicts;
 
