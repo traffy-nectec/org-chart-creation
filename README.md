@@ -169,34 +169,27 @@ sequenceDiagram
     participant Worker as Background Worker
     actor Admin as ผู้ดูแลระบบ (Admin)
 
-    rect rgb(230, 240, 255)
     Note over User, DB: เฟส 1: การยืนยันตัวตนและการเตรียมข้อมูล (Authentication & Preparation)
     User->>UI: กรอกรหัส X-API-Key เพื่อเข้าใช้งานระบบ
     UI->>API: ยืนยันรหัสผ่าน
     API-->>UI: 200 OK
     User->>UI: อัปโหลดไฟล์ Excel / ดึงข้อมูลจาก Google Sheets
     UI->>UI: ตรวจสอบความถูกต้องเบื้องต้น & จัดเรียงแบบ Topological Sort
-    end
 
-    rect rgb(255, 245, 230)
     Note over User, DB: เฟส 2: การตรวจสอบความซ้ำซ้อน (Similarity Check)
     UI->>API: POST /api/similarity (เช็คชื่อซ้ำ)
     API->>DB: Query ความคล้าย (pg_trgm)
     DB-->>API: ส่งรายชื่อที่คล้ายกันกลับมา
     API-->>UI: แสดง Modal แจ้งเตือนความซ้ำซ้อน
     User->>UI: รีวิวและเลือก Action (CREATE สร้างใหม่ หรือ LINK ผูกของเดิม)
-    end
 
-    rect rgb(255, 235, 235)
     Note over User, DB: เฟส 3: ส่งข้อมูลเข้าระบบ Staging (Pending Approval)
     User->>UI: กรอกอีเมล (Soft Identity) & กด "ส่งเข้าระบบ"
     UI->>API: POST /api/import (ส่ง Payload + Email)
     API->>DB: บันทึกข้อมูล JSON ลงตาราง import_jobs (Status: pending_approval)
     API-->>UI: Return Job ID
     UI-->>User: แจ้งเตือน "รอ Admin อนุมัติ" & บันทึก Job ID ลงเครื่อง
-    end
 
-    rect rgb(240, 230, 255)
     Note over Admin, Worker: เฟส 4: กระบวนการตรวจสอบโดย Admin (Admin Review Loop)
     Admin->>UI: เข้าหน้า Admin Dashboard (ต้องใช้รหัส X-Admin-Key)
     UI->>API: GET /api/import/jobs
@@ -217,9 +210,7 @@ sequenceDiagram
         API-)Worker: เริ่มกระบวนการ ProcessBackground (Asynchronous)
         API-->>UI: 200 OK (กำลังสร้างจริง)
     end
-    end
 
-    rect rgb(212, 237, 218)
     Note over User, Worker: เฟส 5: การบันทึกผลจริงและการแสดงผล (Execution & Success)
     loop วนลูป Bulk Insert ทีละชุดตามลำดับชั้น (Topological Order)
         Worker->>DB: INSERT ข้อมูลลง voice_fonduegroup
@@ -232,7 +223,6 @@ sequenceDiagram
     UI->>API: GET /api/import/status/{job_id}
     API-->>UI: { status: "completed", processed: 100% }
     UI-->>User: แสดงผล "สร้างหน่วยงานสำเร็จ 100%"
-    end
 ```
 
 ### 3. Database Schema (รองรับ Multi-parent)
