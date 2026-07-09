@@ -100,29 +100,32 @@
 
 ```mermaid
 flowchart TD
+    classDef completed fill:transparent,stroke:#28a745,stroke-width:2px;
+    classDef pending fill:transparent,stroke:#ffc107,stroke-width:2px,stroke-dasharray: 5 5;
+    classDef waiting fill:transparent,stroke:#dc3545,stroke-width:2px;
 
     subgraph Frontend
-        A("User สร้าง/แก้ไขผังใน UI")
-        B("Topological Sort (Check Circular Ref)")
-        C("แจ้งเตือนข้อผิดพลาด (ถ้ามี)")
-        D("แบ่งข้อมูลยิง API (Chunking)")
-        E("UI จัดการชื่อซ้ำ (Conflict Resolution)")
-        F("Progress Polling UI (รอประมวลผล)")
+        A("User สร้าง/แก้ไขผังใน UI"):::completed
+        B("Topological Sort (Check Circular Ref)"):::completed
+        C("แจ้งเตือนข้อผิดพลาด (ถ้ามี)"):::completed
+        D("แบ่งข้อมูลยิง API (Chunking)"):::completed
+        E("UI จัดการชื่อซ้ำ (Conflict Resolution)"):::completed
+        F("Progress Polling UI (รอประมวลผล)"):::completed
     end
 
     subgraph Backend
-        G("POST /api/similarity (ตรวจสอบชื่อซ้ำ)")
-        H("POST /api/import (รับข้อมูลเข้าระบบ)")
-        I("GET /api/import/status (เช็คสถานะ)")
-        J("Background Worker Pipeline")
-        M("Save to Staging Table (ระบบตะกร้าพัก)")
+        G("POST /api/similarity (ตรวจสอบชื่อซ้ำ)"):::completed
+        H("POST /api/import (รับข้อมูลเข้าระบบ)"):::completed
+        I("GET /api/import/status (เช็คสถานะ)"):::completed
+        J("Background Worker Pipeline"):::completed
+        M("Save to Staging Table (ระบบตะกร้าพัก)"):::pending
     end
 
     subgraph Database
-        K[("pg_trgm Similarity Search")]
-        L[("import_jobs Table")]
-        N[("voice_fonduegroup")]
-        O[("voice_hierarchy_org")]
+        K[("pg_trgm Similarity Search")]:::completed
+        L[("import_jobs Table")]:::completed
+        N[("voice_fonduegroup")]:::waiting
+        O[("voice_hierarchy_org")]:::waiting
     end
 
     A -->|"กดส่งออก Backend"| B
@@ -166,27 +169,34 @@ sequenceDiagram
     participant Worker as Background Worker
     actor Admin as ผู้ดูแลระบบ (Admin)
 
+    rect rgba(0, 150, 255, 0.1)
     Note over User, DB: เฟส 1: การยืนยันตัวตนและการเตรียมข้อมูล (Authentication & Preparation)
     User->>UI: กรอกรหัส X-API-Key เพื่อเข้าใช้งานระบบ
     UI->>API: ยืนยันรหัสผ่าน
     API-->>UI: 200 OK
     User->>UI: อัปโหลดไฟล์ Excel / ดึงข้อมูลจาก Google Sheets
     UI->>UI: ตรวจสอบความถูกต้องเบื้องต้น & จัดเรียงแบบ Topological Sort
+    end
 
+    rect rgba(255, 165, 0, 0.1)
     Note over User, DB: เฟส 2: การตรวจสอบความซ้ำซ้อน (Similarity Check)
     UI->>API: POST /api/similarity (เช็คชื่อซ้ำ)
     API->>DB: Query ความคล้าย (pg_trgm)
     DB-->>API: ส่งรายชื่อที่คล้ายกันกลับมา
     API-->>UI: แสดง Modal แจ้งเตือนความซ้ำซ้อน
     User->>UI: รีวิวและเลือก Action (CREATE สร้างใหม่ หรือ LINK ผูกของเดิม)
+    end
 
+    rect rgba(255, 0, 0, 0.1)
     Note over User, DB: เฟส 3: ส่งข้อมูลเข้าระบบ Staging (Pending Approval)
     User->>UI: กรอกอีเมล (Soft Identity) & กด "ส่งเข้าระบบ"
     UI->>API: POST /api/import (ส่ง Payload + Email)
     API->>DB: บันทึกข้อมูล JSON ลงตาราง import_jobs (Status: pending_approval)
     API-->>UI: Return Job ID
     UI-->>User: แจ้งเตือน "รอ Admin อนุมัติ" & บันทึก Job ID ลงเครื่อง
+    end
 
+    rect rgba(150, 0, 255, 0.1)
     Note over Admin, Worker: เฟส 4: กระบวนการตรวจสอบโดย Admin (Admin Review Loop)
     Admin->>UI: เข้าหน้า Admin Dashboard (ต้องใช้รหัส X-Admin-Key)
     UI->>API: GET /api/import/jobs
@@ -207,7 +217,9 @@ sequenceDiagram
         API-)Worker: เริ่มกระบวนการ ProcessBackground (Asynchronous)
         API-->>UI: 200 OK (กำลังสร้างจริง)
     end
+    end
 
+    rect rgba(0, 255, 0, 0.1)
     Note over User, Worker: เฟส 5: การบันทึกผลจริงและการแสดงผล (Execution & Success)
     loop วนลูป Bulk Insert ทีละชุดตามลำดับชั้น (Topological Order)
         Worker->>DB: INSERT ข้อมูลลง voice_fonduegroup
@@ -220,6 +232,7 @@ sequenceDiagram
     UI->>API: GET /api/import/status/{job_id}
     API-->>UI: { status: "completed", processed: 100% }
     UI-->>User: แสดงผล "สร้างหน่วยงานสำเร็จ 100%"
+    end
 ```
 
 ### 3. Database Schema (รองรับ Multi-parent)
