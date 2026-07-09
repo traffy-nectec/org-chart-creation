@@ -156,94 +156,82 @@ flowchart TD
 - 🟥 **กรอบสีแดง (Waiting):** ส่วนที่พัฒนาเสร็จแล้ว แต่กำลังรอให้เซิร์ฟเวอร์เปิดสิทธิ์ Database แบบ Read-Write ให้
 - 🟨 **กรอบสีเหลืองเส้นปะ (Pending / Roadmap):** แผนงานในอนาคต (Phase ถัดไป)
 
-### 2. Sequence Diagram (การทำงาน E2E จาก Client ถึง Database)
+### 2. Master Sequence Diagram (E2E Workflow)
 
-```mermaid
-sequenceDiagram
-    participant C as Client (Frontend)
-    participant A as Backend API
-    participant W as Async Worker
-    participant DB as PostgreSQL
-
-    rect rgb(212, 237, 218)
-    Note over C, DB: เฟส 1: การจัดการข้อมูลและการค้นหา (เสร็จแล้ว 100%)
-    C->>C: นำเข้าข้อมูล & Topological Sort
-    C->>A: POST /api/similarity (เช็คชื่อซ้ำทีละ 200 แถว)
-    A->>DB: Query `pg_trgm` similarity
-    DB-->>A: ส่งกลับรายชื่อที่คล้าย
-    A-->>C: แสดง Modal ให้ User รีวิว
-    C->>C: User ตัดสินใจ (LINK หรือ CREATE)
-    end
-    
-    rect rgb(212, 237, 218)
-    Note over C, DB: เฟส 2: การนำเข้าข้อมูล (Background Process - เสร็จแล้ว)
-    C->>A: POST /api/import (ส่ง Final JSON)
-    A->>DB: INSERT into `import_jobs`
-    A-->>C: HTTP 202 Accepted (ส่ง Job ID กลับ)
-    C->>A: GET /api/import/status/{job_id} (Polling)
-    A-->>C: { status: "processing", processed: 0 }
-    end
-    
-    rect rgb(248, 215, 218)
-    Note over A, DB: เฟส 3: การบันทึกผลจริง (รอสิทธิ์ Database)
-    A-)W: Spawn Worker Task
-    loop วนลูป Bulk Insert ทีละ 1000 รายการ
-        W->>DB: INSERT ลง `voice_fonduegroup`
-        W->>DB: Update `voice_hierarchy_org` (Materialized Path)
-        W->>DB: Update `import_jobs` progress
-    end
-    W->>DB: อัปเดตสถานะเป็น "completed"
-    end
-    
-    rect rgb(212, 237, 218)
-    Note over C, DB: เฟส 4: แสดงผลลัพธ์ (เสร็จแล้ว 100%)
-    C->>A: GET /api/import/status/{job_id} (Polling)
-    A-->>C: { status: "completed", processed: 1000 }
-    C->>C: ขึ้นหน้าจอ Success (เสร็จสมบูรณ์)
-    end
-```
-
-### 3. Staging Workflow (Admin Approval Flow) [Planned for Next Phase]
+ครอบคลุมกระบวนการตั้งแต่การเข้าสู่ระบบ, ตรวจสอบความซ้ำซ้อน, รอแอดมินอนุมัติ (Staging) ไปจนถึงการสร้างจริงลงฐานข้อมูล
 
 ```mermaid
 sequenceDiagram
     actor User as ผู้ขอสร้าง (User)
     participant UI as Frontend (Org Builder)
     participant API as Backend API
-    participant DB as Database (import_jobs)
+    participant DB as Database (PostgreSQL)
+    participant Worker as Background Worker
     actor Admin as ผู้ดูแลระบบ (Admin)
 
-    User->>UI: อัปโหลดไฟล์ & ตรวจสอบความซ้ำซ้อน
-    UI-->>User: แสดงผลการตรวจสอบ (คล้ายกับอะไร ให้เลือก CREATE/LINK)
-    User->>UI: กรอกข้อมูลผู้ติดต่อ (Email) & กด "ส่งเข้าระบบ"
+    rect rgb(230, 240, 255)
+    Note over User, DB: เฟส 1: การยืนยันตัวตนและการเตรียมข้อมูล (Authentication & Preparation)
+    User->>UI: กรอกรหัส X-API-Key เพื่อเข้าใช้งานระบบ
+    UI->>API: ยืนยันรหัสผ่าน
+    API-->>UI: 200 OK
+    User->>UI: อัปโหลดไฟล์ Excel / ดึงข้อมูลจาก Google Sheets
+    UI->>UI: ตรวจสอบความถูกต้องเบื้องต้น & จัดเรียงแบบ Topological Sort
+    end
+
+    rect rgb(255, 245, 230)
+    Note over User, DB: เฟส 2: การตรวจสอบความซ้ำซ้อน (Similarity Check)
+    UI->>API: POST /api/similarity (เช็คชื่อซ้ำ)
+    API->>DB: Query ความคล้าย (pg_trgm)
+    DB-->>API: ส่งรายชื่อที่คล้ายกันกลับมา
+    API-->>UI: แสดง Modal แจ้งเตือนความซ้ำซ้อน
+    User->>UI: รีวิวและเลือก Action (CREATE สร้างใหม่ หรือ LINK ผูกของเดิม)
+    end
+
+    rect rgb(255, 235, 235)
+    Note over User, DB: เฟส 3: ส่งข้อมูลเข้าระบบ Staging (Pending Approval)
+    User->>UI: กรอกอีเมล (Soft Identity) & กด "ส่งเข้าระบบ"
     UI->>API: POST /api/import (ส่ง Payload + Email)
-    API->>DB: บันทึกข้อมูลเป็น JSON (Status: pending_approval)
-    API-->>UI: Return Job ID (รอดำเนินการ)
-    UI-->>User: แสดงข้อความ "รอ Admin อนุมัติ" และบันทึก Job ID ลงเครื่อง
-    
-    note over Admin,DB: --- กระบวนการตรวจสอบโดย Admin ---
-    
-    Admin->>UI: เปิดหน้า Admin Dashboard (ใช้ X-Admin-Key)
+    API->>DB: บันทึกข้อมูล JSON ลงตาราง import_jobs (Status: pending_approval)
+    API-->>UI: Return Job ID
+    UI-->>User: แจ้งเตือน "รอ Admin อนุมัติ" & บันทึก Job ID ลงเครื่อง
+    end
+
+    rect rgb(240, 230, 255)
+    Note over Admin, Worker: เฟส 4: กระบวนการตรวจสอบโดย Admin (Admin Review Loop)
+    Admin->>UI: เข้าหน้า Admin Dashboard (ต้องใช้รหัส X-Admin-Key)
     UI->>API: GET /api/import/jobs
-    API->>DB: ดึงรายการที่ pending_approval
-    API-->>UI: ส่งรายการกลับมาแสดงผล
-    UI-->>Admin: แสดงข้อมูลผู้ขอ, จำนวนหน่วยงาน, สิ่งที่เลือก (CREATE/LINK)
-    Admin->>UI: กดดูรายละเอียด (Preview)
+    API-->>UI: แสดงรายการงานที่รออนุมัติ
+    Admin->>UI: กด Preview ตรวจสอบ Payload (ชื่อหน่วยงาน, CREATE/LINK)
     
-    alt ถ้าข้อมูลไม่ถูกต้อง (Reject)
-        Admin->>UI: กด Reject พร้อมกรอก "เหตุผล (Admin Comment)"
+    alt กรณีข้อมูลผิดพลาด (Reject)
+        Admin->>UI: กด Reject พร้อมระบุ "เหตุผล"
         UI->>API: POST /api/import/{job_id}/reject (ส่งพร้อม X-Admin-Key)
-        API->>DB: อัปเดต Status เป็น rejected พร้อมเหตุผล
-        UI-->>User: User กรอกอีเมลเช็คสถานะ -> เห็นว่าถูกตีตกพร้อมเหตุผล
-        User->>UI: กดแก้ไขจากงานเก่า (ดึง Payload เดิมจาก DB)
-        User->>UI: กดส่งเข้าระบบ -> สร้าง Job ID ใหม่
-    else ถ้าข้อมูลถูกต้อง (Approve)
+        API->>DB: อัปเดต Status = rejected & บันทึกเหตุผล
+        User->>UI: เข้าแท็บ "ประวัติของฉัน" (ใส่อีเมล) เพื่อเช็คสถานะ
+        UI-->>User: แจ้งเตือนถูกตีตกพร้อมเหตุผล
+        User->>UI: ดึง Payload เดิมมาแก้ไข แล้ววนกลับไป "เฟส 3" (ได้ Job ID ใหม่)
+    else กรณีข้อมูลถูกต้อง (Approve)
         Admin->>UI: กด Approve
         UI->>API: POST /api/import/{job_id}/approve (ส่งพร้อม X-Admin-Key)
-        API->>DB: อัปเดต Status เป็น processing
-        API->>API: เริ่มกระบวนการ ProcessBackground (สร้างลงตารางจริง)
-        API-->>UI: Return 200 OK
-        UI-->>Admin: แสดง Progress Bar การสร้างจริง
+        API->>DB: อัปเดต Status = processing
+        API-)Worker: เริ่มกระบวนการ ProcessBackground (Asynchronous)
+        API-->>UI: 200 OK (กำลังสร้างจริง)
+    end
+    end
+
+    rect rgb(212, 237, 218)
+    Note over User, Worker: เฟส 5: การบันทึกผลจริงและการแสดงผล (Execution & Success)
+    loop วนลูป Bulk Insert ทีละชุดตามลำดับชั้น (Topological Order)
+        Worker->>DB: INSERT ข้อมูลลง voice_fonduegroup
+        Worker->>DB: Update ความสัมพันธ์โครงสร้าง (Materialized Path)
+        Worker->>DB: อัปเดต Progress ในตาราง import_jobs
+    end
+    Worker->>DB: อัปเดตสถานะสุดท้ายเป็น "completed"
+    
+    User->>UI: เช็คสถานะในแท็บ "ประวัติของฉัน" (Polling)
+    UI->>API: GET /api/import/status/{job_id}
+    API-->>UI: { status: "completed", processed: 100% }
+    UI-->>User: แสดงผล "สร้างหน่วยงานสำเร็จ 100%"
     end
 ```
 
