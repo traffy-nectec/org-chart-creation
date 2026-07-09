@@ -118,14 +118,14 @@ flowchart TD
         H("POST /api/import (รับข้อมูลเข้าระบบ)"):::completed
         I("GET /api/import/status (เช็คสถานะ)"):::completed
         J("Background Worker Pipeline"):::completed
-        M("Save to Staging Table (ระบบตะกร้าพัก)"):::pending
+        M("Save to Staging Table (ระบบตะกร้าพัก)"):::completed
     end
 
     subgraph Database
         K[("pg_trgm Similarity Search")]:::completed
         L[("import_jobs Table")]:::completed
-        N[("voice_fonduegroup")]:::waiting
-        O[("voice_hierarchy_org")]:::waiting
+        N[("voice_fonduegroup")]:::completed
+        O[("voice_hierarchy_org")]:::completed
     end
 
     A -->|"กดส่งออก Backend"| B
@@ -147,8 +147,8 @@ flowchart TD
     J -->|"Insert หน่วยงาน (รอ DB เปิดสิทธิ์)"| N
     J -->|"Insert โครงสร้าง Path (รอ DB เปิดสิทธิ์)"| O
     
-    %% Future Roadmap
-    J -.->|"Future: นำเข้า Staging"| M
+    %% Staging Workflow
+    J -.->|"นำเข้า Staging (เสร็จแล้ว)"| M
 ```
 
 **คำอธิบายสถานะ (Status Legend):**
@@ -169,7 +169,7 @@ sequenceDiagram
     participant Worker as Background Worker
     actor Admin as ผู้ดูแลระบบ (Admin)
 
-    rect rgba(0, 150, 255, 0.1)
+    rect rgba(0, 255, 0, 0.1)
     Note over User, DB: เฟส 1: การยืนยันตัวตนและการเตรียมข้อมูล (Authentication & Preparation)
     User->>UI: กรอกรหัส X-API-Key เพื่อเข้าใช้งานระบบ
     UI->>API: ยืนยันรหัสผ่าน
@@ -178,7 +178,7 @@ sequenceDiagram
     UI->>UI: ตรวจสอบความถูกต้องเบื้องต้น & จัดเรียงแบบ Topological Sort
     end
 
-    rect rgba(255, 165, 0, 0.1)
+    rect rgba(0, 255, 0, 0.1)
     Note over User, DB: เฟส 2: การตรวจสอบความซ้ำซ้อน (Similarity Check)
     UI->>API: POST /api/similarity (เช็คชื่อซ้ำ)
     API->>DB: Query ความคล้าย (pg_trgm)
@@ -187,7 +187,7 @@ sequenceDiagram
     User->>UI: รีวิวและเลือก Action (CREATE สร้างใหม่ หรือ LINK ผูกของเดิม)
     end
 
-    rect rgba(255, 0, 0, 0.1)
+    rect rgba(0, 255, 0, 0.1)
     Note over User, DB: เฟส 3: ส่งข้อมูลเข้าระบบ Staging (Pending Approval)
     User->>UI: กรอกอีเมล (Soft Identity) & กด "ส่งเข้าระบบ"
     UI->>API: POST /api/import (ส่ง Payload + Email)
@@ -196,7 +196,7 @@ sequenceDiagram
     UI-->>User: แจ้งเตือน "รอ Admin อนุมัติ" & บันทึก Job ID ลงเครื่อง
     end
 
-    rect rgba(150, 0, 255, 0.1)
+    rect rgba(0, 255, 0, 0.1)
     Note over Admin, Worker: เฟส 4: กระบวนการตรวจสอบโดย Admin (Admin Review Loop)
     Admin->>UI: เข้าหน้า Admin Dashboard (ต้องใช้รหัส X-Admin-Key)
     UI->>API: GET /api/import/jobs
