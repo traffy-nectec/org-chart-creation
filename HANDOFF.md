@@ -31,8 +31,13 @@ The primary objective of the recent sessions was to optimize the backend API to 
 - React hook warnings regarding missing dependencies have been monitored and evaluated (e.g., `apiKey` in `useEffect`). They are acceptable for current functional behavior.
 
 ## Pending Tasks / Next Steps
+- **Staging Database Workflow (Designed, Ready to Implement):** 
+  - Change the export logic to send data to a pending state instead of directly creating.
+  - Implement a "Soft Identity" check forcing users to input an Email for tracking `job_id`s.
+  - Add a "My Submissions" tab to fetch status (`GET /api/import/jobs?email=xxx`).
+  - Add an Admin Dashboard (protected by `X-Admin-Key`) to approve or reject batches with comments.
+  - Update `App.jsx` to load rejected payload for user editing.
 - **Non-spatial Organizations:** Currently lacking a dedicated workflow for organizations that span nationwide (e.g., Ministries) rather than being tied to specific tambons/districts.
-- **Staging Database Workflow:** Future phase involves dropping the direct insertion into production tables and instead using a staging table for Admin review.
 - **Performance Profiling for Extreme Load:** Monitor backend RAM usage when `App.jsx` imports 35,000 nodes simultaneously to ensure the Cloud Run container doesn't OOM.
 - **Mini-map Implementation:** Implementing the much-needed canvas mini-map for navigating massive trees.
 

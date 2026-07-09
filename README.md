@@ -203,6 +203,50 @@ sequenceDiagram
     end
 ```
 
+### 3. Staging Workflow (Admin Approval Flow) [Planned for Next Phase]
+
+```mermaid
+sequenceDiagram
+    actor User as ผู้ขอสร้าง (User)
+    participant UI as Frontend (Org Builder)
+    participant API as Backend API
+    participant DB as Database (import_jobs)
+    actor Admin as ผู้ดูแลระบบ (Admin)
+
+    User->>UI: อัปโหลดไฟล์ & ตรวจสอบความซ้ำซ้อน
+    UI-->>User: แสดงผลการตรวจสอบ (คล้ายกับอะไร ให้เลือก CREATE/LINK)
+    User->>UI: กรอกข้อมูลผู้ติดต่อ (Email) & กด "ส่งเข้าระบบ"
+    UI->>API: POST /api/import (ส่ง Payload + Email)
+    API->>DB: บันทึกข้อมูลเป็น JSON (Status: pending_approval)
+    API-->>UI: Return Job ID (รอดำเนินการ)
+    UI-->>User: แสดงข้อความ "รอ Admin อนุมัติ" และบันทึก Job ID ลงเครื่อง
+    
+    note over Admin,DB: --- กระบวนการตรวจสอบโดย Admin ---
+    
+    Admin->>UI: เปิดหน้า Admin Dashboard (ใช้ X-Admin-Key)
+    UI->>API: GET /api/import/jobs
+    API->>DB: ดึงรายการที่ pending_approval
+    API-->>UI: ส่งรายการกลับมาแสดงผล
+    UI-->>Admin: แสดงข้อมูลผู้ขอ, จำนวนหน่วยงาน, สิ่งที่เลือก (CREATE/LINK)
+    Admin->>UI: กดดูรายละเอียด (Preview)
+    
+    alt ถ้าข้อมูลไม่ถูกต้อง (Reject)
+        Admin->>UI: กด Reject พร้อมกรอก "เหตุผล (Admin Comment)"
+        UI->>API: POST /api/import/{job_id}/reject (ส่งพร้อม X-Admin-Key)
+        API->>DB: อัปเดต Status เป็น rejected พร้อมเหตุผล
+        UI-->>User: User กรอกอีเมลเช็คสถานะ -> เห็นว่าถูกตีตกพร้อมเหตุผล
+        User->>UI: กดแก้ไขจากงานเก่า (ดึง Payload เดิมจาก DB)
+        User->>UI: กดส่งเข้าระบบ -> สร้าง Job ID ใหม่
+    else ถ้าข้อมูลถูกต้อง (Approve)
+        Admin->>UI: กด Approve
+        UI->>API: POST /api/import/{job_id}/approve (ส่งพร้อม X-Admin-Key)
+        API->>DB: อัปเดต Status เป็น processing
+        API->>API: เริ่มกระบวนการ ProcessBackground (สร้างลงตารางจริง)
+        API-->>UI: Return 200 OK
+        UI-->>Admin: แสดง Progress Bar การสร้างจริง
+    end
+```
+
 ### 3. Database Schema (รองรับ Multi-parent)
 เพื่อการขยายตัวในอนาคต ระบบใช้ฐานข้อมูลแบบ Edge Table เพื่อเก็บเส้นทางแยกระหว่างความสัมพันธ์ของหน่วยงาน (Graph)
 - **Table `organizations`:** เก็บข้อมูลพื้นฐาน (`id`, `name`, `metadata`)

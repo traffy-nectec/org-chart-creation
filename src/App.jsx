@@ -2468,6 +2468,7 @@ export default function OrgManagerApp() {
   const [apiKey, setApiKey] = useState(localStorage.getItem('traffy_org_builder_api_key') || '');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const [tablePage, setTablePage] = useState(1);
   const [issueLimit, setIssueLimit] = useState(50);
@@ -2640,11 +2641,15 @@ export default function OrgManagerApp() {
     e.preventDefault();
     if (!apiKey.trim()) return;
     
+    setIsLoggingIn(true);
+    setLoginError('');
+    
     const apiUrl = import.meta.env.VITE_API_URL || '';
     fetch(`${apiUrl}/api/aliases`, {
       headers: { 'X-API-Key': apiKey }
     })
     .then(res => {
+      setIsLoggingIn(false);
       if (res.ok) {
         localStorage.setItem('traffy_org_builder_api_key', apiKey);
         setIsAuthenticated(true);
@@ -2653,7 +2658,10 @@ export default function OrgManagerApp() {
         setLoginError('รหัสผ่านไม่ถูกต้อง');
       }
     })
-    .catch(() => setLoginError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้'));
+    .catch(() => {
+      setIsLoggingIn(false);
+      setLoginError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    });
   };
 
   const handleSaveDraft = async () => {
@@ -3896,18 +3904,28 @@ export default function OrgManagerApp() {
               <input
                 type="password"
                 placeholder="รหัสผ่าน (Passcode)"
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-400"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 autoFocus
+                disabled={isLoggingIn}
               />
               {loginError && <p className="text-red-500 text-sm mt-2 font-medium">{loginError}</p>}
             </div>
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              disabled={isLoggingIn}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
             >
-              เข้าสู่ระบบ <ChevronRight size={18} />
+              {isLoggingIn ? (
+                <>
+                  <Loader2 className="animate-spin" size={18} /> กำลังตรวจสอบ...
+                </>
+              ) : (
+                <>
+                  เข้าสู่ระบบ <ChevronRight size={18} />
+                </>
+              )}
             </button>
           </form>
         </div>
