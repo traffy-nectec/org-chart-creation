@@ -3,7 +3,7 @@ import {
   Plus, Trash2, MapPin, CheckCircle,
   Layers, Network, ChevronDown, ChevronRight, ChevronUp, ChevronLeft,
   ChevronsDown, Upload, FileSpreadsheet, X, Download, Table,
-  AlertTriangle, Check, Database, Search, HelpCircle, Loader2, Lock
+  AlertTriangle, Check, Database, Search, HelpCircle, Loader2, Lock, FileText
 } from 'lucide-react';
 import { ThailandAddressTypeahead, useAddressTypeaheadContext } from "react-thailand-address-typeahead";
 import * as XLSX from 'xlsx';
@@ -11,6 +11,7 @@ import { getOrgPath, generateBackendPayload, topologicalSort } from './utils/exp
 import { extractGoogleSheetIds, fetchGoogleSheetAsCSV } from './utils/googleSheetUtils';
 import toast, { Toaster } from 'react-hot-toast';
 import ReactFlowOrgChart from './ReactFlowOrgChart';
+import { EmailPromptModal, SubmissionsView, AdminView } from './StagingViews';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 
 // ==========================================
@@ -2472,6 +2473,11 @@ export default function OrgManagerApp() {
 
   const [tablePage, setTablePage] = useState(1);
   const [issueLimit, setIssueLimit] = useState(50);
+  
+  // Staging Workflow states
+  const [showEmailPrompt, setShowEmailPrompt] = useState(false);
+  const [pendingExportOrgs, setPendingExportOrgs] = useState(null);
+  const [pendingExportDestination, setPendingExportDestination] = useState(null);
   // Fetch aliases on component mount
   useEffect(() => {
     if (isAuthenticated && !isAliasesLoaded) {
@@ -3292,10 +3298,18 @@ export default function OrgManagerApp() {
     }
   };
 
-  const executeFinalExport = async (currentOrgs = organizations, destination = exportDestination) => {
+  const executeFinalExport = async (currentOrgs = organizations, destination = exportDestination, email = null) => {
+    if (destination === 'api' && !email) {
+      setPendingExportOrgs(currentOrgs);
+      setPendingExportDestination(destination);
+      setShowEmailPrompt(true);
+      return;
+    }
+
     setIsExporting(true);
     try {
       const payload = generateBackendPayload(currentOrgs);
+      if (email) payload.requester_email = email;
       
       if (destination === 'api') {
         const apiUrl = import.meta.env.VITE_API_URL || '';
@@ -3311,7 +3325,10 @@ export default function OrgManagerApp() {
         if (response.status === 202) {
           const result = await response.json();
           setImportJobId(result.job_id);
-          setShowProgressModal(true);
+          setShowEmailPrompt(false);
+          toast.success("ส่งคำขอนำเข้าเรียบร้อย คุณสามารถตรวจสอบสถานะได้ที่เมนู 'สถานะการนำเข้า'", { duration: 5000 });
+          // Note: we don't show progress modal automatically anymore because it's in pending_approval
+          setViewMode('submissions');
         } else {
           const result = await response.json();
           alert(`ส่งข้อมูลสำเร็จ! นำเข้า ${result.nodes_processed || payload.nodes.length} หน่วยงาน`);
@@ -3328,7 +3345,8 @@ export default function OrgManagerApp() {
         URL.revokeObjectURL(url);
       }
     } catch (err) {
-      alert(`เกิดข้อผิดพลาดในการส่งออกข้อมูล: ${err.message}`);
+      console.error(err);
+      alert(`Export failed: ${err.message}`);
     } finally {
       setIsExporting(false);
     }
@@ -3951,7 +3969,6 @@ export default function OrgManagerApp() {
           </h1>
         </div>
         <div className="flex gap-3 relative">
-          {/* View Mode Toggle Group */}
           <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner mr-1">
             <button
               onClick={() => setViewMode('canvas')}
@@ -3977,6 +3994,32 @@ export default function OrgManagerApp() {
             >
               <Table size={14} />
               ตารางข้อมูล
+            </button>
+
+            <button
+              onClick={() => setViewMode('submissions')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === 'submissions'
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+                }`}
+              aria-label="ประวัติและสถานะการนำเข้า"
+              aria-pressed={viewMode === 'submissions'}
+            >
+              <FileText size={14} />
+              สถานะการนำเข้า
+            </button>
+            
+            <button
+              onClick={() => setViewMode('admin')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${viewMode === 'admin'
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+                }`}
+              aria-label="จัดการโดยแอดมิน"
+              aria-pressed={viewMode === 'admin'}
+            >
+              <CheckCircle size={14} />
+              Admin
             </button>
           </div>
 
@@ -4234,9 +4277,11 @@ export default function OrgManagerApp() {
             </div>
           </div>
         )}
+        {viewMode === 'submissions' && <SubmissionsView apiKey={apiKey} />}
+        {viewMode === 'admin' && <AdminView adminKey={apiKey} />}
 
         {/* TOP: Visual Mind Map Canvas (Combined with Floating Config Panel) */}
-        <div className={`flex-1 bg-[#f8fafc] border border-slate-200 shadow-inner overflow-hidden flex flex-col transition-all duration-300 ${isFullscreen ? 'fixed inset-0 z-50 rounded-none w-full h-full' : 'relative rounded-2xl'}`} style={viewMode === 'canvas' ? { backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' } : {}}>
+        <div className={`flex-1 bg-[#f8fafc] border border-slate-200 shadow-inner overflow-hidden flex flex-col transition-all duration-300 ${isFullscreen ? 'fixed inset-0 z-50 rounded-none w-full h-full' : 'relative rounded-2xl'} ${(viewMode === 'submissions' || viewMode === 'admin') ? 'hidden' : ''}`} style={viewMode === 'canvas' ? { backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' } : {}}>
 
           {/* Toggle Sidebar Button (Floating on Canvas) */}
           {viewMode === 'canvas' && !isIssueSidebarOpen && (
@@ -4907,6 +4952,17 @@ export default function OrgManagerApp() {
         <WelcomeModal
           isOpen={showWelcomeModal}
           onClose={() => setShowWelcomeModal(false)}
+        />
+      )}
+      
+      {showEmailPrompt && (
+        <EmailPromptModal
+          isOpen={showEmailPrompt}
+          isExporting={isExporting}
+          onClose={() => setShowEmailPrompt(false)}
+          onSubmit={(email) => {
+            executeFinalExport(pendingExportOrgs, pendingExportDestination, email);
+          }}
         />
       )}
 
