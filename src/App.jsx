@@ -3926,6 +3926,10 @@ export default function OrgManagerApp() {
             <Network className="text-blue-600" />
             Visual Org Builder
             <span className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">Enterprise + JSON</span>
+            <div className="flex flex-col ml-2 border-l border-slate-300 pl-3">
+              <span className="text-slate-400 text-[10px] font-medium leading-tight tracking-wider">UI: v1.2.0</span>
+              <span className="text-slate-400 text-[10px] font-medium leading-tight tracking-wider">API: v1.1.2</span>
+            </div>
           </h1>
         </div>
         <div className="flex gap-3 relative">
