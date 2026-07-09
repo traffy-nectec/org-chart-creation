@@ -3174,7 +3174,7 @@ export default function OrgManagerApp() {
         
         const chunk = orgs.slice(i, i + chunkSize);
         const namesPayload = { names: chunk.map(o => o.name) };
-        console.log(`[Batch ${i}] Sending payload with ${namesPayload.names.length} names...`, namesPayload.names.slice(0, 5));
+
         
         try {
           const apiUrl = import.meta.env.VITE_API_URL || '';
@@ -3187,14 +3187,14 @@ export default function OrgManagerApp() {
           
           if (signal.aborted || isCancelledRef.current) return;
           
-          console.log(`[Batch ${i}] Received response. Status: ${response.status}`);
+
           
           if (!response.ok) {
              throw new Error(`API Error (${response.status})`);
           }
           
           const results = await response.json() || [];
-          console.log(`[Batch ${i}] Parsed ${results.length} similarity results.`);
+
           
           const resultsByName = {};
           results.forEach(res => {
@@ -3223,7 +3223,7 @@ export default function OrgManagerApp() {
           setConflicts([...realConflicts]);
         } catch (fetchErr) {
           if (fetchErr.name === 'AbortError' || isCancelledRef.current) {
-            console.log('Search aborted by user.');
+
             return;
           }
           console.error(`[Batch ${i}] Fetch/Parsing Error:`, fetchErr);
@@ -3231,7 +3231,7 @@ export default function OrgManagerApp() {
         }
         
         setCheckProgress({ current: Math.min(i + chunkSize, orgs.length), total: orgs.length });
-        console.log(`[Batch ${i}] Progress updated.`);
+
       }
       
       if (signal.aborted || isCancelledRef.current) return;
@@ -4055,12 +4055,12 @@ export default function OrgManagerApp() {
                                           <span className="font-bold text-xs text-slate-800 break-words">{node.name || <span className="italic text-slate-500">ไม่ระบุชื่อ</span>}</span>
                                           <button
                                             onClick={() => {
-                                              console.log('Edit clicked for', node.id);
-                                              console.time('EditClickStateUpdates');
+
+
                                               setSelectedNodeId(node.id);
                                               setFocusNodeId(node.parentId || node.id);
                                               setSearchedNodeId(node.id);
-                                              console.timeEnd('EditClickStateUpdates');
+
                                             }}
                                             className="px-2 py-1 bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 rounded-md text-[10px] font-bold shadow-sm cursor-pointer shrink-0"
                                           >
@@ -4094,12 +4094,12 @@ export default function OrgManagerApp() {
                                   <div className="flex gap-1.5 shrink-0">
                                     <button
                                       onClick={() => {
-                                        console.log('Edit clicked for (group)', node.id);
-                                        console.time('EditClickStateUpdates');
+
+
                                         setSelectedNodeId(node.id);
                                         setFocusNodeId(node.parentId || node.id);
                                         setSearchedNodeId(node.id);
-                                        console.timeEnd('EditClickStateUpdates');
+
                                       }}
                                       className={`px-2 py-1 bg-white border ${group.id === 'circle' || group.id === 'missingParent' ? 'border-red-300 text-red-600 hover:bg-red-50' : 'border-amber-300 text-amber-700 hover:bg-amber-50'} rounded-md text-[10px] font-bold shadow-sm cursor-pointer`}
                                     >
