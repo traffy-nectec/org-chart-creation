@@ -3204,7 +3204,9 @@ export default function OrgManagerApp() {
             resultsByName[res.name].push({
               db_id: res.db_id,
               db_name: res.match,
-              score: res.score
+              score: res.score,
+              is_deleted: res.is_deleted,
+              deleted_at: res.deleted_at
             });
           });
           
@@ -4722,7 +4724,14 @@ export default function OrgManagerApp() {
                                     className="text-blue-600 focus:ring-blue-500"
                                   />
                                   <div className="flex-1">
-                                    <div className="text-sm font-bold text-slate-700">{match.db_name}</div>
+                                    <div className="text-sm font-bold text-slate-700">
+                                      {match.db_name}
+                                      {match.is_deleted && (
+                                        <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded ml-2" title={match.deleted_at ? new Date(match.deleted_at).toLocaleString('th-TH') : ''}>
+                                          ถูกลบไปแล้ว {match.deleted_at ? `เมื่อ ${new Date(match.deleted_at).toLocaleDateString('th-TH')}` : ''}
+                                        </span>
+                                      )}
+                                    </div>
                                     <div className="text-xs text-slate-500">ความเหมือน: {Math.round(match.score * 100)}% | ID: {match.db_id}</div>
                                   </div>
                                 </label>
