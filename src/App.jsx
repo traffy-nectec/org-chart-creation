@@ -3,7 +3,7 @@ import {
   Plus, Trash2, MapPin, CheckCircle,
   Layers, Network, ChevronDown, ChevronRight, ChevronUp, ChevronLeft,
   ChevronsDown, Upload, FileSpreadsheet, X, Download, Table,
-  AlertTriangle, Check, Database, Search, HelpCircle, Loader2
+  AlertTriangle, Check, Database, Search, HelpCircle, Loader2, Lock
 } from 'lucide-react';
 import { ThailandAddressTypeahead, useAddressTypeaheadContext } from "react-thailand-address-typeahead";
 import * as XLSX from 'xlsx';
@@ -2465,14 +2465,23 @@ const BulkEditLocationModal = ({ isOpen, onClose, locationName, orgs, locationDb
 };
 
 export default function OrgManagerApp() {
+  const [apiKey, setApiKey] = useState(localStorage.getItem('traffy_org_builder_api_key') || '');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loginError, setLoginError] = useState('');
+
   const [tablePage, setTablePage] = useState(1);
   const [issueLimit, setIssueLimit] = useState(50);
   // Fetch aliases on component mount
   useEffect(() => {
-    if (!isAliasesLoaded) {
+    if (isAuthenticated && !isAliasesLoaded) {
       const apiUrl = import.meta.env.VITE_API_URL || '';
-      fetch(`${apiUrl}/api/aliases`)
-        .then(res => res.json())
+      fetch(`${apiUrl}/api/aliases`, {
+        headers: { 'X-API-Key': apiKey }
+      })
+        .then(res => {
+          if (!res.ok) throw new Error('API Key might be invalid');
+          return res.json();
+        })
         .then(data => {
           if (Array.isArray(data)) {
             // Sort by search_text length descending to match longest phrases first
@@ -2482,7 +2491,7 @@ export default function OrgManagerApp() {
         })
         .catch(err => console.error("Failed to load organization aliases:", err));
     }
-  }, []);
+  }, [isAuthenticated, apiKey]);
 
   const DEFAULT_ORGS = [
     {
@@ -2622,10 +2631,30 @@ export default function OrgManagerApp() {
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
   const [conflicts, setConflicts] = useState([]);
   const [userResolutions, setUserResolutions] = useState({});
-  const [activeConflictTab, setActiveConflictTab] = useState('all'); // 'all', 'high', 'medium', 'low'
+  const [activeConflictTab, setActiveConflictTab] = useState('high'); // 'high', 'medium', 'low', 'very_low'
   const [isPreExportModalOpen, setIsPreExportModalOpen] = useState(false);
   const [preExportChecks, setPreExportChecks] = useState({});
   const [searchDuration, setSearchDuration] = useState(0);
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (!apiKey.trim()) return;
+    
+    const apiUrl = import.meta.env.VITE_API_URL || '';
+    fetch(`${apiUrl}/api/aliases`, {
+      headers: { 'X-API-Key': apiKey }
+    })
+    .then(res => {
+      if (res.ok) {
+        localStorage.setItem('traffy_org_builder_api_key', apiKey);
+        setIsAuthenticated(true);
+        setLoginError('');
+      } else {
+        setLoginError('รหัสผ่านไม่ถูกต้อง');
+      }
+    })
+    .catch(() => setLoginError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้'));
+  };
 
   const handleSaveDraft = async () => {
     try {
@@ -3180,7 +3209,10 @@ export default function OrgManagerApp() {
           const apiUrl = import.meta.env.VITE_API_URL || '';
           const response = await fetch(`${apiUrl}/api/similarity`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'X-API-Key': apiKey
+            },
             body: JSON.stringify(namesPayload),
             signal: signal
           });
@@ -3263,6 +3295,7 @@ export default function OrgManagerApp() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-API-Key': apiKey
           },
           body: JSON.stringify(payload)
         });
@@ -3302,7 +3335,9 @@ export default function OrgManagerApp() {
 
       try {
         const apiUrl = import.meta.env.VITE_API_URL || '';
-        const response = await fetch(`${apiUrl}/api/import/status/${importJobId}`);
+        const response = await fetch(`${apiUrl}/api/import/status/${importJobId}`, {
+          headers: { 'X-API-Key': apiKey }
+        });
         if (response.ok) {
           const data = await response.json();
           setImportProgress(data);
@@ -3842,6 +3877,43 @@ export default function OrgManagerApp() {
     });
     alert('ล้างชื่อหน่วยงาน ปรับการสะกดคำ และแปลงคำย่อทั้งหมดเรียบร้อยแล้ว!');
   };
+
+  // If not authenticated, render login screen early
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-prompt">
+        <div className="bg-white p-8 rounded-xl shadow-md max-w-md w-full border-t-4 border-blue-600">
+          <div className="flex justify-center mb-6">
+            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center">
+              <Lock size={32} />
+            </div>
+          </div>
+          <h1 className="text-2xl font-bold text-center text-slate-800 mb-2">Traffy Fondue Org Builder</h1>
+          <p className="text-center text-slate-500 mb-6">กรุณากรอกรหัสผ่านเพื่อเข้าใช้งานระบบสร้างโครงสร้างหน่วยงาน</p>
+          
+          <form onSubmit={handleLogin}>
+            <div className="mb-4">
+              <input
+                type="password"
+                placeholder="รหัสผ่าน (Passcode)"
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                autoFocus
+              />
+              {loginError && <p className="text-red-500 text-sm mt-2 font-medium">{loginError}</p>}
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              เข้าสู่ระบบ <ChevronRight size={18} />
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 font-sans p-4 flex flex-col h-screen overflow-hidden">
@@ -4608,20 +4680,14 @@ export default function OrgManagerApp() {
 
               {(() => {
                 const highConflicts = conflicts.filter(c => c.matches.some(m => m.score >= 0.9));
-                const mediumConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.9) && c.matches.some(m => m.score >= 0.7));
-                const lowConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.7) && c.matches.some(m => m.score >= 0.5));
-                const veryLowConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.5));
+                const mediumConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.9) && c.matches.some(m => m.score >= 0.75));
+                const lowConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.75) && c.matches.some(m => m.score >= 0.6));
+                const veryLowConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.6) && c.matches.some(m => m.score >= 0.4));
                 
                 const getResolvedCount = (list) => list.filter(c => userResolutions[c.temp_id]).length;
 
                 return (
                   <div className="flex bg-white rounded-lg p-1 border border-amber-200 shadow-sm overflow-x-auto">
-                    <button 
-                      onClick={() => setActiveConflictTab('all')}
-                      className={`flex-none min-w-fit py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'all' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
-                    >
-                      📋 ทั้งหมด ({getResolvedCount(conflicts)}/{conflicts.length})
-                    </button>
                     <button 
                       onClick={() => setActiveConflictTab('high')}
                       className={`flex-none min-w-fit py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'high' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
@@ -4632,19 +4698,19 @@ export default function OrgManagerApp() {
                       onClick={() => setActiveConflictTab('medium')}
                       className={`flex-none min-w-fit py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'medium' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                     >
-                      🟡 ปานกลาง (70-89%) ({getResolvedCount(mediumConflicts)}/{mediumConflicts.length})
+                      🟡 ปานกลาง (75-89%) ({getResolvedCount(mediumConflicts)}/{mediumConflicts.length})
                     </button>
                     <button 
                       onClick={() => setActiveConflictTab('low')}
                       className={`flex-none min-w-fit py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'low' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                     >
-                      🟢 คล้ายน้อย (50-69%) ({getResolvedCount(lowConflicts)}/{lowConflicts.length})
+                      🟢 คล้ายน้อย (60-74%) ({getResolvedCount(lowConflicts)}/{lowConflicts.length})
                     </button>
                     <button 
                       onClick={() => setActiveConflictTab('very_low')}
                       className={`flex-none min-w-fit py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'very_low' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                     >
-                      ⚪️ คล้ายน้อยมาก (0-49%) ({getResolvedCount(veryLowConflicts)}/{veryLowConflicts.length})
+                      ⚪️ คล้ายน้อยมาก (40-59%) ({getResolvedCount(veryLowConflicts)}/{veryLowConflicts.length})
                     </button>
                   </div>
                 );
@@ -4654,12 +4720,11 @@ export default function OrgManagerApp() {
             <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
               {(() => {
                 const highConflicts = conflicts.filter(c => c.matches.some(m => m.score >= 0.9));
-                const mediumConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.9) && c.matches.some(m => m.score >= 0.7));
-                const lowConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.7) && c.matches.some(m => m.score >= 0.5));
-                const veryLowConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.5));
+                const mediumConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.9) && c.matches.some(m => m.score >= 0.75));
+                const lowConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.75) && c.matches.some(m => m.score >= 0.6));
+                const veryLowConflicts = conflicts.filter(c => !c.matches.some(m => m.score >= 0.6) && c.matches.some(m => m.score >= 0.4));
                 
-                const activeConflicts = activeConflictTab === 'all' ? conflicts
-                                      : activeConflictTab === 'high' ? highConflicts 
+                const activeConflicts = activeConflictTab === 'high' ? highConflicts 
                                       : activeConflictTab === 'medium' ? mediumConflicts 
                                       : activeConflictTab === 'low' ? lowConflicts 
                                       : veryLowConflicts;
