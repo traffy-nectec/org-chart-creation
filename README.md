@@ -100,32 +100,29 @@
 
 ```mermaid
 flowchart TD
-    classDef completed fill:#d4edda,stroke:#28a745,stroke-width:2px;
-    classDef pending fill:#fff3cd,stroke:#ffc107,stroke-width:2px,stroke-dasharray: 5 5;
-    classDef waiting fill:#f8d7da,stroke:#dc3545,stroke-width:2px;
 
-    subgraph Frontend [Frontend (React + Vite)]
-        A("User สร้าง/แก้ไขผังใน UI"):::completed
-        B("Topological Sort (Check Circular Ref)"):::completed
-        C("แจ้งเตือนข้อผิดพลาด (ถ้ามี)"):::completed
-        D("แบ่งข้อมูลยิง API (Chunking)"):::completed
-        E("UI จัดการชื่อซ้ำ (Conflict Resolution)"):::completed
-        F("Progress Polling UI (รอประมวลผล)"):::completed
+    subgraph Frontend
+        A("User สร้าง/แก้ไขผังใน UI")
+        B("Topological Sort (Check Circular Ref)")
+        C("แจ้งเตือนข้อผิดพลาด (ถ้ามี)")
+        D("แบ่งข้อมูลยิง API (Chunking)")
+        E("UI จัดการชื่อซ้ำ (Conflict Resolution)")
+        F("Progress Polling UI (รอประมวลผล)")
     end
 
-    subgraph Backend [Backend (Golang API)]
-        G("POST /api/similarity (ตรวจสอบชื่อซ้ำ)"):::completed
-        H("POST /api/import (รับข้อมูลเข้าระบบ)"):::completed
-        I("GET /api/import/status (เช็คสถานะ)"):::completed
-        J("Background Worker Pipeline"):::completed
-        M("Save to Staging Table (ระบบตะกร้าพัก)"):::pending
+    subgraph Backend
+        G("POST /api/similarity (ตรวจสอบชื่อซ้ำ)")
+        H("POST /api/import (รับข้อมูลเข้าระบบ)")
+        I("GET /api/import/status (เช็คสถานะ)")
+        J("Background Worker Pipeline")
+        M("Save to Staging Table (ระบบตะกร้าพัก)")
     end
 
-    subgraph Database [PostgreSQL]
-        K[("pg_trgm Similarity Search")]:::completed
-        L[("import_jobs Table")]:::completed
-        N[("voice_fonduegroup")]:::waiting
-        O[("voice_hierarchy_org")]:::waiting
+    subgraph Database
+        K[("pg_trgm Similarity Search")]
+        L[("import_jobs Table")]
+        N[("voice_fonduegroup")]
+        O[("voice_hierarchy_org")]
     end
 
     A -->|"กดส่งออก Backend"| B
