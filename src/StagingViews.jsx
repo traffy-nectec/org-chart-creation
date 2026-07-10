@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Mail, Send, Loader2, CheckCircle, FileText, Database, X } from 'lucide-react';
+import { Mail, Send, Loader2, CheckCircle, FileText, Database, X, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 
 export const EmailPromptModal = ({ isOpen, onClose, onSubmit, isExporting }) => {
   const [email, setEmail] = useState('');
@@ -69,6 +70,36 @@ export const SubmissionsView = ({ apiKey }) => {
       toast.error('ไม่สามารถดึงข้อมูลได้: ' + err.message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDownloadResults = async (jobId) => {
+    const loadingToast = toast.loading('กำลังดาวน์โหลดข้อมูล...');
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/import/payload/${jobId}`, {
+        headers: { 'X-API-Key': apiKey }
+      });
+      if (!res.ok) throw new Error('Failed to download results');
+      const data = await res.json();
+      
+      if (!data.nodes || data.nodes.length === 0) {
+        throw new Error('ไม่พบข้อมูลหน่วยงานใน Job นี้');
+      }
+
+      const exportData = data.nodes.map(n => ({
+        'ชื่อหน่วยงาน': n.name,
+        'ID ฐานข้อมูล': n.generated_db_id || 'N/A',
+        'Staff Entry Code': n.staff_entry_code || 'N/A'
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Result");
+      XLSX.writeFile(wb, `import_result_${jobId}.xlsx`);
+      toast.success('ดาวน์โหลดสำเร็จ', { id: loadingToast });
+    } catch (err) {
+      toast.error('ดาวน์โหลดล้มเหลว: ' + err.message, { id: loadingToast });
     }
   };
 
@@ -145,6 +176,17 @@ export const SubmissionsView = ({ apiKey }) => {
                   </div>
                 )}
                 
+                {job.status === 'completed' && (
+                  <div className="mt-auto pt-2">
+                    <button 
+                      onClick={() => handleDownloadResults(job.id)}
+                      className="w-full flex justify-center items-center gap-2 px-3 py-2 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 rounded-lg text-sm font-bold transition-colors"
+                    >
+                      <Download size={16} /> ดาวน์โหลดรหัส
+                    </button>
+                  </div>
+                )}
+
                 {job.status === 'processing' && (
                   <div className="mt-auto">
                     <div className="w-full bg-slate-100 rounded-full h-2 mt-2">
