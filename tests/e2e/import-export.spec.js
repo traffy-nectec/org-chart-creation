@@ -2,16 +2,16 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Import and Export Functionality', () => {
-  
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem('hideWelcomeModal', 'true'));
+  });
+
   test('should export organizations to CSV', async ({ page }) => {
     // Navigate to the app
     await page.goto('/');
 
     // Wait for the app to load
     await expect(page.locator('h1')).toBeVisible();
-
-    // Close welcome modal
-    await page.click('button:has-text("เริ่มต้นใช้งานระบบ")');
 
     // Open Data Management Menu
     await page.click('button:has-text("จัดการข้อมูล")');
@@ -32,9 +32,6 @@ test.describe('Import and Export Functionality', () => {
   test('should import organizations from CSV', async ({ page }) => {
     // Navigate to the app
     await page.goto('/');
-
-    // Close welcome modal
-    await page.click('button:has-text("เริ่มต้นใช้งานระบบ")');
 
     // Open Data Management Menu
     await page.click('button:has-text("จัดการข้อมูล")');
@@ -80,9 +77,6 @@ test.describe('Import and Export Functionality', () => {
 
     // Navigate to the app
     await page.goto('/');
-
-    // Close welcome modal
-    await page.click('button:has-text("เริ่มต้นใช้งานระบบ")');
 
     // Open Data Management Menu
     await page.click('button:has-text("จัดการข้อมูล")');
