@@ -339,3 +339,8 @@ INSERT INTO voice_fondue_org_aliases (search_text, replace_text) VALUES ('อบ
   cleaned = cleaned.replace(/เเ/g, 'แ');
   ```
 
+
+## Recent Updates (v2.1)
+- **UX Fixes**: Added pagination in conflict resolution to fix UI freezing for 1000+ items.
+- **Status Flow**: Automatic email persistence and auto-search in Job Status view.
+- **Data Integrity**: Fixed a bug where `locations` was mapped incorrectly, resulting in 0 coverage areas in the database. Now properly reads `org.areas.locations`.
