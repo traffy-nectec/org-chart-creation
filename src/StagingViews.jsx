@@ -32,6 +32,9 @@ export const EmailPromptModal = ({ isOpen, onClose, onSubmit, isExporting }) => 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
+            <p className="text-[11px] text-amber-600 font-semibold mt-2">
+              * กรุณาตรวจสอบอีเมลให้ถูกต้อง หากพิมพ์ผิดจะไม่สามารถเข้าดูประวัติการนำเข้าได้
+            </p>
           </div>
           <button
             type="submit"
@@ -47,19 +50,20 @@ export const EmailPromptModal = ({ isOpen, onClose, onSubmit, isExporting }) => 
   );
 };
 
-export const SubmissionsView = ({ apiKey }) => {
-  const [email, setEmail] = useState('');
+export const SubmissionsView = ({ apiKey, initialEmail = '' }) => {
+  const [email, setEmail] = useState(initialEmail);
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
   const handleSearch = async (e) => {
     if (e) e.preventDefault();
-    if (!email) return;
+    const searchEmail = email || initialEmail;
+    if (!searchEmail) return;
     setIsLoading(true);
     try {
       const apiUrl = import.meta.env.VITE_API_URL || '';
-      const res = await fetch(`${apiUrl}/api/import/jobs?email=${encodeURIComponent(email)}`, {
+      const res = await fetch(`${apiUrl}/api/import/jobs?email=${encodeURIComponent(searchEmail)}`, {
         headers: { 'X-API-Key': apiKey }
       });
       if (!res.ok) throw new Error('Failed to fetch jobs');
@@ -72,6 +76,16 @@ export const SubmissionsView = ({ apiKey }) => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (initialEmail && !hasSearched) {
+      const timer = setTimeout(() => {
+        handleSearch();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialEmail]);
 
   // Auto refresh if any job is processing
   useEffect(() => {

@@ -2629,9 +2629,11 @@ export default function OrgManagerApp() {
   const [conflicts, setConflicts] = useState([]);
   const [userResolutions, setUserResolutions] = useState({});
   const [activeConflictTab, setActiveConflictTab] = useState('high'); // 'high', 'medium', 'low', 'very_low'
+  const [conflictPage, setConflictPage] = useState(1);
   const [isPreExportModalOpen, setIsPreExportModalOpen] = useState(false);
   const [preExportChecks, setPreExportChecks] = useState({});
   const [searchDuration, setSearchDuration] = useState(0);
+  const [lastSubmittedEmail, setLastSubmittedEmail] = useState('');
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -3315,6 +3317,7 @@ export default function OrgManagerApp() {
         
         if (response.status === 202) {
           setShowEmailPrompt(false);
+          setLastSubmittedEmail(email);
           toast.success("ส่งคำขอนำเข้าเรียบร้อย คุณสามารถตรวจสอบสถานะได้ที่เมนู 'สถานะการนำเข้า'", { duration: 5000 });
           // Note: we don't show progress modal automatically anymore because it's in pending_approval
           setViewMode('submissions');
@@ -3376,28 +3379,32 @@ export default function OrgManagerApp() {
   };
 
   const handleConfirmResolutions = () => {
-    const updatedOrgs = organizations.map(org => {
-      const isConflict = conflicts.some(c => c.temp_id === org.id);
+    setIsExporting(true);
+    setTimeout(() => {
+      const updatedOrgs = organizations.map(org => {
+        const isConflict = conflicts.some(c => c.temp_id === org.id);
 
-      if (isConflict) {
-        const res = userResolutions[org.id];
-        if (res) {
-          return {
-            ...org,
-            action: res.action,
-            existing_db_id: res.existing_db_id || null
-          };
-        } else {
-          // Fallback if not resolved
-          return { ...org, action: 'CREATE', existing_db_id: null };
+        if (isConflict) {
+          const res = userResolutions[org.id];
+          if (res) {
+            return {
+              ...org,
+              action: res.action,
+              existing_db_id: res.existing_db_id || null
+            };
+          } else {
+            // Fallback if not resolved
+            return { ...org, action: 'CREATE', existing_db_id: null };
+          }
         }
-      }
-      
-      return org;
-    });
+        
+        return org;
+      });
 
-    setIsConflictModalOpen(false);
-    executeFinalExport(updatedOrgs);
+      setIsConflictModalOpen(false);
+      setIsExporting(false);
+      executeFinalExport(updatedOrgs);
+    }, 50);
   };
 
   const handleExportCSV = () => {
@@ -4206,7 +4213,7 @@ export default function OrgManagerApp() {
             </div>
           </div>
         )}
-        {viewMode === 'submissions' && <SubmissionsView apiKey={apiKey} />}
+        {viewMode === 'submissions' && <SubmissionsView apiKey={apiKey} initialEmail={lastSubmittedEmail} />}
         {viewMode === 'admin' && <AdminView adminKey={apiKey} />}
 
         {/* TOP: Visual Mind Map Canvas (Combined with Floating Config Panel) */}
@@ -4690,25 +4697,25 @@ export default function OrgManagerApp() {
                 return (
                   <div className="flex bg-white rounded-lg p-1 border border-amber-200 shadow-sm overflow-x-auto">
                     <button 
-                      onClick={() => setActiveConflictTab('high')}
+                      onClick={() => { setActiveConflictTab('high'); setConflictPage(1); }}
                       className={`flex-none min-w-fit py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'high' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                     >
                       🔴 คล้ายมาก (90-100%) ({getResolvedCount(highConflicts)}/{highConflicts.length})
                     </button>
                     <button 
-                      onClick={() => setActiveConflictTab('medium')}
+                      onClick={() => { setActiveConflictTab('medium'); setConflictPage(1); }}
                       className={`flex-none min-w-fit py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'medium' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                     >
                       🟡 ปานกลาง (75-89%) ({getResolvedCount(mediumConflicts)}/{mediumConflicts.length})
                     </button>
                     <button 
-                      onClick={() => setActiveConflictTab('low')}
+                      onClick={() => { setActiveConflictTab('low'); setConflictPage(1); }}
                       className={`flex-none min-w-fit py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'low' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                     >
                       🟢 คล้ายน้อย (60-74%) ({getResolvedCount(lowConflicts)}/{lowConflicts.length})
                     </button>
                     <button 
-                      onClick={() => setActiveConflictTab('very_low')}
+                      onClick={() => { setActiveConflictTab('very_low'); setConflictPage(1); }}
                       className={`flex-none min-w-fit py-2 px-3 text-sm font-bold rounded-md transition-all ${activeConflictTab === 'very_low' ? 'bg-amber-100 text-amber-800 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
                     >
                       ⚪️ คล้ายน้อยมาก (40-59%) ({getResolvedCount(veryLowConflicts)}/{veryLowConflicts.length})
@@ -4740,6 +4747,7 @@ export default function OrgManagerApp() {
                 }
 
                 return (
+                  <>
                   <div className="flex flex-col gap-4">
                     <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm sticky top-0 z-10">
                       <span className="text-sm font-bold text-slate-600">จัดการข้อมูลทั้งหมดในหน้านี้ (Bulk Actions)</span>
@@ -4785,7 +4793,7 @@ export default function OrgManagerApp() {
                       </div>
                     </div>
 
-                    {activeConflicts.map((conflict) => (
+                    {activeConflicts.slice((conflictPage - 1) * 20, conflictPage * 20).map((conflict) => (
                       <div key={conflict.temp_id} className={`bg-white border ${userResolutions[conflict.temp_id] ? 'border-green-300 ring-1 ring-green-100' : 'border-slate-200'} rounded-xl p-4 shadow-sm transition-all`}>
                         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
                           <div className="flex-1">
@@ -4834,6 +4842,28 @@ export default function OrgManagerApp() {
                       </div>
                     ))}
                   </div>
+                  {activeConflicts.length > 20 && (
+                    <div className="flex items-center justify-center gap-4 mt-6 pb-2">
+                      <button
+                        onClick={() => setConflictPage(p => Math.max(1, p - 1))}
+                        disabled={conflictPage === 1}
+                        className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-slate-50 transition-colors shadow-sm"
+                      >
+                        ก่อนหน้า
+                      </button>
+                      <span className="text-sm font-bold text-slate-600">
+                        หน้า {conflictPage} / {Math.ceil(activeConflicts.length / 20)}
+                      </span>
+                      <button
+                        onClick={() => setConflictPage(p => Math.min(Math.ceil(activeConflicts.length / 20), p + 1))}
+                        disabled={conflictPage === Math.ceil(activeConflicts.length / 20)}
+                        className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-slate-50 transition-colors shadow-sm"
+                      >
+                        ถัดไป
+                      </button>
+                    </div>
+                  )}
+                  </>
                 );
               })()}
               

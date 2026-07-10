@@ -124,7 +124,7 @@ export const generateBackendPayload = (organizations) => {
         province: org.attributes?.province || ""
         // Note: latitude, longitude, type_fondue_group are expected to be handled/defaulted by Backend
       },
-      locations: org.locations?.map(loc => {
+      locations: org.areas?.locations?.map(loc => {
         const prov = loc.province || "";
         const dist = loc.amphoe || ""; // react-thailand-address uses amphoe for district
         const sub = loc.tambon || ""; // react-thailand-address uses tambon for subdistrict
