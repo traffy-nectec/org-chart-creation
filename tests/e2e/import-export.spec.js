@@ -14,13 +14,13 @@ test.describe('Import and Export Functionality', () => {
     await expect(page.locator('h1')).toBeVisible();
 
     // Open Data Management Menu
-    await page.click('button:has-text("จัดการข้อมูล")');
+    await page.getByRole('button', { name: 'เมนูจัดการข้อมูล' }).click();
     
     // Setup download listener
     const downloadPromise = page.waitForEvent('download');
     
     // Click Export as CSV
-    await page.click('button:has-text("ส่งออกเป็น CSV")');
+    await page.getByRole('button', { name: 'ส่งออกเป็น CSV' }).click();
     
     // Wait for the download to start
     const download = await downloadPromise;
@@ -34,10 +34,10 @@ test.describe('Import and Export Functionality', () => {
     await page.goto('/');
 
     // Open Data Management Menu
-    await page.click('button:has-text("จัดการข้อมูล")');
+    await page.getByRole('button', { name: 'เมนูจัดการข้อมูล' }).click();
     
     // Click Import
-    await page.click('button:has-text("นำเข้าข้อมูล (Import)")');
+    await page.getByRole('button', { name: 'นำเข้าข้อมูล (Import)' }).click();
 
     // Prepare mock CSV data
     // Need BOM \uFEFF for proper UTF-8 parsing if it's treated as Excel/CSV
@@ -79,10 +79,10 @@ test.describe('Import and Export Functionality', () => {
     await page.goto('/');
 
     // Open Data Management Menu
-    await page.click('button:has-text("จัดการข้อมูล")');
+    await page.getByRole('button', { name: 'เมนูจัดการข้อมูล' }).click();
     
     // Click Import
-    await page.click('button:has-text("นำเข้าข้อมูล (Import)")');
+    await page.getByRole('button', { name: 'นำเข้าข้อมูล (Import)' }).click();
 
     // Find the Google Sheets link input and fill it
     await page.fill('input[placeholder="วางลิงก์ Google Sheets..."]', 'https://docs.google.com/spreadsheets/d/mock-id/edit?gid=123');
