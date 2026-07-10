@@ -3296,6 +3296,8 @@ export default function OrgManagerApp() {
     }
 
     setIsExporting(true);
+    // Yield to let UI update and disable button to prevent double clicks
+    await new Promise(resolve => setTimeout(resolve, 50));
     try {
       const payload = generateBackendPayload(currentOrgs);
       if (email) payload.requester_email = email;
