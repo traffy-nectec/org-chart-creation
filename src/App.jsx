@@ -433,9 +433,9 @@ const ImportModal = ({ isOpen, onClose, onImportData, onCancelImport, onDownload
             row['ชื่อหน่วยงานย่อย_2']
           ];
 
-          const province = row['จังหวัด'] || row['จังหวัดที่รับผิดชอบ'];
-          const amphoe = row['อำเภอ'] || row['อำเภอที่รับผิดชอบ'];
-          const tambon = row['ตำบล'] || row['ตำบลที่รับผิดชอบ'];
+          const province = row['จังหวัด'] || row['จังหวัดที่รับผิดชอบ'] || row['จังหวัดที่ตั้ง'];
+          const amphoe = row['อำเภอ'] || row['อำเภอที่รับผิดชอบ'] || row['อำเภอที่ตั้ง'];
+          const tambon = row['ตำบล'] || row['ตำบลที่รับผิดชอบ'] || row['ตำบลที่ตั้ง'];
           const location = { province, amphoe, tambon };
 
           let parent = null;

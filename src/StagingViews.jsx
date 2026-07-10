@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Send, Loader2, CheckCircle, FileText, Database, X, Download } from 'lucide-react';
+import { Mail, Send, Loader2, CheckCircle, FileText, Database, X, Download, Copy, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
@@ -67,11 +67,25 @@ export const SubmissionsView = ({ apiKey }) => {
       setJobs(data || []);
       setHasSearched(true);
     } catch (err) {
-      toast.error('ไม่สามารถดึงข้อมูลได้: ' + err.message);
+      toast.error('ไม่สามารถดึงข้อมูลสถานะได้: ' + err.message);
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Auto refresh if any job is processing
+  useEffect(() => {
+    let intervalId;
+    if (hasSearched && jobs.some(j => j.status === 'processing')) {
+      intervalId = setInterval(() => {
+        handleSearch();
+      }, 3000);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobs, hasSearched]);
 
   const handleDownloadResults = async (jobId) => {
     const loadingToast = toast.loading('กำลังดาวน์โหลดข้อมูล...');
@@ -127,19 +141,32 @@ export const SubmissionsView = ({ apiKey }) => {
           </h2>
           <p className="text-sm text-slate-500 mt-1">ใส่อีเมลที่คุณใช้ยื่นขอนำเข้าข้อมูลเพื่อตรวจสอบสถานะ</p>
         </div>
-        <form onSubmit={handleSearch} className="flex gap-2 w-full sm:w-auto">
-          <input
-            type="email"
-            required
-            placeholder="ใส่อีเมลของคุณ..."
-            className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 min-w-[250px]"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <button type="submit" disabled={isLoading} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap">
-            {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'ค้นหา'}
-          </button>
-        </form>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <form onSubmit={handleSearch} className="flex gap-2 flex-1 sm:flex-initial">
+            <input
+              type="email"
+              required
+              placeholder="ใส่อีเมลของคุณ..."
+              className="w-full sm:w-auto px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <button type="submit" disabled={isLoading} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap">
+              {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'ค้นหา'}
+            </button>
+          </form>
+          {hasSearched && (
+            <button 
+              type="button"
+              onClick={() => handleSearch()} 
+              disabled={isLoading}
+              className="px-3 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center shrink-0"
+              title="รีเฟรชข้อมูล"
+            >
+              <RefreshCw size={20} className={isLoading ? "animate-spin text-blue-600" : ""} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto">
@@ -154,47 +181,66 @@ export const SubmissionsView = ({ apiKey }) => {
             <p>ไม่พบประวัติการขอนำเข้าด้วยอีเมลนี้</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid gap-4">
             {jobs.map(job => (
-              <div key={job.id} className="border border-slate-200 rounded-xl p-4 flex flex-col shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="font-mono text-xs text-slate-500">{job.id.substring(0,8)}...</div>
-                  {getStatusBadge(job.status)}
-                </div>
-                <div className="text-sm font-bold text-slate-700 mb-1">
-                  จำนวนข้อมูล: <span className="text-blue-600">{job.total_items}</span> หน่วยงาน
-                </div>
-                <div className="text-xs text-slate-500 mb-4">
-                  อัปเดตล่าสุด: {new Date(job.updated_at).toLocaleString('th-TH')}
-                </div>
-                
-                {job.status === 'rejected' && job.admin_comment && (
-                  <div className="mt-auto bg-red-50 p-3 rounded-lg border border-red-100 text-sm">
-                    <span className="font-bold text-red-800">เหตุผลที่ปฏิเสธ:</span>
-                    <p className="text-red-700 mt-1">{job.admin_comment}</p>
-                    {/* TODO: Add Edit button here in the future to load payload and fix it */}
+              <div key={job.id} className="border border-slate-200 rounded-xl p-5 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex-1 w-full">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="font-mono text-sm font-bold text-slate-700 flex items-center gap-2">
+                      {job.id}
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(job.id);
+                          toast.success('คัดลอก Job ID แล้ว');
+                        }}
+                        className="text-slate-400 hover:text-blue-600 transition-colors"
+                        title="Copy Job ID"
+                      >
+                        <Copy size={14} />
+                      </button>
+                    </span>
+                    {getStatusBadge(job.status)}
                   </div>
-                )}
+                  <div className="text-sm text-slate-600 mb-1">
+                    <span className="font-semibold text-slate-700">จำนวนข้อมูล:</span> <span className="font-bold text-blue-600">{job.total_items}</span> หน่วยงาน
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    อัปเดตล่าสุด: {new Date(job.updated_at).toLocaleString('th-TH')}
+                  </div>
+                </div>
                 
-                {job.status === 'completed' && (
-                  <div className="mt-auto pt-2">
+                <div className="w-full md:w-auto min-w-[200px] flex flex-col gap-2">
+                  {job.status === 'rejected' && job.admin_comment && (
+                    <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-sm">
+                      <span className="font-bold text-red-800">เหตุผลที่ปฏิเสธ:</span>
+                      <p className="text-red-700 mt-1">{job.admin_comment}</p>
+                    </div>
+                  )}
+                  
+                  {job.status === 'completed' && (
                     <button 
                       onClick={() => handleDownloadResults(job.id)}
-                      className="w-full flex justify-center items-center gap-2 px-3 py-2 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 rounded-lg text-sm font-bold transition-colors"
+                      className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 rounded-lg text-sm font-bold transition-colors"
                     >
-                      <Download size={16} /> ดาวน์โหลดรหัส
+                      <Download size={16} /> ดาวน์โหลดผลลัพธ์
                     </button>
-                  </div>
-                )}
+                  )}
 
-                {job.status === 'processing' && (
-                  <div className="mt-auto">
-                    <div className="w-full bg-slate-100 rounded-full h-2 mt-2">
-                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${(job.processed_items / job.total_items) * 100}%` }}></div>
+                  {job.status === 'processing' && (
+                    <div className="w-full">
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-slate-500 font-bold">ดำเนินการแล้ว</span>
+                        <span className="text-blue-600 font-bold">{job.processed_items} / {job.total_items}</span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-2.5">
+                        <div 
+                          className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-in-out" 
+                          style={{ width: `${Math.max(2, (job.processed_items / job.total_items) * 100)}%` }}
+                        ></div>
+                      </div>
                     </div>
-                    <div className="text-[10px] text-right mt-1 text-slate-500">{job.processed_items} / {job.total_items}</div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             ))}
           </div>
