@@ -4673,18 +4673,23 @@ export default function OrgManagerApp() {
                 </button>
                 <button
                   onClick={() => {
-                    setIsPreExportModalOpen(false);
-                    // eslint-disable-next-line react-hooks/refs
-                    performBulkSimilaritySearch(organizations, exportDestination);
+                    setIsCheckingDuplicates(true); // Disable the button immediately
+                    setTimeout(() => {
+                      setIsPreExportModalOpen(false);
+                      // eslint-disable-next-line react-hooks/refs
+                      performBulkSimilaritySearch(organizations, exportDestination);
+                    }, 50); // Yield to browser to paint the disabled state
                   }}
                   disabled={
                     (missingParentCount > 0 && !preExportChecks.missingParent) ||
                     (noAreaCount > 0 && !preExportChecks.noArea) ||
-                    (invalidAreaCount > 0 && !preExportChecks.invalidArea)
+                    (invalidAreaCount > 0 && !preExportChecks.invalidArea) ||
+                    isCheckingDuplicates
                   }
-                  className="px-6 py-2 text-sm font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2 text-sm font-bold text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex gap-2 items-center"
                 >
-                  รับทราบ และดำเนินการต่อ
+                  {isCheckingDuplicates ? <Loader2 className="animate-spin" size={16} /> : null}
+                  {isCheckingDuplicates ? 'กำลังเตรียมข้อมูล...' : 'รับทราบ และดำเนินการต่อ'}
                 </button>
               </div>
             </div>
