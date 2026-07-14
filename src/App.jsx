@@ -4040,7 +4040,7 @@ export default function OrgManagerApp() {
             {(isExporting || isCheckingDuplicates) && exportDestination === 'api' ? (
               <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> {isCheckingDuplicates ? 'กำลังตรวจสอบ...' : 'กำลังส่งข้อมูล...'}</>
             ) : (
-              <><Upload size={16} /> ส่งเข้าฐานข้อมูล (API)</>
+              <><Upload size={16} /> เช็คข้อมูลหน่วยงาน</>
             )}
           </button>
         </div>
