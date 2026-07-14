@@ -292,10 +292,10 @@ export const AdminView = ({ adminKey }) => {
     }
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (adminKey) fetchJobs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminKey]);
 
   const handleApprove = async (jobId) => {
