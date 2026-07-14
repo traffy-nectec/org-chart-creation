@@ -4876,7 +4876,7 @@ export default function OrgManagerApp() {
             
             <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-white rounded-b-2xl shrink-0">
               <div className="text-sm text-slate-500 font-medium">
-                {`จัดการแล้ว ${conflicts.filter(c => userResolutions[c.id] !== undefined).length} / ${conflicts.length} รายการ`}
+                {`จัดการแล้ว ${conflicts.filter(c => userResolutions[c.temp_id] !== undefined).length} / ${conflicts.length} รายการ`}
               </div>
               <div className="flex gap-3">
                 <button 
@@ -4896,7 +4896,7 @@ export default function OrgManagerApp() {
                   onClick={handleConfirmResolutions}
                   disabled={
                     isCheckingDuplicates || isExporting || 
-                    conflicts.filter(c => userResolutions[c.id] !== undefined).length !== conflicts.length
+                    conflicts.filter(c => userResolutions[c.temp_id] !== undefined).length !== conflicts.length
                   }
                   className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
