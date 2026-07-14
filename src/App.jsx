@@ -2612,6 +2612,14 @@ export default function OrgManagerApp() {
   // States for Bulk Similarity Check UI
   const abortControllerRef = useRef(null);
   const isCancelledRef = useRef(false);
+  const searchInputRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    if (searchQuery === '' && searchInputRef.current) {
+      searchInputRef.current.value = '';
+    }
+  }, [searchQuery]);
   
   // Cleanup on unmount (especially useful for Vite HMR)
   useEffect(() => {
@@ -4302,10 +4310,14 @@ export default function OrgManagerApp() {
                         <Search size={14} className="text-slate-500 shrink-0" />
                         <input
                           type="text"
-                          value={searchQuery}
+                          ref={searchInputRef}
+                          defaultValue={searchQuery}
                           onChange={(e) => {
-                            setSearchQuery(e.target.value);
                             setShowSearchSuggestions(true);
+                            if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+                            searchTimeoutRef.current = setTimeout(() => {
+                              setSearchQuery(e.target.value);
+                            }, 300);
                           }}
                           onFocus={() => setShowSearchSuggestions(true)}
                           onBlur={() => setTimeout(() => setShowSearchSuggestions(false), 200)}
@@ -4314,7 +4326,10 @@ export default function OrgManagerApp() {
                         />
                         {searchQuery && (
                           <button
-                            onClick={() => setSearchQuery('')}
+                            onClick={() => {
+                              setSearchQuery('');
+                              if (searchInputRef.current) searchInputRef.current.value = '';
+                            }}
                             aria-label="ล้างข้อความค้นหา"
                             title="ล้างข้อความค้นหา"
                             className="text-slate-400 hover:text-slate-600 shrink-0"
