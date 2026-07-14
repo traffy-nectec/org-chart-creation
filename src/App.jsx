@@ -2858,6 +2858,46 @@ export default function OrgManagerApp() {
     const potentialRoots = organizations.filter(org => !org.parentId || !idMap.has(org.parentId));
     const primaryRootId = potentialRoots.length > 0 ? potentialRoots[0].id : null;
 
+    // --- Optimized O(N) Cycle Detection ---
+    const nodeState = new Map(); 
+    const cyclePaths = new Map();
+
+    const detectCyclesDFS = (nodeId, currentPath = []) => {
+      const state = nodeState.get(nodeId);
+      if (state === 1) {
+        const cycleStartIndex = currentPath.indexOf(nodeId);
+        const cycle = currentPath.slice(cycleStartIndex);
+        const namesPath = cycle.map(id => idMap.get(id)?.name || 'ไม่ระบุชื่อ');
+        namesPath.push(idMap.get(nodeId)?.name || 'ไม่ระบุชื่อ');
+        const message = `ความสัมพันธ์เป็นวงกลม: ${namesPath.join(' -> ')}`;
+        
+        cycle.forEach(id => {
+          cyclePaths.set(id, message);
+        });
+        return message;
+      }
+      if (state === 2) {
+        return cyclePaths.get(nodeId) || null;
+      }
+
+      nodeState.set(nodeId, 1);
+      const node = idMap.get(nodeId);
+      let result = null;
+      if (node && node.parentId) {
+        result = detectCyclesDFS(node.parentId, [...currentPath, nodeId]);
+      }
+      
+      nodeState.set(nodeId, 2);
+      if (result) {
+        cyclePaths.set(nodeId, result);
+      }
+      return result;
+    };
+
+    organizations.forEach(node => {
+      detectCyclesDFS(node.id);
+    });
+
     organizations.forEach(node => {
       // 1. Root constraint conflict: multiple roots
       if (!node.parentId && primaryRootId && node.id !== primaryRootId) {
@@ -2882,27 +2922,12 @@ export default function OrgManagerApp() {
       }
 
       // 3. Circular dependency conflict
-      const visited = new Set();
-      let current = node;
-      const path = [];
-      let hasCycle = false;
-
-      while (current) {
-        if (visited.has(current.id)) {
-          path.push(current.name || 'ไม่ระบุชื่อ');
-          hasCycle = true;
-          break;
-        }
-        visited.add(current.id);
-        path.push(current.name || 'ไม่ระบุชื่อ');
-        current = idMap.get(current.parentId);
-      }
-
-      if (hasCycle) {
+      const cycleMsg = cyclePaths.get(node.id);
+      if (cycleMsg) {
         unreachable.push({
           ...node,
           causeType: 'error',
-          causeMessage: `ความสัมพันธ์เป็นวงกลม: ${path.join(' -> ')}`
+          causeMessage: cycleMsg
         });
         return;
       }
@@ -3418,12 +3443,13 @@ export default function OrgManagerApp() {
   const handleExportCSV = () => {
     const headers = ['org_name', 'parent_name', 'level', 'coverage_scope', 'province', 'amphoe', 'tambon', 'postal_code', 'area_code', 'path'];
     const rows = [];
+    const orgMap = new Map(organizations.map(o => [o.id, o]));
 
     organizations.forEach(org => {
-      const parentOrg = organizations.find(o => o.id === org.parentId);
+      const parentOrg = orgMap.get(org.parentId);
       const parentName = parentOrg ? parentOrg.name : '';
       const locations = getSelectedLocations(org.areas);
-      const pathValue = getOrgPath(org.id, organizations);
+      const pathValue = getOrgPath(org.id, orgMap);
       const scopeValue = org.areas?.scope === 'NATIONWIDE' ? 'ทั่วประเทศ' : 'เฉพาะพื้นที่';
 
       if (locations.length === 0) {
@@ -3475,11 +3501,13 @@ export default function OrgManagerApp() {
 
   const handleExportExcel = () => {
     const data = [];
+    const orgMap = new Map(organizations.map(o => [o.id, o]));
+
     organizations.forEach(org => {
-      const parentOrg = organizations.find(o => o.id === org.parentId);
+      const parentOrg = orgMap.get(org.parentId);
       const parentName = parentOrg ? parentOrg.name : '';
       const locations = getSelectedLocations(org.areas);
-      const pathValue = getOrgPath(org.id, organizations);
+      const pathValue = getOrgPath(org.id, orgMap);
       const scopeValue = org.areas?.scope === 'NATIONWIDE' ? 'ทั่วประเทศ' : 'เฉพาะพื้นที่';
 
       if (locations.length === 0) {

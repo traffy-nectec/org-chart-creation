@@ -5,12 +5,19 @@
  * @param {Array} organizations - Array of all organization objects
  * @returns {string} The path joined by dots (e.g. "Root.Child.SubChild")
  */
-export const getOrgPath = (orgId, organizations) => {
+export const getOrgPath = (orgId, orgsOrMap) => {
   const path = [];
   let currentId = orgId;
   
   // Guard against circular references by keeping track of visited nodes
   const visited = new Set();
+
+  const getOrg = (id) => {
+    if (orgsOrMap instanceof Map) {
+      return orgsOrMap.get(id);
+    }
+    return orgsOrMap.find(o => o.id === id);
+  };
 
   while (currentId) {
     if (visited.has(currentId)) {
@@ -19,7 +26,7 @@ export const getOrgPath = (orgId, organizations) => {
     }
     visited.add(currentId);
 
-    const currentOrg = organizations.find(o => o.id === currentId);
+    const currentOrg = getOrg(currentId);
     if (!currentOrg) break;
 
     // Unshift puts the current name at the beginning of the array
