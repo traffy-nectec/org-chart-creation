@@ -131,6 +131,37 @@ export const SubmissionsView = ({ apiKey, initialEmail = '' }) => {
     }
   };
 
+  const handleDownloadAllCodes = async (jobId) => {
+    const loadingToast = toast.loading('กำลังดาวน์โหลดข้อมูลรหัส...');
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/import/payload/${jobId}`, {
+        headers: { 'X-API-Key': apiKey }
+      });
+      if (!res.ok) throw new Error('Failed to download results');
+      const data = await res.json();
+      
+      if (!data.nodes || data.nodes.length === 0) {
+        throw new Error('ไม่พบข้อมูลหน่วยงานใน Job นี้');
+      }
+
+      const exportData = data.nodes.map(n => ({
+        'ชื่อหน่วยงาน': n.name,
+        'ID ฐานข้อมูล': n.generated_db_id || 'N/A',
+        'Staff Entry Code': n.staff_entry_code || 'N/A',
+        'Admin Claim Code': n.admin_claim_code || 'N/A'
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Codes");
+      XLSX.writeFile(wb, `import_codes_${jobId}.xlsx`);
+      toast.success('ดาวน์โหลดรหัสสำเร็จ', { id: loadingToast });
+    } catch (err) {
+      toast.error('ดาวน์โหลดล้มเหลว: ' + err.message, { id: loadingToast });
+    }
+  };
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'pending_approval':
@@ -232,12 +263,20 @@ export const SubmissionsView = ({ apiKey, initialEmail = '' }) => {
                   )}
                   
                   {job.status === 'completed' && (
-                    <button 
-                      onClick={() => handleDownloadResults(job.id)}
-                      className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 rounded-lg text-sm font-bold transition-colors"
-                    >
-                      <Download size={16} /> ดาวน์โหลดผลลัพธ์
-                    </button>
+                    <div className="flex flex-col gap-2">
+                      <button 
+                        onClick={() => handleDownloadResults(job.id)}
+                        className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 rounded-lg text-sm font-bold transition-colors"
+                      >
+                        <Download size={16} /> ดาวน์โหลดผลลัพธ์
+                      </button>
+                      <button 
+                        onClick={() => handleDownloadAllCodes(job.id)}
+                        className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 rounded-lg text-sm font-bold transition-colors"
+                      >
+                        <Download size={16} /> ดาวน์โหลดรหัส Staff & Admin
+                      </button>
+                    </div>
                   )}
 
                   {job.status === 'processing' && (
@@ -301,12 +340,19 @@ export const AdminView = ({ adminKey }) => {
   const handleApprove = async (jobId) => {
     if (!confirm('ยืนยันการอนุมัติการนำเข้าข้อมูลนี้? ระบบจะเริ่มประมวลผลทันที')) return;
     
+    const tag = prompt('กรอก Tag สำหรับบันทึกลงในโครงสร้างสายงาน (เช่น ชื่องาน หรือหน่วยงานระดับบน) หรือเว้นว่างไว้:');
+    if (tag === null) return; // User cancelled the prompt
+    
     const loadingToast = toast.loading('กำลังอนุมัติ...');
     try {
       const apiUrl = import.meta.env.VITE_API_URL || '';
       const res = await fetch(`${apiUrl}/api/import/${jobId}/approve`, {
         method: 'POST',
-        headers: { 'X-Admin-Key': adminKey }
+        headers: { 
+          'X-Admin-Key': adminKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ tag: tag.trim() })
       });
       if (!res.ok) throw new Error('Approve failed');
       toast.success('อนุมัติสำเร็จ', { id: loadingToast });
