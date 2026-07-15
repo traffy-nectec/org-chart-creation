@@ -2837,7 +2837,14 @@ export default function OrgManagerApp() {
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase();
-    return organizations.filter(org => org.name && org.name.toLowerCase().includes(q));
+    const filtered = [];
+    for (const org of organizations) {
+      if (org.name && org.name.toLowerCase().includes(q)) {
+        filtered.push(org);
+        if (filtered.length >= 100) break;
+      }
+    }
+    return filtered;
   }, [searchQuery, organizations]);
 
   const conflictingNodes = useMemo(() => {
