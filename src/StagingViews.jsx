@@ -149,7 +149,7 @@ export const SubmissionsView = ({ apiKey, initialEmail = '' }) => {
         'ชื่อหน่วยงาน': n.name,
         'ID ฐานข้อมูล': n.generated_db_id || 'N/A',
         'Staff Entry Code': n.staff_entry_code || 'N/A',
-        'Admin Claim Code': n.admin_claim_code || 'N/A'
+        'Admin Entry Code': n.admin_entry_code || 'N/A'
       }));
 
       const ws = XLSX.utils.json_to_sheet(exportData);
@@ -274,7 +274,7 @@ export const SubmissionsView = ({ apiKey, initialEmail = '' }) => {
                         onClick={() => handleDownloadAllCodes(job.id)}
                         className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 rounded-lg text-sm font-bold transition-colors"
                       >
-                        <Download size={16} /> ดาวน์โหลดรหัส Staff & Admin
+                        <Download size={16} /> ดาวน์โหลดรหัส Staff & Admin (Entry Codes)
                       </button>
                     </div>
                   )}
@@ -392,9 +392,9 @@ export const AdminView = ({ adminKey }) => {
       <div className="flex justify-between items-center mb-6 shrink-0 border-b border-slate-100 pb-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <CheckCircle className="text-green-600" /> Admin Dashboard (รออนุมัติ)
+            <CheckCircle className="text-green-600" /> Admin Dashboard
           </h2>
-          <p className="text-sm text-slate-500 mt-1">รายการขอนำเข้าข้อมูลที่รอการตรวจสอบและอนุมัติจากผู้ดูแลระบบ</p>
+          <p className="text-sm text-slate-500 mt-1">ประวัติการตรวจสอบ อนุมัติ และสถานะการนำเข้าข้อมูลทั้งหมดในระบบ</p>
         </div>
         <button onClick={fetchJobs} className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-bold hover:bg-slate-50">
           รีเฟรชข้อมูล
@@ -409,59 +409,124 @@ export const AdminView = ({ adminKey }) => {
         ) : jobs.length === 0 ? (
           <div className="h-full flex items-center justify-center text-slate-400 flex-col gap-3">
             <CheckCircle size={48} className="text-slate-300" />
-            <p>ไม่มีรายการรออนุมัติ</p>
+            <p>ไม่มีประวัติรายการขอนำเข้าในระบบ</p>
           </div>
         ) : (
           <div className="grid gap-4">
             {jobs.map(job => (
-              <div key={job.id} className="border border-slate-200 rounded-xl p-5 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between shadow-sm">
-                <div>
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="font-mono text-sm font-bold text-slate-700">{job.id}</span>
-                    <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded text-[10px] font-bold">รออนุมัติ</span>
+              <div key={job.id} className="border border-slate-200 rounded-xl p-5 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex-1 w-full">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="font-mono text-sm font-bold text-slate-700 flex items-center gap-2">
+                      {job.id}
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(job.id);
+                          toast.success('คัดลอก Job ID แล้ว');
+                        }}
+                        className="text-slate-400 hover:text-blue-600 transition-colors"
+                        title="Copy Job ID"
+                      >
+                        <Copy size={14} />
+                      </button>
+                    </span>
+                    {getStatusBadge(job.status)}
                   </div>
                   <div className="text-sm text-slate-600 mb-1">
                     <span className="font-semibold text-slate-700">ผู้ขอ:</span> {job.requester_email}
                   </div>
-                  <div className="text-sm text-slate-600">
-                    <span className="font-semibold text-slate-700">จำนวนข้อมูล:</span> {job.total_items} หน่วยงาน
+                  <div className="text-sm text-slate-600 mb-1">
+                    <span className="font-semibold text-slate-700">จำนวนข้อมูล:</span> <span className="font-bold text-blue-600">{job.total_items}</span> หน่วยงาน
                   </div>
-                  <div className="text-xs text-slate-400 mt-2">
+                  <div className="text-xs text-slate-400">
                     เวลาที่ขอ: {new Date(job.created_at).toLocaleString('th-TH')}
                   </div>
                 </div>
-                
-                {rejectingJobId === job.id ? (
-                  <form onSubmit={handleReject} className="w-full md:w-auto flex flex-col gap-2 min-w-[300px]">
-                    <textarea
-                      required
-                      placeholder="ระบุเหตุผลที่ปฏิเสธ..."
-                      className="w-full px-3 py-2 border border-red-300 rounded-lg focus:ring-1 focus:ring-red-500 text-sm"
-                      rows={2}
-                      value={rejectComment}
-                      onChange={(e) => setRejectComment(e.target.value)}
-                    ></textarea>
-                    <div className="flex gap-2 justify-end">
-                      <button type="button" onClick={() => setRejectingJobId(null)} className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg">ยกเลิก</button>
-                      <button type="submit" className="px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg">ยืนยันปฏิเสธ</button>
+
+                <div className="w-full md:w-auto min-w-[240px] flex flex-col gap-2">
+                  {job.status === 'rejected' && job.admin_comment && (
+                    <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-sm">
+                      <span className="font-bold text-red-800">เหตุผลที่ปฏิเสธ:</span>
+                      <p className="text-red-700 mt-1">{job.admin_comment}</p>
                     </div>
-                  </form>
-                ) : (
-                  <div className="flex gap-3 w-full md:w-auto">
-                    <button 
-                      onClick={() => setRejectingJobId(job.id)}
-                      className="flex-1 md:flex-none px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 font-bold rounded-lg transition-colors text-sm"
-                    >
-                      ปฏิเสธ
-                    </button>
-                    <button 
-                      onClick={() => handleApprove(job.id)}
-                      className="flex-1 md:flex-none px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors text-sm shadow-sm"
-                    >
-                      อนุมัติ (ดำเนินการ)
-                    </button>
-                  </div>
-                )}
+                  )}
+
+                  {job.status === 'pending_approval' && (
+                    rejectingJobId === job.id ? (
+                      <form onSubmit={handleReject} className="w-full flex flex-col gap-2">
+                        <textarea
+                          required
+                          placeholder="ระบุเหตุผลที่ปฏิเสธ..."
+                          className="w-full px-3 py-2 border border-red-300 rounded-lg focus:ring-1 focus:ring-red-500 text-sm"
+                          rows={2}
+                          value={rejectComment}
+                          onChange={(e) => setRejectComment(e.target.value)}
+                        ></textarea>
+                        <div className="flex gap-2 justify-end">
+                          <button type="button" onClick={() => setRejectingJobId(null)} className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg">ยกเลิก</button>
+                          <button type="submit" className="px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg">ยืนยันปฏิเสธ</button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="flex gap-2 w-full justify-end">
+                        <button 
+                          onClick={() => setRejectingJobId(job.id)}
+                          className="flex-1 md:flex-none px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 font-bold rounded-lg transition-colors text-sm"
+                        >
+                          ปฏิเสธ
+                        </button>
+                        <button 
+                          onClick={() => handleApprove(job.id)}
+                          className="flex-1 md:flex-none px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors text-sm shadow-sm"
+                        >
+                          อนุมัติ (ดำเนินการ)
+                        </button>
+                      </div>
+                    )
+                  )}
+
+                  {job.status === 'completed' && (
+                    <div className="flex flex-col gap-2">
+                      <button 
+                        onClick={() => handleDownloadResults(job.id)}
+                        className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 rounded-lg text-sm font-bold transition-colors"
+                      >
+                        <Download size={16} /> ดาวน์โหลดผลลัพธ์
+                      </button>
+                      <button 
+                        onClick={() => handleDownloadAllCodes(job.id)}
+                        className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 rounded-lg text-sm font-bold transition-colors"
+                      >
+                        <Download size={16} /> ดาวน์โหลดรหัส Staff & Admin (Entry Codes)
+                      </button>
+                    </div>
+                  )}
+
+                  {job.status === 'processing' && (
+                    <div className="w-full">
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-slate-500 font-bold">ดำเนินการแล้ว</span>
+                        <span className="text-blue-600 font-bold">{job.processed_items} / {job.total_items}</span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-2.5">
+                        <div 
+                          className="bg-blue-600 h-2.5 rounded-full transition-all duration-500" 
+                          style={{ width: `${Math.min(100, Math.round((job.processed_items / job.total_items) * 100))}%` }}
+                        ></div>
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-1 text-right animate-pulse">
+                        กำลังเขียนฐานข้อมูลขนานทีละ Level...
+                      </div>
+                    </div>
+                  )}
+
+                  {job.status === 'error' && (
+                    <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-sm">
+                      <span className="font-bold text-red-800">เกิดข้อผิดพลาด:</span>
+                      <p className="text-red-700 mt-1 text-xs font-mono">{job.error_message}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
