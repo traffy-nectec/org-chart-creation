@@ -29,6 +29,21 @@ The primary objective of the recent sessions was to optimize the backend API to 
   - Added a "My Submissions" tab to fetch status (`GET /api/import/jobs?email=xxx`).
   - Added an Admin Dashboard (protected by `X-Admin-Key`) to approve or reject batches with comments.
   - Updated `App.jsx` to load rejected payload for user editing.
+- **Auditing & Requester Details (Jul 16):**
+  - Swapped the simple EmailPromptModal with `RequesterDetailsModal` to collect email, name, phone, and remarks/note prior to submission.
+  - Automatically persist and retrieve the user's details using `localStorage`.
+- **Pre-check Validation Metrics (Jul 16):**
+  - Updated client-side payload exporter to calculate node levels, build `level_distribution` map, and count pre-check validation warnings and errors, appending these to the metadata payload.
+- **Table and Tree Visualization (Jul 16):**
+  - Added a "ดูข้อมูล / ผังสายงาน" button on the Admin Dashboard that opens a modal containing:
+    - Tab 1: **ตารางข้อมูลหน่วยงาน (Table View)**: An HTML table with search filters and pagination listing Name, Action, Level, Parent, and Coverage area.
+    - Tab 2: **ผังโครงสร้างสายงาน (Tree View)**: An interactive recursive tree representing the hierarchical structure.
+- **Silent Dashboard Auto-Refresh (Jul 16):**
+  - Implemented background polling every 15 seconds on the Admin Dashboard to keep job statuses live without blocking spinners.
+- **API-Driven Parallel QR Generation (Jul 16):**
+  - Decoupled database connection pools from the worker, allowing sidecar-free scale-to-zero exits.
+  - Created endpoints in the backend to partition jobs via modulo on `g.id` (`GET /api/import/qrs/pending` with `FOR UPDATE SKIP LOCKED`) and batch-commit completed IDs.
+  - Parallelized the 3 image generation and upload pipelines inside the worker, reducing processing time from 210ms to 80ms per organization.
 
 ## Current State
 - The frontend is fully operational and has been committed and pushed to `main` (repository: `org-chart-creation`).
@@ -38,7 +53,6 @@ The primary objective of the recent sessions was to optimize the backend API to 
 
 ## Pending Tasks / Next Steps
 - **Non-spatial Organizations:** Currently lacking a dedicated workflow for organizations that span nationwide (e.g., Ministries) rather than being tied to specific tambons/districts.
-- **Performance Profiling for Extreme Load:** Monitor backend RAM usage when `App.jsx` imports 35,000 nodes simultaneously to ensure the Cloud Run container doesn't OOM.
 - **Mini-map Implementation:** Implementing the much-needed canvas mini-map for navigating massive trees.
 
 ## Known Issues / Open Questions
