@@ -3368,11 +3368,7 @@ export default function OrgManagerApp() {
       setSearchDuration(((Date.now() - startTime) / 1000).toFixed(2));
       
       if (realConflicts.length === 0) {
-        setIsConflictModalOpen(false);
-        if (exactMatchesMap.size === 0) {
-          toast.success("ไม่พบหน่วยงานซ้ำซ้อนหรือใกล้เคียงในระบบ", { duration: 3000 });
-        }
-        executeFinalExport(orgs, destination);
+        setIsConflictModalOpen(true);
       }
     } catch (err) {
       setIsCheckingDuplicates(false);
@@ -4808,8 +4804,36 @@ export default function OrgManagerApp() {
       {/* Progressive Conflict Resolution Modal */}
       {isConflictModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-[1100px] max-w-full max-h-[90vh] flex flex-col animate-in zoom-in-95">
-            <div className="px-6 py-4 border-b border-slate-100 flex flex-col gap-4 bg-amber-50 rounded-t-2xl shrink-0">
+          {conflicts.length === 0 && !isCheckingDuplicates ? (
+            <div className="bg-white rounded-2xl shadow-xl w-[500px] max-w-full p-6 flex flex-col items-center text-center animate-in zoom-in-95">
+              <div className="w-16 h-16 bg-green-50 text-green-600 rounded-full flex items-center justify-center mb-4">
+                <CheckCircle size={36} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">ไม่พบหน่วยงานซ้ำซ้อน</h3>
+              <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+                การตรวจสอบความซ้ำซ้อนเสร็จสิ้น ไม่พบหน่วยงานที่ซ้ำซ้อนหรือใกล้เคียงในฐานข้อมูลระบบ หน่วยงานทั้งหมดที่คุณออกแบบเป็นหน่วยงานใหม่ 100%
+              </p>
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setIsConflictModalOpen(false)}
+                  className="flex-1 px-4 py-2.5 border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-sm transition-colors cursor-pointer animate-none"
+                >
+                  ย้อนกลับ
+                </button>
+                <button
+                  onClick={() => {
+                    setIsConflictModalOpen(false);
+                    executeFinalExport(organizations, exportDestination);
+                  }}
+                  className="flex-1 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-sm transition-colors shadow-md shadow-blue-200 cursor-pointer animate-none"
+                >
+                  ดำเนินการนำเข้าข้อมูล
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl shadow-xl w-[1100px] max-w-full max-h-[90vh] flex flex-col animate-in zoom-in-95">
+              <div className="px-6 py-4 border-b border-slate-100 flex flex-col gap-4 bg-amber-50 rounded-t-2xl shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center">
@@ -5081,8 +5105,9 @@ export default function OrgManagerApp() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    )}
 
       {showWelcomeModal && (
         <WelcomeModal

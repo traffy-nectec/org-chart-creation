@@ -58,9 +58,15 @@ const downloadResultsFile = async (jobId, key, isAllCodes, isApiKey) => {
 };
 
 export const RequesterDetailsModal = ({ isOpen, onClose, onSubmit, isExporting, initialEmail = '' }) => {
-  const [email, setEmail] = useState(initialEmail);
-  const [name, setName] = useState('');
-  const [tel, setTel] = useState('');
+  const [email, setEmail] = useState(() => {
+    return localStorage.getItem('requester_email') || initialEmail;
+  });
+  const [name, setName] = useState(() => {
+    return localStorage.getItem('requester_name') || '';
+  });
+  const [tel, setTel] = useState(() => {
+    return localStorage.getItem('requester_tel') || '';
+  });
   const [note, setNote] = useState('');
 
   if (!isOpen) return null;
@@ -78,7 +84,13 @@ export const RequesterDetailsModal = ({ isOpen, onClose, onSubmit, isExporting, 
         <p className="text-xs text-center text-slate-500 mb-6">
           โปรดระบุรายละเอียดผู้ติดต่อและรายละเอียด เพื่อประกอบการอนุมัติการนำเข้าข้อมูล
         </p>
-        <form onSubmit={(e) => { e.preventDefault(); onSubmit({ email, name, tel, note }); }} className="space-y-4">
+        <form onSubmit={(e) => { 
+          e.preventDefault(); 
+          localStorage.setItem('requester_email', email);
+          localStorage.setItem('requester_name', name);
+          localStorage.setItem('requester_tel', tel);
+          onSubmit({ email, name, tel, note }); 
+        }} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">อีเมลผู้ขอนำเข้า (Email) *</label>
             <input
