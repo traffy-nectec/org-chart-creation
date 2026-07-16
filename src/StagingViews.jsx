@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Send, Loader2, CheckCircle, FileText, Database, X, Download, Copy, RefreshCw, ChevronDown, ChevronRight, Info, AlertTriangle } from 'lucide-react';
+import { Mail, Send, Loader2, CheckCircle, FileText, Database, X, Download, Copy, RefreshCw, ChevronDown, ChevronRight, Info, AlertTriangle, Edit } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
@@ -144,7 +144,7 @@ export const RequesterDetailsModal = ({ isOpen, onClose, onSubmit, isExporting, 
   );
 };
 
-export const SubmissionsView = ({ apiKey, initialEmail = '' }) => {
+export const SubmissionsView = ({ apiKey, initialEmail = '', onRestoreJob }) => {
   const [email, setEmail] = useState(initialEmail);
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -276,10 +276,23 @@ export const SubmissionsView = ({ apiKey, initialEmail = '' }) => {
                 </div>
                 
                 <div className="w-full md:w-auto min-w-[200px] flex flex-col gap-2">
-                  {job.status === 'rejected' && job.admin_comment && (
-                    <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-sm">
-                      <span className="font-bold text-red-800">เหตุผลที่ปฏิเสธ:</span>
-                      <p className="text-red-700 mt-1">{job.admin_comment}</p>
+                  {job.status === 'rejected' && (
+                    <div className="flex flex-col gap-2">
+                      {job.admin_comment && (
+                        <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-sm">
+                          <span className="font-bold text-red-800">เหตุผลที่ปฏิเสธ:</span>
+                          <p className="text-red-700 mt-1">{job.admin_comment}</p>
+                        </div>
+                      )}
+                      {onRestoreJob && (
+                        <button
+                          type="button"
+                          onClick={() => onRestoreJob(job.id)}
+                          className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 rounded-lg text-sm font-bold transition-colors shadow-sm"
+                        >
+                          <Edit size={16} /> ดึงข้อมูลกลับมาแก้ไข
+                        </button>
+                      )}
                     </div>
                   )}
                   
@@ -312,6 +325,26 @@ export const SubmissionsView = ({ apiKey, initialEmail = '' }) => {
                           style={{ width: `${Math.max(2, (job.processed_items / job.total_items) * 100)}%` }}
                         ></div>
                       </div>
+                    </div>
+                  )}
+
+                  {job.status === 'error' && (
+                    <div className="flex flex-col gap-2">
+                      {job.error_message && (
+                        <div className="bg-red-50 p-3 rounded-lg border border-red-100 text-sm">
+                          <span className="font-bold text-red-800">เกิดข้อผิดพลาด:</span>
+                          <p className="text-red-700 mt-1 text-xs font-mono">{job.error_message}</p>
+                        </div>
+                      )}
+                      {onRestoreJob && (
+                        <button
+                          type="button"
+                          onClick={() => onRestoreJob(job.id)}
+                          className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 rounded-lg text-sm font-bold transition-colors shadow-sm"
+                        >
+                          <Edit size={16} /> ดึงข้อมูลกลับมาแก้ไข
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

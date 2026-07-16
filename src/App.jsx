@@ -2651,17 +2651,40 @@ export default function OrgManagerApp() {
     setLoginError('');
     
     const apiUrl = import.meta.env.VITE_API_URL || '';
-    fetch(`${apiUrl}/api/aliases`, {
-      headers: { 'X-API-Key': apiKey }
+    
+    // Check if the key is the Admin Key by querying the admin jobs list
+    fetch(`${apiUrl}/api/import/jobs`, {
+      headers: { 'X-Admin-Key': apiKey }
     })
-    .then(res => {
-      setIsLoggingIn(false);
+    .then(async (res) => {
       if (res.ok) {
+        // It is the admin key!
+        setIsLoggingIn(false);
         localStorage.setItem('traffy_org_builder_api_key', apiKey);
         setIsAuthenticated(true);
         setLoginError('');
-      } else {
-        setLoginError('รหัสผ่านไม่ถูกต้อง');
+        setViewMode('admin'); // Redirect to approve dashboard directly
+        return;
+      }
+      
+      // If not admin, try regular API Key with /api/aliases
+      try {
+        const aliasesRes = await fetch(`${apiUrl}/api/aliases`, {
+          headers: { 'X-API-Key': apiKey }
+        });
+        setIsLoggingIn(false);
+        if (aliasesRes.ok) {
+          localStorage.setItem('traffy_org_builder_api_key', apiKey);
+          setIsAuthenticated(true);
+          setLoginError('');
+          setViewMode('canvas'); // Normal user goes to canvas
+        } else {
+          setLoginError('รหัสผ่านไม่ถูกต้อง');
+        }
+      } catch (err) {
+        console.error(err);
+        setIsLoggingIn(false);
+        setLoginError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
       }
     })
     .catch(() => {
@@ -3629,6 +3652,58 @@ export default function OrgManagerApp() {
     }
   };
 
+  const handleRestoreJob = async (jobId) => {
+    const loadingToast = toast.loading('กำลังดึงข้อมูลเพื่อนำกลับมาแก้ไข...');
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/import/payload/${jobId}`, {
+        headers: { 'X-API-Key': apiKey }
+      });
+      if (!res.ok) throw new Error('ไม่สามารถโหลดข้อมูล payload ได้');
+      const payload = await res.json();
+      
+      if (payload && Array.isArray(payload.nodes)) {
+        const restoredOrgs = payload.nodes.map(n => {
+          const scope = (n.locations && n.locations.length > 0) ? 'LOCAL' : 'NATIONWIDE';
+          return {
+            id: n.temp_id,
+            name: n.name,
+            parentId: n.parent_temp_id || null,
+            logo: null,
+            action: n.action || 'CREATE',
+            existing_db_id: n.existing_db_id || null,
+            attributes: {
+              address: n.details?.address || "",
+              tel: n.details?.tel || "",
+              province: n.details?.province || ""
+            },
+            areas: {
+              scope: scope,
+              locations: n.locations?.map(loc => ({
+                province: loc.province,
+                amphoe: loc.district,
+                tambon: loc.subdistrict,
+                zipcode: loc.zipcode || ""
+              })) || []
+            }
+          };
+        });
+
+        // Update state and switch view to canvas
+        setOrganizations(recalculateAllLevels(restoredOrgs));
+        if (restoredOrgs.length > 0) {
+          setSelectedNodeId(restoredOrgs[0].id);
+        }
+        setViewMode('canvas');
+        toast.success('ดึงข้อมูลกลับมาแก้ไขสำเร็จแล้ว', { id: loadingToast });
+      } else {
+        throw new Error('ไม่พบข้อมูลหน่วยงานในงานดังกล่าว');
+      }
+    } catch (err) {
+      toast.error('โหลดข้อมูลล้มเหลว: ' + err.message, { id: loadingToast });
+    }
+  };
+
   const renderTableView = () => {
     const toggleTableCollapse = (id, e) => {
       e.stopPropagation();
@@ -4303,7 +4378,7 @@ export default function OrgManagerApp() {
             </div>
           </div>
         )}
-        {viewMode === 'submissions' && <SubmissionsView apiKey={apiKey} initialEmail={lastSubmittedEmail} />}
+        {viewMode === 'submissions' && <SubmissionsView apiKey={apiKey} initialEmail={lastSubmittedEmail} onRestoreJob={handleRestoreJob} />}
         {viewMode === 'admin' && <AdminView adminKey={apiKey} />}
 
         {/* TOP: Visual Mind Map Canvas (Combined with Floating Config Panel) */}
