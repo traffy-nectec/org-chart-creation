@@ -3234,6 +3234,7 @@ export default function OrgManagerApp() {
     setCheckProgress({ current: 0, total: orgs.length });
     
     const realConflicts = [];
+    const exactMatchesMap = new Map();
     const chunkSize = 200; // ลดขนาด Chunk ลงมาเพื่อป้องกัน Database ค้าง (Memory Spill) จากข้อมูลคำซ้ำเยอะๆ (เช่น คำว่า "โรงเรียน")
     // eslint-disable-next-line react-hooks/purity
     const startTime = Date.now();
@@ -3249,7 +3250,6 @@ export default function OrgManagerApp() {
         const chunk = orgs.slice(i, i + chunkSize);
         const namesPayload = { names: chunk.map(o => o.name) };
 
-        
         try {
           const apiUrl = import.meta.env.VITE_API_URL || '';
           const response = await fetch(`${apiUrl}/api/similarity`, {
@@ -3264,15 +3264,12 @@ export default function OrgManagerApp() {
           
           if (signal.aborted || isCancelledRef.current) return;
           
-
-          
           if (!response.ok) {
              throw new Error(`API Error (${response.status})`);
           }
           
           const results = await response.json() || [];
 
-          
           const resultsByName = {};
           results.forEach(res => {
             if (!resultsByName[res.name]) {
@@ -3288,19 +3285,26 @@ export default function OrgManagerApp() {
           });
           
           chunk.forEach(org => {
-             const validMatches = (resultsByName[org.name] || []).filter(m => m.score >= 0.5);
-             if (validMatches.length > 0) {
-               realConflicts.push({
-                 temp_id: org.id,
-                 org_name: org.name,
-                 matches: validMatches
-               });
+             const matches = resultsByName[org.name] || [];
+             // Check if there is an exact duplicate (score >= 0.99 or identical string trim case-insensitive)
+             const exactMatch = matches.find(m => m.score >= 0.99 || m.db_name.trim().toLowerCase() === org.name.trim().toLowerCase());
+             
+             if (exactMatch) {
+               exactMatchesMap.set(org.id, exactMatch);
+             } else {
+               const validMatches = matches.filter(m => m.score >= 0.5);
+               if (validMatches.length > 0) {
+                 realConflicts.push({
+                   temp_id: org.id,
+                   org_name: org.name,
+                   matches: validMatches
+                 });
+               }
              }
           });
           setConflicts([...realConflicts]);
         } catch (fetchErr) {
           if (fetchErr.name === 'AbortError' || isCancelledRef.current) {
-
             return;
           }
           console.error(`[Batch ${i}] Fetch/Parsing Error:`, fetchErr);
@@ -3308,17 +3312,43 @@ export default function OrgManagerApp() {
         }
         
         setCheckProgress({ current: Math.min(i + chunkSize, orgs.length), total: orgs.length });
-
       }
       
       if (signal.aborted || isCancelledRef.current) return;
       
+      // Mutate orgs array and update state for exact matches
+      if (exactMatchesMap.size > 0) {
+        orgs.forEach(o => {
+          if (exactMatchesMap.has(o.id)) {
+            const match = exactMatchesMap.get(o.id);
+            o.action = 'LINK';
+            o.existing_db_id = match.db_id;
+          }
+        });
+        // Update main organizations state
+        setOrganizations(prevOrgs => prevOrgs.map(o => {
+          if (exactMatchesMap.has(o.id)) {
+            const match = exactMatchesMap.get(o.id);
+            return {
+              ...o,
+              action: 'LINK',
+              existing_db_id: match.db_id
+            };
+          }
+          return o;
+        }));
+        toast.success(`ตรวจพบหน่วยงานซ้ำ 100% จำนวน ${exactMatchesMap.size} แห่ง ระบบทำการเชื่อมโยงข้อมูลเดิมให้อัตโนมัติ`, { duration: 4000 });
+      }
+
       setIsCheckingDuplicates(false);
       // eslint-disable-next-line react-hooks/purity
       setSearchDuration(((Date.now() - startTime) / 1000).toFixed(2));
       
       if (realConflicts.length === 0) {
         setIsConflictModalOpen(false);
+        if (exactMatchesMap.size === 0) {
+          toast.success("ไม่พบหน่วยงานซ้ำซ้อนหรือใกล้เคียงในระบบ", { duration: 3000 });
+        }
         executeFinalExport(orgs, destination);
       }
     } catch (err) {
