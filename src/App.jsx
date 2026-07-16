@@ -11,7 +11,7 @@ import { getOrgPath, generateBackendPayload, topologicalSort } from './utils/exp
 import { extractGoogleSheetIds, fetchGoogleSheetAsCSV } from './utils/googleSheetUtils';
 import toast, { Toaster } from 'react-hot-toast';
 import ReactFlowOrgChart from './ReactFlowOrgChart';
-import { EmailPromptModal, SubmissionsView, AdminView } from './StagingViews';
+import { RequesterDetailsModal, SubmissionsView, AdminView } from './StagingViews';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 
 // ==========================================
@@ -3329,8 +3329,8 @@ export default function OrgManagerApp() {
     }
   };
 
-  const executeFinalExport = async (currentOrgs = organizations, destination = exportDestination, email = null) => {
-    if (destination === 'api' && !email) {
+  const executeFinalExport = async (currentOrgs = organizations, destination = exportDestination, requesterDetails = null) => {
+    if (destination === 'api' && !requesterDetails) {
       setPendingExportOrgs(currentOrgs);
       setPendingExportDestination(destination);
       setShowEmailPrompt(true);
@@ -3342,7 +3342,24 @@ export default function OrgManagerApp() {
     await new Promise(resolve => setTimeout(resolve, 50));
     try {
       const payload = generateBackendPayload(currentOrgs);
-      if (email) payload.requester_email = email;
+      if (requesterDetails) {
+        payload.requester_email = requesterDetails.email;
+        payload.requester_name = requesterDetails.name;
+        payload.requester_tel = requesterDetails.tel;
+        payload.requester_note = requesterDetails.note;
+      }
+
+      // Sum warnings and errors from currentOrgs
+      let warningsCount = 0;
+      let errorsCount = 0;
+      if (Array.isArray(currentOrgs)) {
+        currentOrgs.forEach(node => {
+          if (node.warnings) warningsCount += node.warnings.length;
+          if (node.errors) errorsCount += node.errors.length;
+        });
+      }
+      payload.metadata.warnings_count = warningsCount;
+      payload.metadata.errors_count = errorsCount;
       
       if (destination === 'api') {
         const apiUrl = import.meta.env.VITE_API_URL || '';
@@ -3357,7 +3374,7 @@ export default function OrgManagerApp() {
         
         if (response.status === 202) {
           setShowEmailPrompt(false);
-          setLastSubmittedEmail(email);
+          setLastSubmittedEmail(requesterDetails.email);
           toast.success("ส่งคำขอนำเข้าเรียบร้อย คุณสามารถตรวจสอบสถานะได้ที่เมนู 'สถานะการนำเข้า'", { duration: 5000 });
           // Note: we don't show progress modal automatically anymore because it's in pending_approval
           setViewMode('submissions');
@@ -4970,12 +4987,13 @@ export default function OrgManagerApp() {
       )}
       
       {showEmailPrompt && (
-        <EmailPromptModal
+        <RequesterDetailsModal
           isOpen={showEmailPrompt}
           isExporting={isExporting}
+          initialEmail={lastSubmittedEmail}
           onClose={() => setShowEmailPrompt(false)}
-          onSubmit={(email) => {
-            executeFinalExport(pendingExportOrgs, pendingExportDestination, email);
+          onSubmit={(details) => {
+            executeFinalExport(pendingExportOrgs, pendingExportDestination, details);
           }}
         />
       )}

@@ -117,6 +117,22 @@ rawAddressDB.forEach(item => {
 export const generateBackendPayload = (organizations) => {
   const sortedOrgs = topologicalSort(organizations);
   
+  const nodeLevels = new Map();
+  sortedOrgs.forEach(org => {
+    if (!org.parentId) {
+      nodeLevels.set(org.id, 0);
+    } else {
+      const parentLvl = nodeLevels.get(org.parentId);
+      nodeLevels.set(org.id, (parentLvl !== undefined ? parentLvl : 0) + 1);
+    }
+  });
+
+  const levelDistribution = {};
+  nodeLevels.forEach((level) => {
+    const lvlStr = String(level);
+    levelDistribution[lvlStr] = (levelDistribution[lvlStr] || 0) + 1;
+  });
+
   const nodes = sortedOrgs.map(org => {
     // Determine action. Default is CREATE, but can be set to LINK if user resolved conflicts
     return {
@@ -155,7 +171,8 @@ export const generateBackendPayload = (organizations) => {
     metadata: {
       version: "1.0",
       exported_at: new Date().toISOString(),
-      total_nodes: nodes.length
+      total_nodes: nodes.length,
+      level_distribution: levelDistribution
     },
     nodes
   };
