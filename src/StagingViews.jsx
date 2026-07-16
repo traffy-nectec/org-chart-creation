@@ -402,15 +402,15 @@ export const AdminView = ({ adminKey }) => {
   const handleDownloadResults = (jobId) => downloadResultsFile(jobId, adminKey, false, false);
   const handleDownloadAllCodes = (jobId) => downloadResultsFile(jobId, adminKey, true, false);
   
-  const fetchJobs = async () => {
-    setIsLoading(true);
+  const fetchJobs = async (silent = false) => {
+    if (!silent) setIsLoading(true);
     try {
       const apiUrl = import.meta.env.VITE_API_URL || '';
       const res = await fetch(`${apiUrl}/api/import/jobs`, {
         headers: { 'X-Admin-Key': adminKey }
       });
       if (res.status === 401) {
-        toast.error('Admin Key ไม่ถูกต้อง');
+        if (!silent) toast.error('Admin Key ไม่ถูกต้อง');
         setJobs([]);
         return;
       }
@@ -418,15 +418,29 @@ export const AdminView = ({ adminKey }) => {
       const data = await res.json();
       setJobs(data || []);
     } catch (err) {
-      toast.error('ไม่สามารถดึงข้อมูลได้: ' + err.message);
+      if (!silent) toast.error('ไม่สามารถดึงข้อมูลได้: ' + err.message);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (adminKey) fetchJobs();
+    if (adminKey) {
+      // Defer execution to avoid calling state updates synchronously in effect
+      const timeout = setTimeout(() => {
+        fetchJobs(false);
+      }, 0);
+      
+      // Auto refresh the admin board silently every 15 seconds
+      const timer = setInterval(() => {
+        fetchJobs(true);
+      }, 15000);
+      
+      return () => {
+        clearTimeout(timeout);
+        clearInterval(timer);
+      };
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminKey]);
 
