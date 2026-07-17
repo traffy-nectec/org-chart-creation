@@ -3,7 +3,7 @@ import {
   Plus, Trash2, MapPin, CheckCircle,
   Layers, Network, ChevronDown, ChevronRight, ChevronUp, ChevronLeft,
   ChevronsDown, Upload, FileSpreadsheet, X, Download, Table,
-  AlertTriangle, Check, Database, Search, HelpCircle, Loader2, Lock, FileText
+  AlertTriangle, Check, Database, Search, HelpCircle, Loader2, Lock, FileText, Edit
 } from 'lucide-react';
 import { ThailandAddressTypeahead, useAddressTypeaheadContext } from "react-thailand-address-typeahead";
 import * as XLSX from 'xlsx';
@@ -2638,6 +2638,8 @@ export default function OrgManagerApp() {
   const [userResolutions, setUserResolutions] = useState({});
   const [activeConflictTab, setActiveConflictTab] = useState('high'); // 'high', 'medium', 'low', 'very_low'
   const [conflictPage, setConflictPage] = useState(1);
+  const [renameValues, setRenameValues] = useState({});
+  const [isEditingName, setIsEditingName] = useState({});
   const [isPreExportModalOpen, setIsPreExportModalOpen] = useState(false);
   const [preExportChecks, setPreExportChecks] = useState({});
   const [searchDuration, setSearchDuration] = useState(0);
@@ -3482,6 +3484,84 @@ export default function OrgManagerApp() {
       ...prev,
       [temp_id]: resolution
     }));
+  };
+
+  const handleRenameAndRecheckConflict = async (temp_id, newName) => {
+    if (!newName || newName.trim() === '') {
+      toast.error('กรุณาระบุชื่อหน่วยงาน');
+      return;
+    }
+    
+    const loadingToast = toast.loading('กำลังตรวจเช็คชื่อซ้ำ...');
+    try {
+      // 1. Update organizations name in local state
+      setOrganizations(prev => prev.map(org => {
+        if (org.id === temp_id) {
+          return { ...org, name: newName };
+        }
+        return org;
+      }));
+
+      // 2. Call similarity check API for this name
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${apiUrl}/api/similarity`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey
+        },
+        body: JSON.stringify({ names: [newName] })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API Error (${response.status})`);
+      }
+      
+      const results = await response.json() || [];
+      const matches = results.map(res => ({
+        db_id: res.db_id,
+        db_name: res.match,
+        score: res.score,
+        is_deleted: res.is_deleted,
+        deleted_at: res.deleted_at
+      })).filter(m => m.score >= 0.5);
+
+      // Check if there is an exact duplicate
+      const exactMatch = matches.find(m => m.score >= 0.99 || m.db_name.trim().toLowerCase() === newName.trim().toLowerCase());
+
+      if (exactMatch) {
+        handleResolveConflict(temp_id, { action: "LINK", existing_db_id: exactMatch.db_id });
+        setConflicts(prev => prev.map(c => {
+          if (c.temp_id === temp_id) {
+            return { ...c, org_name: newName, matches: [exactMatch] };
+          }
+          return c;
+        }));
+        setIsEditingName(prev => ({ ...prev, [temp_id]: false }));
+        toast.success('พบหน่วยงานที่ซ้ำกัน และเชื่อมโยงข้อมูลสำเร็จ', { id: loadingToast });
+      } else if (matches.length > 0) {
+        setConflicts(prev => prev.map(c => {
+          if (c.temp_id === temp_id) {
+            return { ...c, org_name: newName, matches: matches };
+          }
+          return c;
+        }));
+        setUserResolutions(prev => {
+          const updated = { ...prev };
+          delete updated[temp_id];
+          return updated;
+        });
+        setIsEditingName(prev => ({ ...prev, [temp_id]: false }));
+        toast.success(`พบหน่วยงานที่คล้ายคลึง ${matches.length} แห่ง กรุณาเลือกวิธีจัดการ`, { id: loadingToast });
+      } else {
+        setConflicts(prev => prev.filter(c => c.temp_id !== temp_id));
+        handleResolveConflict(temp_id, { action: "CREATE", existing_db_id: null });
+        setIsEditingName(prev => ({ ...prev, [temp_id]: false }));
+        toast.success('ชื่อไม่ซ้ำซ้อนแล้ว และได้รับการอนุมัติการสร้างใหม่', { id: loadingToast });
+      }
+    } catch (err) {
+      toast.error('การตรวจเช็คล้มเหลว: ' + err.message, { id: loadingToast });
+    }
   };
 
   const handleConfirmResolutions = () => {
@@ -4992,9 +5072,48 @@ export default function OrgManagerApp() {
                     {activeConflicts.slice((conflictPage - 1) * 20, conflictPage * 20).map((conflict) => (
                       <div key={conflict.temp_id} className={`bg-white border ${userResolutions[conflict.temp_id] ? 'border-green-300 ring-1 ring-green-100' : 'border-slate-200'} rounded-xl p-4 shadow-sm transition-all`}>
                         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-                          <div className="flex-1">
+                          <div className="flex-1 w-full">
                             <div className="text-xs font-semibold text-slate-400 mb-1">หน่วยงานที่กำลังสร้าง (ใหม่)</div>
-                            <div className="font-bold text-slate-800 text-base">{conflict.org_name}</div>
+                            {isEditingName[conflict.temp_id] ? (
+                              <div className="flex flex-col gap-2 mt-1">
+                                <input
+                                  type="text"
+                                  value={renameValues[conflict.temp_id] || ''}
+                                  onChange={(e) => setRenameValues(prev => ({ ...prev, [conflict.temp_id]: e.target.value }))}
+                                  className="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500"
+                                  placeholder="ระบุชื่อหน่วยงานใหม่..."
+                                  autoFocus
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => handleRenameAndRecheckConflict(conflict.temp_id, renameValues[conflict.temp_id])}
+                                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-[10px] transition-colors cursor-pointer"
+                                  >
+                                    ตรวจใหม่
+                                  </button>
+                                  <button
+                                    onClick={() => setIsEditingName(prev => ({ ...prev, [conflict.temp_id]: false }))}
+                                    className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-lg text-[10px] transition-colors cursor-pointer"
+                                  >
+                                    ยกเลิก
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 group/title">
+                                <div className="font-bold text-slate-800 text-base">{conflict.org_name}</div>
+                                <button
+                                  onClick={() => {
+                                    setIsEditingName(prev => ({ ...prev, [conflict.temp_id]: true }));
+                                    setRenameValues(prev => ({ ...prev, [conflict.temp_id]: conflict.org_name }));
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100 opacity-0 group-hover/title:opacity-100 transition-opacity"
+                                  title="แก้ไขชื่อหน่วยงาน"
+                                >
+                                  <Edit size={14} />
+                                </button>
+                              </div>
+                            )}
                           </div>
                           
                           <div className="flex-1 w-full bg-slate-50 rounded-lg p-3 border border-slate-100">

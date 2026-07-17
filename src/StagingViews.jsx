@@ -820,6 +820,30 @@ export const JobDetailsModal = ({ isOpen, onClose, payload }) => {
     return found ? found.name : id;
   };
 
+  const handleDownloadDraft = () => {
+    try {
+      const exportData = nodesWithLevels.map(n => ({
+        'ชื่อหน่วยงาน': n.name,
+        'Temp ID': n.temp_id,
+        'ระดับชั้น': `ระดับ ${n.level}`,
+        'ประเภทการทำงาน': n.action === 'CREATE' ? 'สร้างใหม่' : 'เชื่อมต่อหน่วยงานเดิม',
+        'ID หน่วยงานเดิมที่เชื่อมต่อ': n.existing_db_id || 'N/A',
+        'Temp ID หน่วยงานต้นสังกัด': n.parent_temp_id || 'ไม่มี (โหนดราก)',
+        'ชื่อหน่วยงานต้นสังกัด': n.parent_temp_id ? getNodeNameById(n.parent_temp_id) : 'ไม่มี (โหนดราก)',
+        'รหัสพื้นที่ (DOPA)': n.subdistrict_code || n.area_code || 'N/A'
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Draft Nodes");
+      const filename = `import_draft_${payload.job_id || payload.id || 'payload'}.xlsx`;
+      XLSX.writeFile(wb, filename);
+      toast.success('ดาวน์โหลดไฟล์แบบร่าง (.xlsx) สำเร็จ');
+    } catch (err) {
+      toast.error('ดาวน์โหลดล้มเหลว: ' + err.message);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col relative overflow-hidden">
@@ -832,9 +856,17 @@ export const JobDetailsModal = ({ isOpen, onClose, payload }) => {
               จำนวนทั้งหมด: <span className="font-bold text-blue-600">{nodes.length}</span> หน่วยงาน | สรุปประมวลผลก่อนนำเข้าจริง
             </p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleDownloadDraft}
+              className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 transition-colors font-bold text-xs cursor-pointer"
+            >
+              <Download size={14} /> ดาวน์โหลดแบบร่างผัง (.xlsx)
+            </button>
+            <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 cursor-pointer">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Tabs Bar */}
