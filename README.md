@@ -402,6 +402,17 @@ INSERT INTO voice_fondue_org_aliases (search_text, replace_text) VALUES ('อบ
   ```
 
 
+## 🔗 Backend API Integrations & Documentation
+
+โปรเจกต์นี้ทำงานเชื่อมต่อกับระบบ Backend (`fondue-org-importer`) เพื่อจัดการบันทึกข้อมูลและสร้าง QR Code โดยมีข้อมูลการเชื่อมต่อดังนี้:
+
+- **เอกสารอ้างอิง API v2 (หลัก):** รายละเอียดการเรียกใช้งาน API การสร้าง QR Code และโครงสร้าง ER Diagram มีระบุไว้ที่ [docs/qrcode_api_v2.md (ในส่วนของ Backend)](file:///home/plagad/active/fondue-org-importer/docs/qrcode_api_v2.md)
+- **ตัวแปรสภาพแวดล้อมที่เกี่ยวข้อง (Frontend):**
+  - ตัวแปร URL สำหรับเรียกใช้ API จะชี้ไปยังเซิร์ฟเวอร์หลักของ backend: [https://fondue-org-importer-api-884122932397.asia-southeast1.run.app](https://fondue-org-importer-api-884122932397.asia-southeast1.run.app)
+  - ข้อมูลสำหรับการทำงานกับแบบร่างหน่วยงานขนาดใหญ่ ถูกบันทึกไว้บนเว็บบราวเซอร์ผ่านระบบ **IndexedDB** เพื่อความปลอดภัย
+
+---
+
 ## Recent Updates (v2.1)
 - **UX Fixes**: Added pagination in conflict resolution to fix UI freezing for 1000+ items.
 - **Status Flow**: Automatic email persistence and auto-search in Job Status view.
