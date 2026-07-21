@@ -3305,7 +3305,8 @@ export default function OrgManagerApp() {
               db_name: res.match,
               score: res.score,
               is_deleted: res.is_deleted,
-              deleted_at: res.deleted_at
+              deleted_at: res.deleted_at,
+              official_group: res.official_group
             });
           });
           
@@ -5131,6 +5132,11 @@ export default function OrgManagerApp() {
                                   <div className="flex-1">
                                     <div className="text-sm font-bold text-slate-700">
                                       {match.db_name}
+                                      {match.official_group && (
+                                        <span className="text-[10px] bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded ml-2 font-bold shadow-sm">
+                                          บัญชีทางการ
+                                        </span>
+                                      )}
                                       {match.is_deleted && (
                                         <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded ml-2" title={match.deleted_at ? new Date(match.deleted_at).toLocaleString('th-TH') : ''}>
                                           ถูกลบไปแล้ว {match.deleted_at ? `เมื่อ ${new Date(match.deleted_at).toLocaleDateString('th-TH')}` : ''}

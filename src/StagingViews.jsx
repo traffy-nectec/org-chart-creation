@@ -210,6 +210,44 @@ export const SubmissionsView = ({ apiKey, initialEmail = '', onRestoreJob }) => 
   const handleDownloadResults = (jobId) => downloadResultsFile(jobId, apiKey, false, true);
   const handleDownloadAllCodes = (jobId) => downloadResultsFile(jobId, apiKey, true, true);
 
+  const handleWithdraw = async (jobId, quiet = false) => {
+    if (!quiet && !confirm('ยืนยันที่จะถอนคำขอนำเข้าผังสายงานนี้? คำขอจะถูกยกเลิกและต้องยื่นใหม่เท่านั้น')) return false;
+    
+    let loadingToast;
+    if (!quiet) loadingToast = toast.loading('กำลังถอนคำขอ...');
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/import/${jobId}/withdraw`, {
+        method: 'POST',
+        headers: { 
+          'X-API-Key': apiKey,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!res.ok) throw new Error('Withdraw request failed');
+      if (!quiet) {
+        toast.success('ถอนคำขอสำเร็จ', { id: loadingToast });
+        handleSearch();
+      }
+      return true;
+    } catch (err) {
+      if (!quiet) {
+        toast.error('เกิดข้อผิดพลาด: ' + err.message, { id: loadingToast });
+      }
+      return false;
+    }
+  };
+
+  const handleEditPending = async (jobId) => {
+    if (!confirm('การแก้ไขผังสายงานนี้จะเป็นการถอนคำขอนำเข้าเดิมที่อยู่ระหว่างรออนุมัติ ยืนยันการดำเนินการ?')) return;
+    const success = await handleWithdraw(jobId, true);
+    if (success) {
+      onRestoreJob(jobId);
+    } else {
+      toast.error('ไม่สามารถถอนคำขอเดิมเพื่อนำกลับมาแก้ไขได้');
+    }
+  };
+
   return (
     <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col h-full overflow-hidden">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 shrink-0">
@@ -303,6 +341,27 @@ export const SubmissionsView = ({ apiKey, initialEmail = '', onRestoreJob }) => 
                           className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 rounded-lg text-sm font-bold transition-colors shadow-sm"
                         >
                           <Edit size={16} /> ดึงข้อมูลกลับมาแก้ไข
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {job.status === 'pending_approval' && (
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleWithdraw(job.id)}
+                        className="w-full flex justify-center items-center gap-2 px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-bold transition-colors shadow-sm cursor-pointer"
+                      >
+                        ถอนความประสงค์
+                      </button>
+                      {onRestoreJob && (
+                        <button
+                          type="button"
+                          onClick={() => handleEditPending(job.id)}
+                          className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 rounded-lg text-sm font-bold transition-colors shadow-sm cursor-pointer"
+                        >
+                          <Edit size={16} /> แก้ไขผังสายงาน
                         </button>
                       )}
                     </div>
