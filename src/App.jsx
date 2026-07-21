@@ -5101,14 +5101,14 @@ export default function OrgManagerApp() {
                                 </div>
                               </div>
                             ) : (
-                              <div className="flex items-center gap-2 group/title">
+                              <div className="flex items-center gap-2">
                                 <div className="font-bold text-slate-800 text-base">{conflict.org_name}</div>
                                 <button
                                   onClick={() => {
                                     setIsEditingName(prev => ({ ...prev, [conflict.temp_id]: true }));
                                     setRenameValues(prev => ({ ...prev, [conflict.temp_id]: conflict.org_name }));
                                   }}
-                                  className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100 opacity-0 group-hover/title:opacity-100 transition-opacity"
+                                  className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors flex items-center justify-center shrink-0 border border-blue-200 cursor-pointer"
                                   title="แก้ไขชื่อหน่วยงาน"
                                 >
                                   <Edit size={14} />
@@ -5121,29 +5121,35 @@ export default function OrgManagerApp() {
                             <div className="text-xs font-semibold text-slate-400 mb-2">หน่วยงานที่คล้ายกันในระบบ (พบ {conflict.matches.length} รายการ)</div>
                             <div className="flex flex-col gap-2">
                               {conflict.matches.map(match => (
-                                <label key={match.db_id} className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${userResolutions[conflict.temp_id]?.existing_db_id === match.db_id ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:border-blue-300'}`}>
-                                  <input 
-                                    type="radio" 
-                                    name={`conflict_${conflict.temp_id}`} 
-                                    checked={userResolutions[conflict.temp_id]?.existing_db_id === match.db_id}
-                                    onChange={() => handleResolveConflict(conflict.temp_id, { action: "LINK", existing_db_id: match.db_id })}
-                                    className="text-blue-600 focus:ring-blue-500"
-                                  />
-                                  <div className="flex-1">
-                                    <div className="text-sm font-bold text-slate-700">
-                                      {match.db_name}
-                                      {match.official_group && (
-                                        <span className="text-[10px] bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded ml-2 font-bold shadow-sm">
-                                          บัญชีทางการ
-                                        </span>
-                                      )}
-                                      {match.is_deleted && (
-                                        <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded ml-2" title={match.deleted_at ? new Date(match.deleted_at).toLocaleString('th-TH') : ''}>
-                                          ถูกลบไปแล้ว {match.deleted_at ? `เมื่อ ${new Date(match.deleted_at).toLocaleDateString('th-TH')}` : ''}
-                                        </span>
-                                      )}
+                                <label key={match.db_id} className={`flex items-center justify-between gap-3 p-3 rounded-xl border cursor-pointer transition-all ${userResolutions[conflict.temp_id]?.existing_db_id === match.db_id ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-white border-slate-200 hover:border-blue-300'}`}>
+                                  <div className="flex items-center gap-3 flex-1">
+                                    <input 
+                                      type="radio" 
+                                      name={`conflict_${conflict.temp_id}`} 
+                                      checked={userResolutions[conflict.temp_id]?.existing_db_id === match.db_id}
+                                      onChange={() => handleResolveConflict(conflict.temp_id, { action: "LINK", existing_db_id: match.db_id })}
+                                      className="text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                    />
+                                    <div>
+                                      <div className="text-sm font-bold text-slate-700 flex items-center flex-wrap gap-1.5">
+                                        {match.db_name}
+                                        {match.official_group && (
+                                          <span className="text-[10px] bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded font-bold shadow-sm">
+                                            บัญชีทางการ
+                                          </span>
+                                        )}
+                                        {match.is_deleted && (
+                                          <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded" title={match.deleted_at ? new Date(match.deleted_at).toLocaleString('th-TH') : ''}>
+                                            ถูกลบไปแล้ว {match.deleted_at ? `เมื่อ ${new Date(match.deleted_at).toLocaleDateString('th-TH')}` : ''}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-xs text-slate-400 mt-0.5 font-semibold">ID: {match.db_id}</div>
                                     </div>
-                                    <div className="text-xs text-slate-500">ความเหมือน: {Math.round(match.score * 100)}% | ID: {match.db_id}</div>
+                                  </div>
+                                  <div className={`text-right shrink-0 px-3 py-1.5 rounded-lg flex flex-col justify-center items-center min-w-[70px] transition-all border ${userResolutions[conflict.temp_id]?.existing_db_id === match.db_id ? 'bg-blue-100 border-blue-300 text-blue-800' : 'bg-slate-100 border-slate-200 text-slate-700'}`}>
+                                    <span className="text-lg font-black leading-none">{Math.round(match.score * 100)}%</span>
+                                    <span className="text-[9px] font-bold opacity-75 mt-0.5">ความเหมือน</span>
                                   </div>
                                 </label>
                               ))}

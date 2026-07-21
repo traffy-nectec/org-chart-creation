@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Mail, Send, Loader2, CheckCircle, FileText, Database, X, Download, Copy, RefreshCw, ChevronDown, ChevronRight, Info, AlertTriangle, Edit } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -161,6 +161,17 @@ export const SubmissionsView = ({ apiKey, initialEmail = '', onRestoreJob }) => 
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const centeredInputRef = useRef(null);
+
+  // Focus the large centered email input on mount if not searched yet
+  useEffect(() => {
+    if (!hasSearched && centeredInputRef.current) {
+      const focusTimer = setTimeout(() => {
+        centeredInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(focusTimer);
+    }
+  }, [hasSearched]);
 
   const handleSearch = async (e) => {
     if (e) e.preventDefault();
@@ -250,28 +261,28 @@ export const SubmissionsView = ({ apiKey, initialEmail = '', onRestoreJob }) => 
 
   return (
     <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col h-full overflow-hidden">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 shrink-0">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 shrink-0 border-b border-slate-100 pb-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
             <FileText className="text-blue-600" /> สถานะการนำเข้าของฉัน
           </h2>
-          <p className="text-sm text-slate-500 mt-1">ใส่อีเมลที่คุณใช้ยื่นขอนำเข้าข้อมูลเพื่อตรวจสอบสถานะ</p>
+          <p className="text-sm text-slate-500 mt-1">ตรวจสอบสถานะและประวัติการยื่นขอนำเข้าผังองค์กร</p>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <form onSubmit={handleSearch} className="flex gap-2 flex-1 sm:flex-initial">
-            <input
-              type="email"
-              required
-              placeholder="ใส่อีเมลของคุณ..."
-              className="w-full sm:w-auto px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 min-w-[200px]"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <button type="submit" disabled={isLoading} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap">
-              {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'ค้นหา'}
-            </button>
-          </form>
-          {hasSearched && (
+        {hasSearched && (
+          <div className="flex gap-2 w-full sm:w-auto">
+            <form onSubmit={handleSearch} className="flex gap-2 flex-1 sm:flex-initial">
+              <input
+                type="email"
+                required
+                placeholder="ใส่อีเมลของคุณ..."
+                className="w-full sm:w-auto px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <button type="submit" disabled={isLoading} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap">
+                {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'ค้นหา'}
+              </button>
+            </form>
             <button 
               type="button"
               onClick={() => handleSearch()} 
@@ -281,15 +292,42 @@ export const SubmissionsView = ({ apiKey, initialEmail = '', onRestoreJob }) => 
             >
               <RefreshCw size={20} className={isLoading ? "animate-spin text-blue-600" : ""} />
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-auto">
         {!hasSearched ? (
-          <div className="h-full flex items-center justify-center text-slate-400 flex-col gap-3">
-            <Search size={48} className="text-slate-300" />
-            <p>กรุณากรอกอีเมลและกดค้นหา</p>
+          <div className="h-full flex items-center justify-center py-12 px-4">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-xl p-8 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+              <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-6">
+                <Mail size={32} />
+              </div>
+              <h3 className="text-2xl font-black text-slate-800 mb-2">ตรวจสอบสถานะการนำเข้า</h3>
+              <p className="text-sm text-slate-500 mb-8 max-w-sm leading-relaxed">
+                ระบุอีเมลที่คุณใช้ยื่นขอนำเข้าข้อมูลระบบผังองค์กรเพื่อดูรายการและสถานะทั้งหมด
+              </p>
+              
+              <form onSubmit={handleSearch} className="w-full flex flex-col sm:flex-row gap-3">
+                <input
+                  ref={centeredInputRef}
+                  type="email"
+                  required
+                  placeholder="กรอกอีเมลของคุณที่นี่..."
+                  className="flex-1 px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-base shadow-sm"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+                <button 
+                  type="submit" 
+                  disabled={isLoading} 
+                  className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap shadow-md shadow-blue-200 hover:shadow-lg transition-all text-base flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
+                  ค้นหาข้อมูล
+                </button>
+              </form>
+            </div>
           </div>
         ) : jobs.length === 0 ? (
           <div className="h-full flex items-center justify-center text-slate-400 flex-col gap-3">
