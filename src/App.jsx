@@ -4890,10 +4890,30 @@ export default function OrgManagerApp() {
               <div className="w-16 h-16 bg-green-50 text-green-600 rounded-full flex items-center justify-center mb-4">
                 <CheckCircle size={36} />
               </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">ไม่พบหน่วยงานซ้ำซ้อน</h3>
-              <p className="text-sm text-slate-500 mb-6 leading-relaxed">
-                การตรวจสอบความซ้ำซ้อนเสร็จสิ้น ไม่พบหน่วยงานที่ซ้ำซ้อนหรือใกล้เคียงในฐานข้อมูลระบบ หน่วยงานทั้งหมดที่คุณออกแบบเป็นหน่วยงานใหม่ 100%
-              </p>
+              {(() => {
+                const exactCount = organizations.filter(o => o.action === 'LINK' && o.existing_db_id).length;
+                const totalCount = organizations.length;
+                
+                let title = "ไม่พบหน่วยงานซ้ำซ้อน";
+                let desc = "การตรวจสอบความซ้ำซ้อนเสร็จสิ้น ไม่พบหน่วยงานที่ซ้ำซ้อนหรือใกล้เคียงในฐานข้อมูลระบบ หน่วยงานทั้งหมดที่คุณออกแบบเป็นหน่วยงานใหม่ 100%";
+                
+                if (exactCount > 0) {
+                  if (exactCount === totalCount) {
+                    title = "เชื่อมโยงข้อมูลเดิมสำเร็จ";
+                    desc = `ระบบตรวจพบหน่วยงานที่มีชื่อซ้ำตรงกับระบบเดิม 100% ทั้งหมด (${exactCount} แห่ง) และดำเนินการเชื่อมโยงข้อมูลกับหน่วยงานเดิมให้อัตโนมัติเรียบร้อยแล้ว`;
+                  } else {
+                    title = "ตรวจสอบความซ้ำซ้อนสำเร็จ";
+                    desc = `ระบบตรวจพบหน่วยงานซ้ำตรงกับในระบบเดิม 100% และทำการเชื่อมโยงให้อัตโนมัติจำนวน ${exactCount} แห่ง สำหรับหน่วยงานที่เหลืออีก ${totalCount - exactCount} แห่ง เป็นหน่วยงานใหม่ 100% ที่จะถูกสร้างขึ้นใหม่`;
+                  }
+                }
+                
+                return (
+                  <>
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">{title}</h3>
+                    <p className="text-sm text-slate-500 mb-6 leading-relaxed">{desc}</p>
+                  </>
+                );
+              })()}
               <div className="flex gap-3 w-full">
                 <button
                   onClick={() => setIsConflictModalOpen(false)}
