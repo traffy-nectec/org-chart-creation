@@ -418,6 +418,11 @@ INSERT INTO voice_fondue_org_aliases (search_text, replace_text) VALUES ('อบ
 - **Status Flow**: Automatic email persistence and auto-search in Job Status view.
 - **Data Integrity**: Fixed a bug where `locations` was mapped incorrectly, resulting in 0 coverage areas in the database. Now properly reads `org.areas.locations`.
 
+## Recent Updates (v2.3 - Jul 22)
+- **Withdraw & Edit Workflow**: Added withdraw functionality allowing creators to recall pending submission jobs and reload payload directly back into the canvas designer.
+- **Official Account Conflict Warning**: Integrated `official_group` badge display in duplicate organization warning modals.
+- **Explicit UUID Rule & JPEG Compliance**: Aligned backend QR API v2 with explicit UUID rules (omitting `uuid_qr` = Create Mode with retry collision check, passing `uuid_qr` = Update Mode) and 95% quality JPEG image outputs for seamless UI rendering.
+
 ## Recent Updates (v2.2 - Jul 16)
 - **Requester Auditing Flow**: Swapped `EmailPromptModal` with `RequesterDetailsModal` to collect email, name, phone, and remarks/note prior to submission.
 - **Pre-check Validation Metrics**: Client-side payload exporter now calculates node levels, builds `level_distribution` map, and counts pre-check validation warnings and errors, appending these to the metadata payload.

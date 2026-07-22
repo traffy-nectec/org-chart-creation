@@ -44,6 +44,10 @@ The primary objective of the recent sessions was to optimize the backend API to 
   - Decoupled database connection pools from the worker, allowing sidecar-free scale-to-zero exits.
   - Created endpoints in the backend to partition jobs via modulo on `g.id` (`GET /api/import/qrs/pending` with `FOR UPDATE SKIP LOCKED`) and batch-commit completed IDs.
   - Parallelized the 3 image generation and upload pipelines inside the worker, reducing processing time from 210ms to 80ms per organization.
+- **Withdraw & Edit & Explicit UUID Rule (Jul 22):**
+  - Added withdraw capability for creators to recall pending import jobs and reload payload directly back into the chart editor.
+  - Integrated `official_group` badges into the duplicate organization conflict warning modal.
+  - Aligned backend QR API v2 with explicit UUID rules (omitting `uuid_qr` = Create Mode with retry collision check, passing `uuid_qr` = Update Mode) and 95% quality JPEG image outputs for seamless UI rendering.
 
 ## Current State
 - The frontend is fully operational and has been committed and pushed to `main` (repository: `org-chart-creation`).
