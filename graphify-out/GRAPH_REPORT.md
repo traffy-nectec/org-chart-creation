@@ -1,16 +1,16 @@
 # Graph Report - org-chart-creation  (2026-07-23)
 
 ## Corpus Check
-- 41 files · ~302,081 words
+- 42 files · ~302,259 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 269 nodes · 289 edges · 32 communities (29 shown, 3 thin omitted)
+- 277 nodes · 296 edges · 33 communities (30 shown, 3 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 2 edges (avg confidence: 0.5)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `d411af17`
+- Built from commit: `79be5af3`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -41,6 +41,7 @@
 - CLAUDE.md
 - CLAUDE.md
 - Prompt สำหรับสร้าง Backend `fondue-org-importer` จากศูนย์
+- 2. Core Technical Concepts
 
 ## God Nodes (most connected - your core abstractions)
 1. `OrgManagerApp()` - 11 edges
@@ -69,7 +70,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (32 total, 3 thin omitted)
+## Communities (33 total, 3 thin omitted)
 
 ### Community 0 - "App.jsx"
 Cohesion: 0.12
@@ -163,8 +164,12 @@ Nodes (4): 1. Think Before Coding, 2. Simplicity First, 3. Surgical Changes, 4. 
 Cohesion: 0.50
 Nodes (3): Prompt สำหรับสร้าง Backend `fondue-org-importer` จากศูนย์, 🚀 สิ่งที่คุณ (AI) ต้องทำ:, 📋 สเปคการทำงานของระบบ (Requirements):
 
+### Community 32 - "2. Core Technical Concepts"
+Cohesion: 0.25
+Nodes (7): 1. Context & Purpose, 2.1 Kahn's Algorithm (Topological Sort), 2.2 Performance Optimizations, 2.3 Embedded Integration & Root-Only Policy, 2. Core Technical Concepts, 3. Usage Guidelines, Frontend Module: Organization Chart Creation Tool
+
 ## Knowledge Gaps
-- **145 isolated node(s):** `xlsx`, `xlsx`, `fs`, `path`, `dbPath` (+140 more)
+- **150 isolated node(s):** `xlsx`, `xlsx`, `fs`, `path`, `dbPath` (+145 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **3 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -172,13 +177,13 @@ Nodes (3): Prompt สำหรับสร้าง Backend `fondue-org-importer
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `dependencies` connect `dependencies` to `App.jsx`, `scripts`?**
-  _High betweenness centrality (0.112) - this node is a cross-community bridge._
+  _High betweenness centrality (0.106) - this node is a cross-community bridge._
 - **Why does `react` connect `App.jsx` to `dependencies`, `ReactFlowOrgChart.jsx`?**
-  _High betweenness centrality (0.089) - this node is a cross-community bridge._
+  _High betweenness centrality (0.084) - this node is a cross-community bridge._
 - **Why does `devDependencies` connect `devDependencies` to `scripts`?**
-  _High betweenness centrality (0.076) - this node is a cross-community bridge._
+  _High betweenness centrality (0.072) - this node is a cross-community bridge._
 - **What connects `xlsx`, `xlsx`, `fs` to the rest of the system?**
-  _145 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _150 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `App.jsx` be split into smaller, more focused modules?**
   _Cohesion score 0.11764705882352941 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**

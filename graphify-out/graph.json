@@ -2961,6 +2961,94 @@
       "community": 26,
       "community_name": "Features & Capabilities",
       "norm_label": "phase 2: admin review"
+    },
+    {
+      "label": "module_org_chart_creation.md",
+      "file_type": "document",
+      "source_file": "okf/module_org_chart_creation.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "okf_module_org_chart_creation",
+      "community": 32,
+      "community_name": "2. Core Technical Concepts",
+      "norm_label": "module_org_chart_creation.md"
+    },
+    {
+      "label": "Frontend Module: Organization Chart Creation Tool",
+      "file_type": "document",
+      "source_file": "okf/module_org_chart_creation.md",
+      "source_location": "L10",
+      "_origin": "ast",
+      "id": "okf_module_org_chart_creation_frontend_module_organization_chart_creation_tool",
+      "community": 32,
+      "community_name": "2. Core Technical Concepts",
+      "norm_label": "frontend module: organization chart creation tool"
+    },
+    {
+      "label": "1. Context & Purpose",
+      "file_type": "document",
+      "source_file": "okf/module_org_chart_creation.md",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "okf_module_org_chart_creation_1_context_purpose",
+      "community": 32,
+      "community_name": "2. Core Technical Concepts",
+      "norm_label": "1. context & purpose"
+    },
+    {
+      "label": "2. Core Technical Concepts",
+      "file_type": "document",
+      "source_file": "okf/module_org_chart_creation.md",
+      "source_location": "L15",
+      "_origin": "ast",
+      "id": "okf_module_org_chart_creation_2_core_technical_concepts",
+      "community": 32,
+      "community_name": "2. Core Technical Concepts",
+      "norm_label": "2. core technical concepts"
+    },
+    {
+      "label": "2.1 Kahn's Algorithm (Topological Sort)",
+      "file_type": "document",
+      "source_file": "okf/module_org_chart_creation.md",
+      "source_location": "L17",
+      "_origin": "ast",
+      "id": "okf_module_org_chart_creation_2_1_kahn_s_algorithm_topological_sort",
+      "community": 32,
+      "community_name": "2. Core Technical Concepts",
+      "norm_label": "2.1 kahn's algorithm (topological sort)"
+    },
+    {
+      "label": "2.2 Performance Optimizations",
+      "file_type": "document",
+      "source_file": "okf/module_org_chart_creation.md",
+      "source_location": "L20",
+      "_origin": "ast",
+      "id": "okf_module_org_chart_creation_2_2_performance_optimizations",
+      "community": 32,
+      "community_name": "2. Core Technical Concepts",
+      "norm_label": "2.2 performance optimizations"
+    },
+    {
+      "label": "2.3 Embedded Integration & Root-Only Policy",
+      "file_type": "document",
+      "source_file": "okf/module_org_chart_creation.md",
+      "source_location": "L25",
+      "_origin": "ast",
+      "id": "okf_module_org_chart_creation_2_3_embedded_integration_root_only_policy",
+      "community": 32,
+      "community_name": "2. Core Technical Concepts",
+      "norm_label": "2.3 embedded integration & root-only policy"
+    },
+    {
+      "label": "3. Usage Guidelines",
+      "file_type": "document",
+      "source_file": "okf/module_org_chart_creation.md",
+      "source_location": "L29",
+      "_origin": "ast",
+      "id": "okf_module_org_chart_creation_3_usage_guidelines",
+      "community": 32,
+      "community_name": "2. Core Technical Concepts",
+      "norm_label": "3. usage guidelines"
     }
   ],
   "links": [
@@ -6223,8 +6311,85 @@
       "source": "knowledge_workflow_two_tier_validation_workflow",
       "target": "knowledge_workflow_phase_2_admin_review",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "okf/module_org_chart_creation.md",
+      "source_location": "L10",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "okf_module_org_chart_creation",
+      "target": "okf_module_org_chart_creation_frontend_module_organization_chart_creation_tool",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "okf/module_org_chart_creation.md",
+      "source_location": "L12",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "okf_module_org_chart_creation_frontend_module_organization_chart_creation_tool",
+      "target": "okf_module_org_chart_creation_1_context_purpose",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "okf/module_org_chart_creation.md",
+      "source_location": "L15",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "okf_module_org_chart_creation_frontend_module_organization_chart_creation_tool",
+      "target": "okf_module_org_chart_creation_2_core_technical_concepts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "okf/module_org_chart_creation.md",
+      "source_location": "L29",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "okf_module_org_chart_creation_frontend_module_organization_chart_creation_tool",
+      "target": "okf_module_org_chart_creation_3_usage_guidelines",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "okf/module_org_chart_creation.md",
+      "source_location": "L17",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "okf_module_org_chart_creation_2_core_technical_concepts",
+      "target": "okf_module_org_chart_creation_2_1_kahn_s_algorithm_topological_sort",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "okf/module_org_chart_creation.md",
+      "source_location": "L20",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "okf_module_org_chart_creation_2_core_technical_concepts",
+      "target": "okf_module_org_chart_creation_2_2_performance_optimizations",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "okf/module_org_chart_creation.md",
+      "source_location": "L25",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "okf_module_org_chart_creation_2_core_technical_concepts",
+      "target": "okf_module_org_chart_creation_2_3_embedded_integration_root_only_policy",
+      "confidence_score": 1.0
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "d411af17d25beaf793c197905bb5151b35973b22"
+  "built_at_commit": "79be5af34c6bec510e43956962c95a8b0d6d2558"
 }
