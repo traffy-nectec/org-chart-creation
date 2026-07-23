@@ -52,8 +52,13 @@
 
 เพื่อให้ระบบสามารถขยายขนาด (Scale) และรองรับการจัดการคุณภาพข้อมูล (Data Quality) ที่มีประสิทธิภาพ จะมีการนำ **Two-Tier Validation Workflow** มาใช้งาน โดยมีแผนงานดังนี้:
 
-1. **Nationwide / Non-spatial Organization Handling (TODO):**
+1. **Delegated Approval System (Root-Only Policy):**
+   - **Embedded Mode Integration:** ฝังระบบเป็นส่วนหนึ่งของเว็บหลัก Traffy Fondue ดึงบริบทตัวตนผู้ใช้ (`user_id`, `member_id`, `org_id`) จากระบบล็อกอินเดิมอัตโนมัติ
+   - **Root-Only Policy Enforcement:** อนุญาตให้เฉพาะผู้ดูแลประจำหน่วยงานหลักระดับ Root Node เท่านั้นที่สามารถสร้าง ส่งเรื่อง และกดอนุมัติผังได้ (ล็อกปุ่มหาก logged-in `member.org_id` ไม่ตรงกับ Root Node)
+   - **Approver Modal & Audit Metadata:** Auto-fill ข้อมูลผู้อนุมัติจาก Session และเปิดช่องให้กรอกเฉพาะเลขที่หนังสือสั่งการ (Reference Doc No.) และหมายเหตุเพิ่มเติม
+2. **Nationwide / Non-spatial Organization Handling (TODO):**
    - หาวิธีจัดการกับหน่วยงานที่ "รับผิดชอบทั้งประเทศ" หรือไม่ได้ผูกติดกับพื้นที่ใดพื้นที่หนึ่ง (Non-spatial) เพื่อให้สามารถบันทึกข้อมูลเข้าสู่ระบบและนำไปใช้งานต่อได้อย่างเป็นมาตรฐาน
+
 2. **Pre-processing (String Sanitization):**
    - ระบบจะทำการลบช่องว่างส่วนเกิน, อักขระพิเศษ, และรวมสระที่ซ้ำกัน (เช่น `เเ` เป็น `แ`) โดยอัตโนมัติ.
 3. **Dictionary Normalization & Backend Aliases:**
