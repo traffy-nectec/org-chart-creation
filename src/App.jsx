@@ -2603,7 +2603,7 @@ export default function OrgManagerApp() {
   const [expandedEmptyCategories, setExpandedEmptyCategories] = useState(new Set());
   const [collapsedSubGroups, setCollapsedSubGroups] = useState(new Set());
   const [bulkEditGroup, setBulkEditGroup] = useState(null);
-  const [viewMode, setViewMode] = useState('canvas'); // 'canvas' or 'table'
+  const [viewMode, setViewMode] = useState('table'); // 'table' or 'canvas'
   const [deleteConfirmNode, setDeleteConfirmNode] = useState(null);
   const [moveMode, setMoveMode] = useState('branch'); // 'branch' or 'single'
   const [isDataMenuOpen, setIsDataMenuOpen] = useState(false);
@@ -2679,7 +2679,7 @@ export default function OrgManagerApp() {
           localStorage.setItem('traffy_org_builder_api_key', apiKey);
           setIsAuthenticated(true);
           setLoginError('');
-          setViewMode('canvas'); // Normal user goes to canvas
+          setViewMode('table'); // Normal user goes to table view by default
         } else {
           setLoginError('รหัสผ่านไม่ถูกต้อง');
         }
@@ -3771,7 +3771,7 @@ export default function OrgManagerApp() {
         if (restoredOrgs.length > 0) {
           setSelectedNodeId(restoredOrgs[0].id);
         }
-        setViewMode('canvas');
+        setViewMode('table');
         toast.success('ดึงข้อมูลกลับมาแก้ไขสำเร็จแล้ว', { id: loadingToast });
       } else {
         throw new Error('ไม่พบข้อมูลหน่วยงานในงานดังกล่าว');
