@@ -1,0 +1,32 @@
+# Git & CI/CD
+.git
+.github
+.husky
+
+# Dependencies & Build Output
+node_modules
+dist
+dist-ssr
+
+# Test & Linting Reports
+playwright-report
+test-results
+lint-results.json
+typos_result.txt
+graphify-out
+tests
+
+# Environment files
+.env*
+!.env.example
+
+# IDE & Tooling
+.vscode
+.idea
+.agents
+.cursorrules
+CLAUDE.md
+
+# Documentation & Development Scripts
+*.md
+!README.md

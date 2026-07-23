@@ -23,3 +23,15 @@ dist-ssr
 *.sln
 *.sw?
 code.txt
+
+# Test & Lint Reports
+playwright-report/
+test-results/
+lint-results.json
+typos_result.txt
+graphify-out/
+coverage/
+
+# Environment files
+.env.local
+.env.*.local
