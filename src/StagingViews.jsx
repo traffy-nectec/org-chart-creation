@@ -593,13 +593,16 @@ export const AdminView = ({ adminKey }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminKey]);
 
-  const handleApprove = async (jobId) => {
-    if (!confirm('ยืนยันการอนุมัติการนำเข้าข้อมูลนี้? ระบบจะเริ่มประมวลผลทันที')) return;
-    
-    const tag = prompt('กรอก Tag สำหรับบันทึกลงในโครงสร้างสายงาน (เช่น ชื่องาน หรือหน่วยงานระดับบน) หรือเว้นว่างไว้:');
-    if (tag === null) return; // User cancelled the prompt
-    
-    const loadingToast = toast.loading('กำลังอนุมัติ...');
+  const [approvingJobId, setApprovingJobId] = useState(null);
+  const [approveTag, setApproveTag] = useState('');
+  const [approveIsOfficial, setApproveIsOfficial] = useState(true);
+
+  const handleApproveSubmit = async (e) => {
+    e.preventDefault();
+    if (!approvingJobId) return;
+
+    const jobId = approvingJobId;
+    const loadingToast = toast.loading('กำลังอนุมัติการนำเข้า...');
     try {
       const apiUrl = import.meta.env.VITE_API_URL || '';
       const res = await fetch(`${apiUrl}/api/import/${jobId}/approve`, {
@@ -608,13 +611,19 @@ export const AdminView = ({ adminKey }) => {
           'X-Admin-Key': adminKey,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ tag: tag.trim() })
+        body: JSON.stringify({ 
+          tag: approveTag.trim(),
+          is_official: approveIsOfficial
+        })
       });
       if (!res.ok) throw new Error('Approve failed');
-      toast.success('อนุมัติสำเร็จ', { id: loadingToast });
+      toast.success('อนุมัติการนำเข้าสำเร็จ', { id: loadingToast });
+      setApprovingJobId(null);
+      setApproveTag('');
+      setApproveIsOfficial(true);
       fetchJobs();
     } catch (err) {
-      toast.error('เกิดข้อผิดพลาด: ' + err.message, { id: loadingToast });
+      toast.error('เกิดข้อผิดพลาดในการอนุมัติ: ' + err.message, { id: loadingToast });
     }
   };
 
@@ -792,8 +801,12 @@ export const AdminView = ({ adminKey }) => {
                           ปฏิเสธ
                         </button>
                         <button 
-                          onClick={() => handleApprove(job.id)}
-                          className="flex-1 md:flex-none px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors text-sm shadow-sm"
+                          onClick={() => {
+                            setApprovingJobId(job.id);
+                            setApproveTag('');
+                            setApproveIsOfficial(true);
+                          }}
+                          className="flex-1 md:flex-none px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors text-sm shadow-sm cursor-pointer"
                         >
                           อนุมัติ (ดำเนินการ)
                         </button>
@@ -848,6 +861,75 @@ export const AdminView = ({ adminKey }) => {
           </div>
         )}
       </div>
+      {approvingJobId && (
+        <div className="fixed inset-0 z-[220] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col relative overflow-hidden">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <CheckCircle className="text-green-600" size={20} /> ยืนยันการอนุมัติการนำเข้า
+              </h3>
+              <button 
+                onClick={() => setApprovingJobId(null)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleApproveSubmit} className="flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Tag สำหรับสายบังคับบัญชา (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="เช่น ชัยภูมิ, อบรม, กระทรวง..."
+                  value={approveTag}
+                  onChange={(e) => setApproveTag(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">ใช้ระบุหมวดหมู่ในตารางสายงาน</p>
+              </div>
+
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={approveIsOfficial}
+                    onChange={(e) => setApproveIsOfficial(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 block">
+                      ตั้งค่าเป็นบัญชีทางการ (Official Account)
+                    </span>
+                    <span className="text-[11px] text-slate-500 block leading-tight mt-0.5">
+                      หน่วยงานทั้งหมดในผังนี้ (ทั้งสร้างใหม่และเชื่อมต่อเดิม) จะได้รับตราสัญลักษณ์ Official
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              <div className="flex gap-2 justify-end mt-2">
+                <button
+                  type="button"
+                  onClick={() => setApprovingJobId(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg shadow-md transition-all cursor-pointer"
+                >
+                  ยืนยันอนุมัติข้อมูล
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <JobDetailsModal
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
