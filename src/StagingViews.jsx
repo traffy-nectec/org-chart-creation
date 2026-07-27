@@ -35,14 +35,14 @@ const downloadResultsFile = async (jobId, key, isAllCodes, isApiKey) => {
     if (isAllCodes) {
       exportData = data.nodes.map(n => ({
         'ชื่อหน่วยงาน': n.name,
-        'ID ฐานข้อมูล': n.generated_db_id || 'N/A',
+        'ID ฐานข้อมูล': n.generated_db_id || n.existing_db_id || 'N/A',
         'Staff Entry Code': n.staff_entry_code || 'N/A',
         'Admin Entry Code': n.admin_entry_code || 'N/A'
       }));
     } else {
       exportData = data.nodes.map(n => ({
         'ชื่อหน่วยงาน': n.name,
-        'ID ฐานข้อมูล': n.generated_db_id || 'N/A',
+        'ID ฐานข้อมูล': n.generated_db_id || n.existing_db_id || 'N/A',
         'Staff Entry Code': n.staff_entry_code || 'N/A'
       }));
     }
