@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Mail, Send, Loader2, CheckCircle, FileText, Database, X, Download, Copy, RefreshCw, ChevronDown, ChevronRight, Info, AlertTriangle, Edit } from 'lucide-react';
+import { Mail, Send, Loader2, CheckCircle, FileText, Database, X, Download, Copy, RefreshCw, ChevronDown, ChevronRight, Info, AlertTriangle, Edit, Eye, QrCode, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
@@ -161,7 +161,30 @@ export const SubmissionsView = ({ apiKey, initialEmail = '', onRestoreJob }) => 
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [activeJobPayload, setActiveJobPayload] = useState(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
   const centeredInputRef = useRef(null);
+
+  const handleViewDetails = async (jobId) => {
+    setDetailsLoading(true);
+    const loadingToast = toast.loading('กำลังโหลดรายละเอียดหน่วยงาน...');
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/import/payload/${jobId}`, {
+        headers: { 'X-API-Key': apiKey }
+      });
+      if (!res.ok) throw new Error('Failed to fetch job payload');
+      const data = await res.json();
+      setActiveJobPayload(data);
+      setIsDetailsModalOpen(true);
+      toast.success('โหลดข้อมูลสำเร็จ', { id: loadingToast });
+    } catch (err) {
+      toast.error('ไม่สามารถโหลดรายละเอียดได้: ' + err.message, { id: loadingToast });
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
 
   // Focus the large centered email input on mount if not searched yet
   useEffect(() => {
@@ -408,14 +431,21 @@ export const SubmissionsView = ({ apiKey, initialEmail = '', onRestoreJob }) => 
                   {job.status === 'completed' && (
                     <div className="flex flex-col gap-2">
                       <button 
-                        onClick={() => handleDownloadResults(job.id)}
-                        className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 rounded-lg text-sm font-bold transition-colors"
+                        onClick={() => handleViewDetails(job.id)}
+                        disabled={detailsLoading}
+                        className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 rounded-lg text-sm font-bold transition-colors shadow-sm cursor-pointer"
                       >
-                        <Download size={16} /> ดาวน์โหลดผลลัพธ์
+                        <Eye size={16} /> ดูข้อมูลหน่วยงาน & QR Code
+                      </button>
+                      <button 
+                        onClick={() => handleDownloadResults(job.id)}
+                        className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 rounded-lg text-sm font-bold transition-colors cursor-pointer"
+                      >
+                        <Download size={16} /> ดาวน์โหลดผลลัพธ์ (.xlsx)
                       </button>
                       <button 
                         onClick={() => handleDownloadAllCodes(job.id)}
-                        className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 rounded-lg text-sm font-bold transition-colors"
+                        className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 rounded-lg text-sm font-bold transition-colors cursor-pointer"
                       >
                         <Download size={16} /> ดาวน์โหลดรหัส Staff & Admin (Entry Codes)
                       </button>
@@ -462,6 +492,15 @@ export const SubmissionsView = ({ apiKey, initialEmail = '', onRestoreJob }) => 
           </div>
         )}
       </div>
+
+      <JobDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => {
+          setIsDetailsModalOpen(false);
+          setActiveJobPayload(null);
+        }}
+        payload={activeJobPayload}
+      />
     </div>
   );
 };
@@ -1009,63 +1048,91 @@ export const JobDetailsModal = ({ isOpen, onClose, payload }) => {
                   <thead>
                     <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 text-xs uppercase">
                       <th className="px-4 py-3">ชื่อหน่วยงาน</th>
-                      <th className="px-4 py-3">ระดับชั้น</th>
                       <th className="px-4 py-3">ประเภทการกระทำ</th>
-                      <th className="px-4 py-3">หน่วยงานต้นสังกัด</th>
-                      <th className="px-4 py-3">พื้นที่บริการ</th>
+                      <th className="px-4 py-3">Staff Code</th>
+                      <th className="px-4 py-3">Admin Code</th>
+                      <th className="px-4 py-3">UUID QR</th>
+                      <th className="px-4 py-3 text-center">ดูรูปภาพ & ลิงก์ QR Code</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {paginatedNodes.length === 0 ? (
                       <tr>
-                        <td colSpan="5" className="px-4 py-8 text-center text-slate-400">
+                        <td colSpan="6" className="px-4 py-8 text-center text-slate-400">
                           ไม่พบข้อมูลที่ตรงกับการค้นหา
                         </td>
                       </tr>
                     ) : (
-                      paginatedNodes.map(node => (
-                        <tr key={node.temp_id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-4 py-3.5">
-                            <div className="font-bold text-slate-800">{node.name}</div>
-                            <div className="text-[10px] font-mono text-slate-400">Temp ID: {node.temp_id}</div>
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                              node.level === 0 ? 'bg-purple-100 text-purple-700' :
-                              node.level === 1 ? 'bg-blue-100 text-blue-700' :
-                              node.level === 2 ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-700'
-                            }`}>ระดับ {node.level}</span>
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
-                              node.action === 'CREATE' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-blue-50 text-blue-700 border-blue-200'
-                            }`}>
-                              {node.action === 'CREATE' ? 'สร้างใหม่' : `เชื่อมต่อ (DB ID: ${node.existing_db_id})`}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3.5 text-xs text-slate-600">
-                            {node.parent_temp_id ? (
-                              <div>
-                                <span className="font-bold text-slate-700">{getNodeNameById(node.parent_temp_id)}</span>
-                                <div className="text-[9px] text-slate-400 font-mono">Temp ID: {node.parent_temp_id}</div>
+                      paginatedNodes.map(node => {
+                        const uuid = node.generated_uuid_qr;
+                        const reportQrUrl = uuid ? `https://storage.googleapis.com/traffy_public_bucket/traffy_fondue_qrcode/${uuid}.jpg` : null;
+                        const reportRawUrl = uuid ? `https://storage.googleapis.com/traffy_public_bucket/traffy_fondue_qrcode/${uuid}_none_frame.jpg` : null;
+                        const inviteQrUrl = uuid ? `https://storage.googleapis.com/traffy_public_bucket/traffy_fondue_qrcode/${uuid}_invite.jpg` : null;
+                        const inviteRawUrl = uuid ? `https://storage.googleapis.com/traffy_public_bucket/traffy_fondue_qrcode/${uuid}_invite_none_frame.jpg` : null;
+                        const landingUrl = uuid ? `https://landing.traffy.in.th/?key=${uuid}` : null;
+
+                        return (
+                          <tr key={node.temp_id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-3.5">
+                              <div className="font-bold text-slate-800">{node.name}</div>
+                              <div className="text-[10px] font-mono text-slate-400">
+                                {node.generated_db_id ? `DB ID: ${node.generated_db_id}` : `Temp ID: ${node.temp_id}`}
                               </div>
-                            ) : (
-                              <span className="text-slate-400 italic">ไม่มี (เป็น Root)</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3.5 text-xs text-slate-500 max-w-[200px] truncate" title={node.locations?.map(l => `${l.subdistrict} (${l.code})`).join(', ')}>
-                            {node.locations && node.locations.length > 0 ? (
-                              node.locations.map((loc, idx) => (
-                                <div key={idx} className="truncate">
-                                  📍 {loc.subdistrict} / {loc.district}
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                node.action === 'CREATE' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-blue-50 text-blue-700 border-blue-200'
+                              }`}>
+                                {node.action === 'CREATE' ? 'สร้างใหม่' : `เชื่อมต่อ (${node.existing_db_id})`}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5 font-mono text-xs font-bold text-slate-700">
+                              {node.staff_entry_code || '-'}
+                            </td>
+                            <td className="px-4 py-3.5 font-mono text-xs font-bold text-slate-700">
+                              {node.admin_entry_code || '-'}
+                            </td>
+                            <td className="px-4 py-3.5 font-mono text-xs text-blue-600 font-bold">
+                              {uuid || '-'}
+                            </td>
+                            <td className="px-4 py-3.5 text-xs text-center">
+                              {uuid ? (
+                                <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                  <a
+                                    href={reportQrUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="px-2 py-1 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 rounded text-[11px] font-bold flex items-center gap-1 transition-colors"
+                                    title="เปิดรูป Report QR (มีกรอบ)"
+                                  >
+                                    <QrCode size={13} /> Report QR
+                                  </a>
+                                  <a
+                                    href={inviteQrUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="px-2 py-1 bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 rounded text-[11px] font-bold flex items-center gap-1 transition-colors"
+                                    title="เปิดรูป Staff Invite QR (มีกรอบ)"
+                                  >
+                                    <QrCode size={13} /> Invite QR
+                                  </a>
+                                  <a
+                                    href={landingUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="p-1 bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 rounded text-[11px] font-bold flex items-center transition-colors"
+                                    title="เปิด Landing Page"
+                                  >
+                                    <ExternalLink size={13} />
+                                  </a>
                                 </div>
-                              ))
-                            ) : (
-                              <span className="text-slate-400">ไม่ได้กำหนด</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))
+                              ) : (
+                                <span className="text-slate-400 italic text-[11px]">ไม่มี QR (หน่วยงานเดิม)</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

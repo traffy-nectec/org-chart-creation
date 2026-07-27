@@ -47,6 +47,7 @@
 - **O(N) Performance Optimization:** ปรับปรุงอัลกอริทึมการสร้างโครงสร้างแผนผัง (`orgTree`) และการคำนวณระดับชั้น (`recalculateAllLevels`) ด้วยการใช้ Map Lookup (ความซับซ้อนระดับ O(N)) แทนการค้นหาแบบวนลูป (O(N²)) ส่งผลให้ระบบประมวลผลการคำนวณต้นสังกัดนับหมื่นรายการได้ในเสี้ยววินาที ขจัดปัญหาเบราว์เซอร์ค้างรอกดยืนยัน
 - **Double Submission Prevention & Progressive UX:** เพิ่มระบบล็อกปุ่ม (Disabled states) และแสดงไอคอนโหลด (Spinners) ในจังหวะที่ระบบกำลังประมวลผล (เช่น การตรวจสอบรายชื่อซ้ำ หรือการยิง API ส่งออก) เพื่อป้องกันผู้ใช้กดเบิ้ล 
 - **100% Conflict Resolution Enforcement:** บังคับให้ผู้ใช้งานต้องจัดการความซ้ำซ้อนให้ครบทุกรายการ (LINK หรือ CREATE) จึงจะสามารถกดปุ่มยืนยันส่งข้อมูลเข้า API ได้
+- **Completed Job Details & QR Code Inspector Modal:** เพิ่มปุ่ม `ดูข้อมูลหน่วยงาน & QR Code` ในหน้าประวัติการนำเข้า (`SubmissionsView`) เฉพาะ Job ที่มีสถานะอนุมัติสำเร็จ (`completed`) โดยเปิด Modal ตารางรายละเอียดหน่วยงานทั้งหมด พร้อมรหัส Staff Entry Code, Admin Entry Code, UUID QR และปุ่มดู/ดาวน์โหลดรูปภาพ QR Code (Report QR, Invite QR) และลิงก์ Landing Page ได้โดยตรง
 
 ## 🚧 สิ่งที่กำลังจะทำ (Roadmap / Next Steps)
 
