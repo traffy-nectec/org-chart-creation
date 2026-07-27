@@ -378,9 +378,22 @@ export const SubmissionsView = ({ apiKey, initialEmail = '', onRestoreJob }) => 
                     </span>
                     {getStatusBadge(job.status)}
                   </div>
-                  <div className="text-sm text-slate-600 mb-1">
-                    <span className="font-semibold text-slate-700">จำนวนข้อมูล:</span> <span className="font-bold text-blue-600">{job.total_items}</span> หน่วยงาน
+                  <div className="text-sm text-slate-600 mb-1 flex items-center gap-4 flex-wrap">
+                    <div>
+                      <span className="font-semibold text-slate-700">จำนวนข้อมูล:</span> <span className="font-bold text-blue-600">{job.total_items}</span> หน่วยงาน
+                    </div>
+                    {job.requester_name && (
+                      <div className="text-xs text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full">
+                        👤 <span className="font-bold text-slate-700">{job.requester_name}</span>
+                        {job.requester_tel && <span> ({job.requester_tel})</span>}
+                      </div>
+                    )}
                   </div>
+                  {job.requester_note && (
+                    <div className="text-xs text-slate-500 italic mb-1 bg-slate-50 p-1.5 rounded border border-slate-100">
+                      💬 <span className="font-medium text-slate-600">หมายเหตุ:</span> {job.requester_note}
+                    </div>
+                  )}
                   <div className="text-xs text-slate-400">
                     อัปเดตล่าสุด: {new Date(job.updated_at).toLocaleString('th-TH')}
                   </div>
