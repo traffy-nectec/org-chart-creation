@@ -971,16 +971,21 @@ export const JobDetailsModal = ({ isOpen, onClose, payload }) => {
 
   const handleDownloadDraft = () => {
     try {
-      const exportData = nodesWithLevels.map(n => ({
-        'ชื่อหน่วยงาน': n.name,
-        'Temp ID': n.temp_id,
-        'ระดับชั้น': `ระดับ ${n.level}`,
-        'ประเภทการทำงาน': n.action === 'CREATE' ? 'สร้างใหม่' : 'เชื่อมต่อหน่วยงานเดิม',
-        'ID หน่วยงานเดิมที่เชื่อมต่อ': n.existing_db_id || 'N/A',
-        'Temp ID หน่วยงานต้นสังกัด': n.parent_temp_id || 'ไม่มี (โหนดราก)',
-        'ชื่อหน่วยงานต้นสังกัด': n.parent_temp_id ? getNodeNameById(n.parent_temp_id) : 'ไม่มี (โหนดราก)',
-        'รหัสพื้นที่ (DOPA)': n.subdistrict_code || n.area_code || 'N/A'
-      }));
+      const exportData = nodesWithLevels.map(n => {
+        const uuid = n.generated_uuid_qr;
+        return {
+          'ชื่อหน่วยงาน': n.name,
+          'ประเภทการทำงาน': n.action === 'CREATE' ? 'สร้างใหม่' : 'เชื่อมต่อหน่วยงานเดิม',
+          'ID หน่วยงาน (DB ID)': n.generated_db_id || n.existing_db_id || 'N/A',
+          'Staff Entry Code': n.staff_entry_code || 'N/A',
+          'Admin Entry Code': n.admin_entry_code || 'N/A',
+          'ระดับชั้น': `ระดับ ${n.level}`,
+          'ชื่อหน่วยงานต้นสังกัด': n.parent_temp_id ? getNodeNameById(n.parent_temp_id) : 'ไม่มี (โหนดราก)',
+          'รหัสพื้นที่ (DOPA)': n.subdistrict_code || n.area_code || 'N/A',
+          'Report QR Link': uuid ? `https://storage.googleapis.com/traffy_public_bucket/traffy_fondue_qrcode/${uuid}.jpg` : 'N/A',
+          'Invite QR Link': uuid ? `https://storage.googleapis.com/traffy_public_bucket/traffy_fondue_qrcode/${uuid}_invite.jpg` : 'N/A'
+        };
+      });
 
       const ws = XLSX.utils.json_to_sheet(exportData);
       const wb = XLSX.utils.book_new();
