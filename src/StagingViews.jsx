@@ -982,7 +982,7 @@ export const JobDetailsModal = ({ isOpen, onClose, payload }) => {
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col relative overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col relative overflow-hidden">
         
         {/* Header */}
         <div className="p-6 border-b border-slate-100 flex justify-between items-center shrink-0">
@@ -1034,7 +1034,7 @@ export const JobDetailsModal = ({ isOpen, onClose, payload }) => {
               <div className="flex gap-2 relative">
                 <input
                   type="text"
-                  placeholder="ค้นหาชื่อหน่วยงาน หรือ Temp ID..."
+                  placeholder="ค้นหาชื่อหน่วยงาน..."
                   value={search}
                   onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                   className="w-full pl-10 pr-4 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -1044,21 +1044,20 @@ export const JobDetailsModal = ({ isOpen, onClose, payload }) => {
 
               {/* Table */}
               <div className="flex-1 overflow-auto border border-slate-200 rounded-xl">
-                <table className="w-full text-sm text-left border-collapse">
+                <table className="w-full text-sm text-left border-collapse whitespace-nowrap">
                   <thead>
                     <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 text-xs uppercase">
                       <th className="px-4 py-3">ชื่อหน่วยงาน</th>
-                      <th className="px-4 py-3">ประเภทการกระทำ</th>
-                      <th className="px-4 py-3">Staff Code</th>
-                      <th className="px-4 py-3">Admin Code</th>
-                      <th className="px-4 py-3">UUID QR</th>
-                      <th className="px-4 py-3 text-center">ดูรูปภาพ & ลิงก์ QR Code</th>
+                      <th className="px-4 py-3">ประเภท</th>
+                      <th className="px-4 py-3">Staff Entry Code</th>
+                      <th className="px-4 py-3">Admin Entry Code</th>
+                      <th className="px-4 py-3 text-center">รูปภาพ QR Code</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {paginatedNodes.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="px-4 py-8 text-center text-slate-400">
+                        <td colSpan="5" className="px-4 py-8 text-center text-slate-400">
                           ไม่พบข้อมูลที่ตรงกับการค้นหา
                         </td>
                       </tr>
@@ -1066,68 +1065,50 @@ export const JobDetailsModal = ({ isOpen, onClose, payload }) => {
                       paginatedNodes.map(node => {
                         const uuid = node.generated_uuid_qr;
                         const reportQrUrl = uuid ? `https://storage.googleapis.com/traffy_public_bucket/traffy_fondue_qrcode/${uuid}.jpg` : null;
-                        const reportRawUrl = uuid ? `https://storage.googleapis.com/traffy_public_bucket/traffy_fondue_qrcode/${uuid}_none_frame.jpg` : null;
                         const inviteQrUrl = uuid ? `https://storage.googleapis.com/traffy_public_bucket/traffy_fondue_qrcode/${uuid}_invite.jpg` : null;
-                        const inviteRawUrl = uuid ? `https://storage.googleapis.com/traffy_public_bucket/traffy_fondue_qrcode/${uuid}_invite_none_frame.jpg` : null;
-                        const landingUrl = uuid ? `https://landing.traffy.in.th/?key=${uuid}` : null;
 
                         return (
                           <tr key={node.temp_id} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="px-4 py-3.5">
-                              <div className="font-bold text-slate-800">{node.name}</div>
-                              <div className="text-[10px] font-mono text-slate-400">
-                                {node.generated_db_id ? `DB ID: ${node.generated_db_id}` : `Temp ID: ${node.temp_id}`}
-                              </div>
+                            <td className="px-4 py-2.5 font-bold text-slate-800">
+                              {node.name}
                             </td>
-                            <td className="px-4 py-3.5">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                            <td className="px-4 py-2.5">
+                              <span className={`text-xs font-bold px-2.5 py-1 rounded border ${
                                 node.action === 'CREATE' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-blue-50 text-blue-700 border-blue-200'
                               }`}>
-                                {node.action === 'CREATE' ? 'สร้างใหม่' : `เชื่อมต่อ (${node.existing_db_id})`}
+                                {node.action === 'CREATE' ? 'สร้างใหม่' : 'เชื่อมต่อ'}
                               </span>
                             </td>
-                            <td className="px-4 py-3.5 font-mono text-xs font-bold text-slate-700">
+                            <td className="px-4 py-2.5 font-mono text-xs font-bold text-slate-700">
                               {node.staff_entry_code || '-'}
                             </td>
-                            <td className="px-4 py-3.5 font-mono text-xs font-bold text-slate-700">
+                            <td className="px-4 py-2.5 font-mono text-xs font-bold text-slate-700">
                               {node.admin_entry_code || '-'}
                             </td>
-                            <td className="px-4 py-3.5 font-mono text-xs text-blue-600 font-bold">
-                              {uuid || '-'}
-                            </td>
-                            <td className="px-4 py-3.5 text-xs text-center">
+                            <td className="px-4 py-2.5 text-xs text-center">
                               {uuid ? (
-                                <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                <div className="flex items-center justify-center gap-2">
                                   <a
                                     href={reportQrUrl}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="px-2 py-1 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 rounded text-[11px] font-bold flex items-center gap-1 transition-colors"
-                                    title="เปิดรูป Report QR (มีกรอบ)"
+                                    className="px-2.5 py-1 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 rounded text-xs font-bold flex items-center gap-1 transition-colors"
+                                    title="เปิดรูป Report QR Code"
                                   >
-                                    <QrCode size={13} /> Report QR
+                                    <QrCode size={14} /> Report QR
                                   </a>
                                   <a
                                     href={inviteQrUrl}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="px-2 py-1 bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 rounded text-[11px] font-bold flex items-center gap-1 transition-colors"
-                                    title="เปิดรูป Staff Invite QR (มีกรอบ)"
+                                    className="px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 rounded text-xs font-bold flex items-center gap-1 transition-colors"
+                                    title="เปิดรูป Staff Invite QR Code"
                                   >
-                                    <QrCode size={13} /> Invite QR
-                                  </a>
-                                  <a
-                                    href={landingUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="p-1 bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 rounded text-[11px] font-bold flex items-center transition-colors"
-                                    title="เปิด Landing Page"
-                                  >
-                                    <ExternalLink size={13} />
+                                    <QrCode size={14} /> Invite QR
                                   </a>
                                 </div>
                               ) : (
-                                <span className="text-slate-400 italic text-[11px]">ไม่มี QR (หน่วยงานเดิม)</span>
+                                <span className="text-slate-400 italic text-xs">-</span>
                               )}
                             </td>
                           </tr>
