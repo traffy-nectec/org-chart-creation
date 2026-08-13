@@ -3005,7 +3005,7 @@ export default function OrgManagerApp() {
 
       // 5. Missing Area check
       const locations = getSelectedLocations(node.areas);
-      if (locations.length === 0) {
+      if (node.areas?.scope !== 'NATIONWIDE' && locations.length === 0) {
         unreachable.push({
           ...node,
           causeType: 'warning',
