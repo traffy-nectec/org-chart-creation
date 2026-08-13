@@ -593,7 +593,7 @@ const ImportModal = ({ isOpen, onClose, onImportData, onCancelImport, onDownload
 
           // If the area is nationwide or all, clear the location data so it becomes unassigned
           const isNationwide = [province, amphoe, tambon, rawProvItem, rawAmphoe, rawTambon, String(rawCoverageScope || '')].some(val =>
-            val && (val.includes('ทั่วประเทศ') || val.includes('ส่วนกลาง') || val.includes('ระดับชาติ') || val.includes('ทั้งหมด'))
+            val && (val.toLowerCase().includes('nationwide') || val.includes('ทั่วประเทศ') || val.includes('ส่วนกลาง') || val.includes('ระดับชาติ') || val.includes('ทั้งหมด'))
           );
 
           if (isNationwide) {
