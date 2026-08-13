@@ -48,11 +48,24 @@ The primary objective of the recent sessions was to optimize the backend API to 
   - Added withdraw capability for creators to recall pending import jobs and reload payload directly back into the chart editor.
   - Integrated `official_group` badges into the duplicate organization conflict warning modal.
   - Aligned backend QR API v2 with explicit UUID rules (omitting `uuid_qr` = Create Mode with retry collision check, passing `uuid_qr` = Update Mode) and 95% quality JPEG image outputs for seamless UI rendering.
+- **Scope & Nationwide Floating Org Fixes (Aug 13):**
+  - Passed `coverage_scope` to intermediate parent nodes during topological processing in `src/App.jsx`.
+  - Suppressed missing area pre-export warnings for nodes with `NATIONWIDE` coverage.
+- **Admin Dashboard API Performance & Memory Optimization (Aug 13):**
+  - Updated `src/StagingViews.jsx` polling from 15s interval to 60s conditional check (polls only when pending/processing jobs exist).
+  - Cleaned up heavy JSON payloads (`100MB+`) in-memory on frontend right after fetch.
+  - Updated backend Go API `ListAllJobs`, `ListJobsByEmail`, `ListJobsByStatus` queries in `fondue-org-importer` to exclude the heavy `payload` column from list views (`NULL::jsonb`), reducing payload size from **100MB+ to 7.2KB** (<50ms response).
+- **Go UTF-8 Rune Truncation Fix (Aug 13):**
+  - Fixed a critical UTF-8 slicing bug in `importer/processor.go` where Go byte slicing (`string[:97]`) cut Thai characters in half (resulting in invalid `0xe0 0xb8 0x2e` byte sequence).
+  - Replaced all byte slicing with rune-safe `truncateRune(string, 97)` function.
+- **Build & Cloud Run Deployment (Aug 13):**
+  - Optimized `.gcloudignore` to exclude local binaries (`/api`, `/api_bin`), reducing Cloud Build upload context from **128.8MB to 2.2MB**.
+  - Built and deployed updated Go API service `fondue-org-importer-api` (`revision 00065-kzv`) on Google Cloud Run.
 
 ## Current State
-- The frontend is fully operational and has been committed and pushed to `main` (repository: `org-chart-creation`).
-- The backend has been deployed to Cloud Run (`fondue-org-importer-api`) and is serving traffic on `asia-southeast1.run.app`.
-- All automated unit tests are passing.
+- The frontend (`org-chart-creation`) is fully operational and pushed to `main`.
+- The backend (`fondue-org-importer`) is updated, compiled, and deployed to Cloud Run (`fondue-org-importer-api`) serving 100% of traffic on `asia-southeast1.run.app`.
+- All unit tests and compilation checks pass cleanly.
 - React hook warnings regarding missing dependencies have been monitored and evaluated (e.g., `apiKey` in `useEffect`). They are acceptable for current functional behavior.
 
 ## Pending Tasks / Next Steps
