@@ -170,6 +170,13 @@ const cleanInput = (val, type) => {
     if (cleaned.startsWith('ตำบล')) cleaned = cleaned.substring(4).trim();
     if (cleaned.startsWith('แขวง')) cleaned = cleaned.substring(4).trim();
     if (cleaned === 'สุไหงโกลก') cleaned = 'สุไหงโก-ลก';
+
+    // Correction mappings for typos found in Excel imports
+    if (cleaned === 'ไผ่จำศิล') cleaned = 'ไผ่จำศีล';
+    if (cleaned === 'ปากน้ำกระแส') cleaned = 'ปากน้ำประแส';
+    if (cleaned === 'ตระการ') cleaned = 'ตระการพืชผล';
+    if (cleaned.includes('ปอภาร')) cleaned = 'ปอภาร';
+    if (cleaned === 'วัดไทรย์') cleaned = 'วัดไทร';
   }
   return cleaned;
 };
@@ -433,9 +440,9 @@ const ImportModal = ({ isOpen, onClose, onImportData, onCancelImport, onDownload
             row['ชื่อหน่วยงานย่อย_2']
           ];
 
-          const province = row['จังหวัด'] || row['จังหวัดที่รับผิดชอบ'] || row['จังหวัดที่ตั้ง'];
-          const amphoe = row['อำเภอ'] || row['อำเภอที่รับผิดชอบ'] || row['อำเภอที่ตั้ง'];
-          const tambon = row['ตำบล'] || row['ตำบลที่รับผิดชอบ'] || row['ตำบลที่ตั้ง'];
+          const province = row['จังหวัดที่รับผิดชอบ'] || row['จังหวัด'] || row['จังหวัดที่ตั้ง'];
+          const amphoe = row['อำเภอที่รับผิดชอบ'] || row['อำเภอ'] || row['อำเภอที่ตั้ง'];
+          const tambon = row['ตำบลที่รับผิดชอบ'] || row['ตำบล'] || row['ตำบลที่ตั้ง'];
           const location = { province, amphoe, tambon };
 
           let parent = null;
