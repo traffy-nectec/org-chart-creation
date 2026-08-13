@@ -441,11 +441,25 @@ const ImportModal = ({ isOpen, onClose, onImportData, onCancelImport, onDownload
           let parent = null;
           let currentPath = [];
           let deepestNode = null;
+          let deepestNodeRaw = null;
 
-          levels.forEach(node => {
+          const nonNullLevels = levels.filter(Boolean);
+          const leafNodeStr = nonNullLevels.length > 0 ? String(nonNullLevels[nonNullLevels.length - 1]).trim() : '';
+
+          // Format location suffix string for leaf node e.g. (ต.ตำบล อ.อำเภอ จ.จังหวัด)
+          const locParts = [];
+          if (tambon && String(tambon).trim()) locParts.push(`ต.${String(tambon).trim()}`);
+          if (amphoe && String(amphoe).trim()) locParts.push(`อ.${String(amphoe).trim()}`);
+          if (province && String(province).trim()) locParts.push(`จ.${String(province).trim()}`);
+          const locSuffix = locParts.length > 0 ? ` (${locParts.join(' ')})` : '';
+
+          levels.forEach((node, idx) => {
             if (node) {
               const nodeStr = String(node).trim();
-              currentPath.unshift(nodeStr);
+              const isLeaf = (idx === levels.reduce((lastIdx, val, i) => val ? i : lastIdx, -1));
+              const formattedNodeStr = isLeaf && locSuffix ? `${nodeStr}${locSuffix}` : nodeStr;
+
+              currentPath.unshift(formattedNodeStr);
               const nodeFullName = currentPath.join(' ');
 
               normalized.push({
