@@ -580,10 +580,16 @@ export const AdminView = ({ adminKey }) => {
         fetchJobs(false);
       }, 0);
       
-      // Auto refresh the admin board silently every 15 seconds
+      // Auto refresh the admin board silently every 60 seconds if there are active jobs
       const timer = setInterval(() => {
-        fetchJobs(true);
-      }, 15000);
+        setJobs(prevJobs => {
+          const hasActiveJobs = prevJobs.some(j => j.status === 'pending_approval' || j.status === 'processing');
+          if (hasActiveJobs) {
+            fetchJobs(true);
+          }
+          return prevJobs;
+        });
+      }, 60000);
       
       return () => {
         clearTimeout(timeout);
