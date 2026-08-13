@@ -208,7 +208,7 @@ export const SubmissionsView = ({ apiKey, initialEmail = '', onRestoreJob }) => 
       });
       if (!res.ok) throw new Error('Failed to fetch jobs');
       const data = await res.json();
-      setJobs(data || []);
+      setJobs(Array.isArray(data) ? data : (data?.jobs && Array.isArray(data.jobs) ? data.jobs : []));
       setHasSearched(true);
     } catch (err) {
       toast.error('ไม่สามารถดึงข้อมูลสถานะได้: ' + err.message);
@@ -565,7 +565,7 @@ export const AdminView = ({ adminKey }) => {
       }
       if (!res.ok) throw new Error('Failed to fetch jobs');
       const data = await res.json();
-      setJobs(data || []);
+      setJobs(Array.isArray(data) ? data : (data?.jobs && Array.isArray(data.jobs) ? data.jobs : []));
     } catch (err) {
       if (!silent) toast.error('ไม่สามารถดึงข้อมูลได้: ' + err.message);
     } finally {
