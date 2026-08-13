@@ -208,7 +208,12 @@ export const SubmissionsView = ({ apiKey, initialEmail = '', onRestoreJob }) => 
       });
       if (!res.ok) throw new Error('Failed to fetch jobs');
       const data = await res.json();
-      setJobs(Array.isArray(data) ? data : (data?.jobs && Array.isArray(data.jobs) ? data.jobs : []));
+      const rawJobs = Array.isArray(data) ? data : (data?.jobs && Array.isArray(data.jobs) ? data.jobs : (data?.results && Array.isArray(data.results) ? data.results : []));
+      const cleanedJobs = rawJobs.map(job => {
+        const { payload, ...meta } = job;
+        return meta;
+      });
+      setJobs(cleanedJobs);
       setHasSearched(true);
     } catch (err) {
       toast.error('ไม่สามารถดึงข้อมูลสถานะได้: ' + err.message);
@@ -565,7 +570,13 @@ export const AdminView = ({ adminKey }) => {
       }
       if (!res.ok) throw new Error('Failed to fetch jobs');
       const data = await res.json();
-      setJobs(Array.isArray(data) ? data : (data?.jobs && Array.isArray(data.jobs) ? data.jobs : []));
+      const rawJobs = Array.isArray(data) ? data : (data?.jobs && Array.isArray(data.jobs) ? data.jobs : (data?.results && Array.isArray(data.results) ? data.results : []));
+      // Clean up heavy payload field from memory for list view
+      const cleanedJobs = rawJobs.map(job => {
+        const { payload, ...meta } = job;
+        return meta;
+      });
+      setJobs(cleanedJobs);
     } catch (err) {
       if (!silent) toast.error('ไม่สามารถดึงข้อมูลได้: ' + err.message);
     } finally {
