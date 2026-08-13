@@ -460,6 +460,8 @@ const ImportModal = ({ isOpen, onClose, onImportData, onCancelImport, onDownload
           if (province && String(province).trim()) locParts.push(`จ.${String(province).trim()}`);
           const locSuffix = locParts.length > 0 ? ` (${locParts.join(' ')})` : '';
 
+          const scope = row['ประเภทการกำหนดขอบเขต'] || row['coverage_scope'] || row['ขอบเขตพื้นที่'] || row['scope'];
+
           levels.forEach((node, idx) => {
             if (node) {
               const nodeStr = String(node).trim();
@@ -471,7 +473,11 @@ const ImportModal = ({ isOpen, onClose, onImportData, onCancelImport, onDownload
 
               normalized.push({
                 org_name: nodeFullName,
-                parent_name: parent
+                parent_name: parent,
+                coverage_scope: scope,
+                province: isLeaf ? province : (scope && (scope.includes('ทั่วประเทศ') || scope.includes('Nationwide')) ? '' : province),
+                amphoe: isLeaf ? amphoe : (scope && (scope.includes('ทั่วประเทศ') || scope.includes('Nationwide')) ? '' : amphoe),
+                tambon: isLeaf ? tambon : (scope && (scope.includes('ทั่วประเทศ') || scope.includes('Nationwide')) ? '' : tambon)
               });
               parent = nodeFullName;
               deepestNode = nodeFullName;
