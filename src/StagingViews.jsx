@@ -1165,7 +1165,9 @@ export const JobDetailsModal = ({ isOpen, onClose, payload }) => {
                   <thead>
                     <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 text-xs uppercase">
                       <th className="px-4 py-3">ชื่อหน่วยงาน</th>
+                      <th className="px-4 py-3">การทำงาน</th>
                       <th className="px-4 py-3">ประเภท</th>
+                      <th className="px-4 py-3">พิกัด / รัศมี</th>
                       <th className="px-4 py-3">Staff Entry Code</th>
                       <th className="px-4 py-3">Admin Entry Code</th>
                       <th className="px-4 py-3 text-center">รูปภาพ QR Code</th>
@@ -1174,7 +1176,7 @@ export const JobDetailsModal = ({ isOpen, onClose, payload }) => {
                   <tbody className="divide-y divide-slate-100">
                     {paginatedNodes.length === 0 ? (
                       <tr>
-                        <td colSpan="5" className="px-4 py-8 text-center text-slate-400">
+                        <td colSpan="7" className="px-4 py-8 text-center text-slate-400">
                           ไม่พบข้อมูลที่ตรงกับการค้นหา
                         </td>
                       </tr>
@@ -1183,6 +1185,8 @@ export const JobDetailsModal = ({ isOpen, onClose, payload }) => {
                         const uuid = node.generated_uuid_qr;
                         const reportQrUrl = uuid ? `https://storage.googleapis.com/traffy_public_bucket/traffy_fondue_qrcode/${uuid}.jpg` : null;
                         const inviteQrUrl = uuid ? `https://storage.googleapis.com/traffy_public_bucket/traffy_fondue_qrcode/${uuid}_invite.jpg` : null;
+                        const typeId = node.details?.type_fondue_group_id || (node.name && (node.name.includes('โรงเรียน') || node.name.includes('รร.')) ? 5 : 6);
+                        const hasCoords = node.details?.latitude && node.details?.longitude;
 
                         return (
                           <tr key={node.temp_id} className="hover:bg-slate-50/50 transition-colors">
@@ -1195,6 +1199,20 @@ export const JobDetailsModal = ({ isOpen, onClose, payload }) => {
                               }`}>
                                 {node.action === 'CREATE' ? 'สร้างใหม่' : 'เชื่อมต่อ'}
                               </span>
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <span className={`text-xs font-bold px-2.5 py-1 rounded border ${
+                                typeId === 5 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              }`}>
+                                {typeId === 5 ? '🏫 โรงเรียน (5)' : '🏢 หน่วยงานรัฐ (6)'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5 text-xs text-slate-600">
+                              {hasCoords ? (
+                                <span>{node.details.latitude.toFixed(4)}, {node.details.longitude.toFixed(4)} ({node.details.radius_km ? `${node.details.radius_km * 1000}m` : '250m'})</span>
+                              ) : (
+                                <span className="text-slate-400 italic">ตามขอบเขตพื้นที่</span>
+                              )}
                             </td>
                             <td className="px-4 py-2.5 font-mono text-xs font-bold text-slate-700">
                               {node.staff_entry_code || '-'}

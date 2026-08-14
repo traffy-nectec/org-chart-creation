@@ -144,8 +144,11 @@ export const generateBackendPayload = (organizations) => {
       details: {
         address: org.attributes?.address || "",
         tel: org.attributes?.tel || "",
-        province: org.attributes?.province || ""
-        // Note: latitude, longitude, type_fondue_group are expected to be handled/defaulted by Backend
+        province: org.attributes?.province || "",
+        latitude: org.attributes?.latitude || null,
+        longitude: org.attributes?.longitude || null,
+        radius_km: org.attributes?.radius_km !== undefined ? org.attributes.radius_km : 0.25,
+        type_fondue_group_id: org.attributes?.type_fondue_group_id || (org.name && (org.name.includes('โรงเรียน') || org.name.includes('รร.')) ? 5 : 6)
       },
       locations: org.areas?.locations?.map(loc => {
         const prov = loc.province || "";

@@ -48,6 +48,7 @@
 - **Double Submission Prevention & Progressive UX:** เพิ่มระบบล็อกปุ่ม (Disabled states) และแสดงไอคอนโหลด (Spinners) ในจังหวะที่ระบบกำลังประมวลผล (เช่น การตรวจสอบรายชื่อซ้ำ หรือการยิง API ส่งออก) เพื่อป้องกันผู้ใช้กดเบิ้ล 
 - **100% Conflict Resolution Enforcement:** บังคับให้ผู้ใช้งานต้องจัดการความซ้ำซ้อนให้ครบทุกรายการ (LINK หรือ CREATE) จึงจะสามารถกดปุ่มยืนยันส่งข้อมูลเข้า API ได้
 - **Completed Job Details & QR Code Inspector Modal:** เพิ่มปุ่ม `ดูข้อมูลหน่วยงาน & QR Code` ในหน้าประวัติการนำเข้า (`SubmissionsView`) เฉพาะ Job ที่มีสถานะอนุมัติสำเร็จ (`completed`) โดยเปิด Modal ตารางรายละเอียดหน่วยงานทั้งหมด พร้อมรหัส Staff Entry Code, Admin Entry Code, UUID QR และปุ่มดู/ดาวน์โหลดรูปภาพ QR Code (Report QR, Invite QR) และลิงก์ Landing Page ได้โดยตรง
+- **Spatial Coordinates, Radius & Org Type Ingestion Pipeline:** ระบบอ่านและส่งต่อข้อมูลพิกัด (`Latitude`, `Longitude`), รัศมีรับผิดชอบ (`รัศมีรับผิดชอบ_เมตร`), และประเภทองค์กร (`ประเภท_type_fondue_group_id`) จากไฟล์ CSV/Excel เข้าสู่ Payload ของ Staging Job อัตโนมัติ พร้อมแสดง Badge ประเภทองค์กร (`[🏫 โรงเรียน (5)]` / `[🏢 หน่วยงานรัฐ (6)]`) และพิกัด/รัศมี ในหน้าตารางตรวจสอบข้อมูลก่อนและหลังการอนุมัติ
 
 ## 🚧 สิ่งที่กำลังจะทำ (Roadmap / Next Steps)
 

@@ -61,6 +61,10 @@ The primary objective of the recent sessions was to optimize the backend API to 
 - **Build & Cloud Run Deployment (Aug 13):**
   - Optimized `.gcloudignore` to exclude local binaries (`/api`, `/api_bin`), reducing Cloud Build upload context from **128.8MB to 2.2MB**.
   - Built and deployed updated Go API service `fondue-org-importer-api` (`revision 00065-kzv`) on Google Cloud Run.
+- **Coordinates, Radius & Org Type Pipeline (Aug 14):**
+  - Updated CSV/Excel parser in `src/App.jsx` to parse `Latitude`, `Longitude`, `รัศมีรับผิดชอบ_เมตร`, and `ประเภท_type_fondue_group_id`.
+  - Exported parsed spatial/type attributes inside `node.details` in `src/utils/exportUtils.js`.
+  - Added Organization Type badge (`🏫 โรงเรียน (5)` / `🏢 หน่วยงานรัฐ (6)`) and coordinates/radius display in `src/StagingViews.jsx` Table View.
 
 ## Current State
 - The frontend (`org-chart-creation`) is fully operational and pushed to `main`.

@@ -461,6 +461,10 @@ const ImportModal = ({ isOpen, onClose, onImportData, onCancelImport, onDownload
           const locSuffix = locParts.length > 0 ? ` (${locParts.join(' ')})` : '';
 
           const scope = row['ประเภทการกำหนดขอบเขต'] || row['coverage_scope'] || row['ขอบเขตพื้นที่'] || row['scope'];
+          const rawLat = row['Latitude'] || row['latitude'] || row['lat'] || row['Lat'];
+          const rawLon = row['Longitude'] || row['longitude'] || row['lon'] || row['Lon'] || row['lng'] || row['Lng'];
+          const rawRadius = row['รัศมีรับผิดชอบ_เมตร'] || row['radius_meters'] || row['radius'] || row['radius_km'];
+          const rawType = row['ประเภท_type_fondue_group_id'] || row['type_fondue_group_id'] || row['type_id'];
 
           levels.forEach((node, idx) => {
             if (node) {
@@ -477,7 +481,11 @@ const ImportModal = ({ isOpen, onClose, onImportData, onCancelImport, onDownload
                 coverage_scope: scope,
                 province: isLeaf ? province : (scope && (scope.includes('ทั่วประเทศ') || scope.includes('Nationwide')) ? '' : province),
                 amphoe: isLeaf ? amphoe : (scope && (scope.includes('ทั่วประเทศ') || scope.includes('Nationwide')) ? '' : amphoe),
-                tambon: isLeaf ? tambon : (scope && (scope.includes('ทั่วประเทศ') || scope.includes('Nationwide')) ? '' : tambon)
+                tambon: isLeaf ? tambon : (scope && (scope.includes('ทั่วประเทศ') || scope.includes('Nationwide')) ? '' : tambon),
+                latitude: isLeaf && rawLat ? parseFloat(rawLat) : null,
+                longitude: isLeaf && rawLon ? parseFloat(rawLon) : null,
+                radius_meters: isLeaf && rawRadius ? parseFloat(rawRadius) : null,
+                type_fondue_group_id: isLeaf && rawType ? parseInt(rawType, 10) : null
               });
               parent = nodeFullName;
               deepestNode = nodeFullName;
@@ -554,12 +562,21 @@ const ImportModal = ({ isOpen, onClose, onImportData, onCancelImport, onDownload
         const rawPostalCode = getVal(row, ['postal_code', 'postalcode', 'รหัสไปรษณีย์', 'postalCode']);
         const rawCoverageScope = getVal(row, ['coverage_scope', 'ขอบเขตพื้นที่', 'scope', 'ขอบเขตอำนาจ', 'ขอบเขตการรับผิดชอบ']);
 
+        const rawLat = getVal(row, ['latitude', 'Latitude', 'lat', 'Lat']);
+        const rawLon = getVal(row, ['longitude', 'Longitude', 'lon', 'Lon', 'lng', 'Lng']);
+        const rawRadius = getVal(row, ['radius_meters', 'รัศมีรับผิดชอบ_เมตร', 'radius', 'radius_km']);
+        const rawType = getVal(row, ['type_fondue_group_id', 'ประเภท_type_fondue_group_id', 'type_id']);
+
         if (!orgMap.has(orgName)) {
           orgMap.set(orgName, {
             name: orgName,
             parentName: parentName || null,
             locations: [],
             scope: 'LOCAL',
+            latitude: rawLat ? parseFloat(rawLat) : null,
+            longitude: rawLon ? parseFloat(rawLon) : null,
+            radius_meters: rawRadius ? parseFloat(rawRadius) : null,
+            type_fondue_group_id: rawType ? parseInt(rawType, 10) : null,
             errors: [],
             warnings: [],
             rawRows: []
@@ -567,6 +584,10 @@ const ImportModal = ({ isOpen, onClose, onImportData, onCancelImport, onDownload
         }
 
         const orgInfo = orgMap.get(orgName);
+        if (!orgInfo.latitude && rawLat) orgInfo.latitude = parseFloat(rawLat);
+        if (!orgInfo.longitude && rawLon) orgInfo.longitude = parseFloat(rawLon);
+        if (!orgInfo.radius_meters && rawRadius) orgInfo.radius_meters = parseFloat(rawRadius);
+        if (!orgInfo.type_fondue_group_id && rawType) orgInfo.type_fondue_group_id = parseInt(rawType, 10);
 
         // บันทึกข้อมูลแถวต้นฉบับจากไฟล์
         orgInfo.rawRows.push({
@@ -787,6 +808,12 @@ const ImportModal = ({ isOpen, onClose, onImportData, onCancelImport, onDownload
             level: calculatedLevel,
             parentId,
             logo: null,
+            attributes: {
+              latitude: org.latitude || null,
+              longitude: org.longitude || null,
+              radius_km: org.radius_meters ? org.radius_meters / 1000.0 : 0.25,
+              type_fondue_group_id: org.type_fondue_group_id || (org.name && (org.name.includes('โรงเรียน') || org.name.includes('รร.')) ? 5 : 6)
+            },
             areas: {
               scope: org.scope || 'LOCAL',
               locations: org.locations || []
